@@ -1,0 +1,45 @@
+# Project theme. Streamlit reads this automatically when you run the app from
+# this folder - there is no code to change and nothing to import.
+#
+# Every key below needs Streamlit 1.46 or newer (June 2025). If your Streamlit
+# is older and it complains about a key, delete that one line.
+#
+# Check yours with:  streamlit --version
+
+[theme]
+base = "light"
+
+# Deep teal reads as calm and slightly academic, and it does not fight the
+# Blues heatmap or the Viridis network colours.
+primaryColor = "#1B5E5A"
+linkColor = "#1B5E5A"
+
+# Warm off-white instead of pure white. Long reading sessions are easier on
+# paper tones, and charts with transparent backgrounds blend into it.
+backgroundColor = "#FBFAF7"
+secondaryBackgroundColor = "#F1EDE5"
+textColor = "#232A31"
+borderColor = "#E4DED2"
+codeBackgroundColor = "#F1EDE5"
+
+# Serif headings over a sans body is the oldest trick in editorial design and
+# still the cheapest way to stop an app looking like a default template.
+# Georgia ships on Windows and macOS, so nothing is downloaded at runtime.
+headingFont = "Georgia, 'Iowan Old Style', 'Times New Roman', serif"
+font = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+codeFont = "'Cascadia Code', Consolas, 'SF Mono', monospace"
+baseFontSize = 15
+
+baseRadius = "0.6rem"
+showWidgetBorder = true
+
+[theme.sidebar]
+backgroundColor = "#F5F1E9"
+borderColor = "#E4DED2"
+
+[server]
+# Stops Streamlit reloading the page every time you save a file mid-edit.
+runOnSave = false
+
+[browser]
+gatherUsageStats = false

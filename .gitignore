@@ -1,0 +1,33 @@
+# Virtual environment - never commit this, it is machine-specific and huge
+.venv/
+venv/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Data and databases. Keep these out of git: they are large and regenerable.
+# Anyone can rebuild them with:
+#   python make_sample_data.py && python build_db.py && python mine_windows.py
+data/
+*.duckdb
+*.sqlite
+*.sqlite-journal
+*.jsonl
+*.csv
+
+# Anything that could hold your OpenAlex API key
+.env
+*.key
+secrets.toml
+.streamlit/secrets.toml
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# The private build/strategy guide - notes to self, not part of the project
+BUILD_GUIDE.md
+scratch.py

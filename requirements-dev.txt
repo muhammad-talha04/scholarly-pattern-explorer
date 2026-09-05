@@ -1,0 +1,9 @@
+# Extra packages used only when checking the work:
+#     pip install -r requirements-dev.txt
+#
+# mlxtend is a second, independent implementation of FP-Growth. test_fpgrowth.py
+# compares our miner against it when it is installed and skips that comparison
+# cleanly when it is not, so this file is optional. It is kept out of
+# requirements.txt because mlxtend pulls in scikit-learn, which the app never
+# imports and which makes a cloud deployment slower for no benefit.
+mlxtend>=0.23
