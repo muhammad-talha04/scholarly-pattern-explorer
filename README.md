@@ -24,7 +24,11 @@ falling to the floor is one the field left behind.
 3. Treats each paper as a *transaction* whose *items* are its topics, then runs
    FP-Growth over overlapping three-year windows and writes every frequent
    itemset and association rule back into the same database.
-4. Serves four linked views over those stored results.
+4. Serves four linked views over those stored results, either for the whole
+   corpus or filtered to a single country from a searchable sidebar dropdown.
+5. Refreshes itself: a scheduled GitHub Actions workflow re-fetches new papers
+   daily and re-mines weekly, so the corpus and patterns stay current without
+   anyone running a script by hand.
 
 Storing the mined patterns alongside the raw data is what makes the front end
 interactive, and what makes pattern *lifecycles* possible at all: the support of
@@ -68,6 +72,9 @@ Two corpora were mined. The headline run is **44,047 Canadian computer-science
 papers, 2000–2026** (`country_code:ca`, cited 10+), 2,064 topics, 82,266 authors,
 mined at `--min-support 0.005` into 5,734 pattern rows across 25 windows. A
 larger run covers **188,462 papers in the Artificial Intelligence subfield**.
+Both are also mined per country — pick any country with enough papers from the
+sidebar to re-run every view against just its authors — and both are kept
+current automatically (see [Automation](#automation) below).
 
 Change in support between the first and last window in which each pair appears:
 
@@ -154,6 +161,22 @@ A slice that is too small is worse than no slice: at roughly 175 papers per
 window, a "frequent" pattern needs only three papers to qualify, and you are
 mining noise.
 
+## Automation
+
+The corpus does not go stale, and it does not need anyone's laptop turned on.
+Two GitHub Actions workflows run on GitHub's own servers:
+
+| Workflow | Schedule | Does |
+|---|---|---|
+| `daily-fetch.yml` | 03:00 UTC, every day | Pulls papers published in the last 45 days for both corpora. Only rebuilds and re-mines if something new actually arrived. |
+| `weekly-mine.yml` | 04:00 UTC, every Sunday | A 3-year catch-up fetch, a full rebuild and re-mine of both databases (including per-country patterns and co-authorship link prediction), and republishes the small public snapshot under `docs/`. |
+
+Both databases and their raw JSONL live on this repo's `data-store` release
+rather than in git — GitHub blocks any committed file over 100 MB — and each
+workflow downloads them at the start of a run and uploads the updated copies at
+the end. Either one can also be triggered by hand from the repo's **Actions**
+tab with "Run workflow", no local setup required.
+
 ## Files
 
 | File | Role |
@@ -168,7 +191,12 @@ mining noise.
 | `analytics.py` | every SQL query in the project, with a command-line self-test |
 | `app.py` | the Streamlit front end — contains no SQL at all |
 | `.streamlit/config.toml` | the theme; the app injects no CSS |
-| `fetch_openalex.py` | resumable OpenAlex downloader |
+| `fetch_openalex.py` | resumable OpenAlex downloader — one-shot bulk download to start a new corpus |
+| `refresh.py` | incremental fetch used by the automation — appends only new papers since the last run |
+| `mine_countries.py` | per-country patterns and rules, for the sidebar's country filter |
+| `countries.py` | country name/code lookups shared by the app and the miner |
+| `linkgraph.py` / `linkpred.py` | co-authorship graph, temporal train/test split, and the link-prediction models |
+| `export_snapshot.py` | writes the small public snapshot (`docs/`) that `weekly-mine.yml` commits |
 | `check_setup.py` | environment check |
 
 The split between `analytics.py` and `app.py` is intentional. UI code is hard to
