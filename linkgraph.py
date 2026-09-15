@@ -57,18 +57,22 @@ class Schema:
 def resolve_schema(con):
     tabs = _tables(con)
 
-    def need_table(*needles, forbid=()):
+    def need_table(*needles, forbid=(), exact=None):
+        # An exact, known table name always wins over fuzzy matching.
+        if exact and exact in tabs:
+            return exact
         t = _pick(tabs, *needles, forbid=forbid)
         if t is None:
             raise SystemExit(f"Could not find a table matching {needles} "
                              f"among tables: {tabs}")
         return t
 
-    works = need_table("work", forbid=("author", "topic", "country"))
-    authors = need_table("author", forbid=("work",))
-    topics = need_table("topic", forbid=("work",))
-    wa = need_table("work", "author")
-    wt = need_table("work", "topic")
+    # "countr" (not "country") so that work_countries is also excluded.
+    works = need_table("work", forbid=("author", "topic", "countr"), exact="works")
+    authors = need_table("author", forbid=("work",), exact="authors")
+    topics = need_table("topic", forbid=("work", "countr"), exact="topics")
+    wa = need_table("work", "author", exact="work_authors")
+    wt = need_table("work", "topic", exact="work_topics")
 
     def need_col(table, *needles, forbid=()):
         c = _pick(_cols(con, table), *needles, forbid=forbid)
