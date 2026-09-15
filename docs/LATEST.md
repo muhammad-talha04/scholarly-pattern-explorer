@@ -1,6 +1,6 @@
 # Weekly snapshot
 
-_Generated 2026-09-15 18:35. Corpus: 12,453 papers, 51,529 authors,
+_Generated 2026-09-15 18:39. Corpus: 12,453 papers, 51,529 authors,
 1,112 topics, publication years 2023-2026._
 
 ![papers per year](charts/papers_per_year.png)
@@ -14,10 +14,10 @@ _Generated 2026-09-15 18:35. Corpus: 12,453 papers, 51,529 authors,
 | Energy Load and Power Forecasting | Solar Radiation and Photovoltaics | 2023 | 0.0225 | 2024 | 0.0244 | 0.0019 |
 | AI in cancer detection | Brain Tumor Detection and Classification | 2023 | 0.0122 | 2024 | 0.0138 | 0.0017 |
 | Artificial Intelligence in Healthcare and Education | Explainable Artificial Intelligence (XAI) | 2023 | 0.014 | 2024 | 0.0157 | 0.0017 |
-| AI in Service Interactions | Technology Adoption and User Behaviour | 2023 | 0.0112 | 2024 | 0.0129 | 0.0016 |
 | AI in Service Interactions | Online Learning and Analytics | 2023 | 0.0092 | 2024 | 0.0107 | 0.0016 |
+| AI in Service Interactions | Technology Adoption and User Behaviour | 2023 | 0.0112 | 2024 | 0.0129 | 0.0016 |
+| Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics | 2023 | 0.0162 | 2024 | 0.0175 | 0.0013 |
 | AI in Service Interactions | Social Robot Interaction and HRI | 2023 | 0.0149 | 2024 | 0.0162 | 0.0013 |
-| Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare | Topic Modeling | 2023 | 0.005 | 2024 | 0.0063 | 0.0013 |
 
 ![lifecycles](charts/pattern_lifecycles.png)
 
@@ -52,16 +52,16 @@ _Generated 2026-09-15 18:35. Corpus: 12,453 papers, 51,529 authors,
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |
 |---|---|---|
-| Andreas Bengtsson | 27 | 115 |
-| Alejandro Grajales Dau | 24 | 98 |
-| Brian Burkett | 24 | 98 |
-| Alexandre Bourassa | 21 | 89 |
-| Ilya Drozdov | 20 | 80 |
-| Joseph C. Bardin | 20 | 80 |
-| M. Ansmann | 20 | 80 |
-| Matthew P. Harrigan | 20 | 80 |
-| Hung-Shen Chang | 19 | 78 |
-| Abraham Asfaw | 19 | 76 |
+| Andreas Bengtsson | 29 | 123 |
+| Brian Burkett | 26 | 106 |
+| Hung-Shen Chang | 26 | 106 |
+| Alexandre Bourassa | 24 | 101 |
+| Alejandro Grajales Dau | 23 | 94 |
+| Joseph C. Bardin | 21 | 84 |
+| Raja Gosula | 21 | 84 |
+| Élie Genois | 21 | 84 |
+| Agustín Di Paolo | 20 | 80 |
+| Michael Broughton | 20 | 80 |
 
 ![network](charts/coauthor_network.png)
 
