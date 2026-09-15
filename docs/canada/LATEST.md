@@ -1,6 +1,6 @@
 # Weekly snapshot
 
-_Generated 2026-09-15 18:36. Corpus: 2,717 papers, 12,844 authors,
+_Generated 2026-09-15 18:41. Corpus: 2,717 papers, 12,844 authors,
 854 topics, publication years 2023-2026._
 
 ![papers per year](charts/papers_per_year.png)
@@ -36,16 +36,16 @@ _Generated 2026-09-15 18:36. Corpus: 2,717 papers, 12,844 authors,
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |
 |---|---|---|
-| Xuemin Shen | 22 | 115 |
-| Dusit Niyato | 17 | 104 |
-| Habib Hamam | 16 | 87 |
-| Witold Pedrycz | 13 | 44 |
-| Jiawen Kang | 12 | 71 |
-| Roberto Morandotti | 11 | 37 |
-| Stefania Sciara | 10 | 30 |
+| Xuemin Shen | 21 | 113 |
+| Dusit Niyato | 18 | 106 |
+| Habib Hamam | 17 | 87 |
+| Jiawen Kang | 12 | 73 |
+| Roberto Morandotti | 12 | 39 |
+| Rongxing Lu | 10 | 40 |
 | Hongyang Du | 9 | 60 |
-| Rongxing Lu | 9 | 38 |
 | F. Richard Yu | 9 | 37 |
+| Witold Pedrycz | 9 | 36 |
+| David Moss | 9 | 28 |
 
 ![network](charts/coauthor_network.png)
 
