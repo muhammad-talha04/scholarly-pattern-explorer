@@ -79,7 +79,10 @@ jobs:
           python build_db.py --input ${{ matrix.jsonl }} --db ${{ matrix.db }}
           python mine_windows.py --db ${{ matrix.db }} ${{ matrix.mine_args }}
           python mine_countries.py --db ${{ matrix.db }}
-          python linkpred.py --db ${{ matrix.db }} --graph-split 2021
+
+      - name: Link prediction (optional - a failure here does not block publishing)
+        continue-on-error: true
+        run: python linkpred.py --db ${{ matrix.db }} --graph-split 2021
 
       - name: Export the small public snapshot
         run: |
