@@ -64,7 +64,7 @@ def resolve_schema(con):
                              f"among tables: {tabs}")
         return t
 
-    works = need_table("work", forbid=("author", "topic"))
+    works = need_table("work", forbid=("author", "topic", "country"))
     authors = need_table("author", forbid=("work",))
     topics = need_table("topic", forbid=("work",))
     wa = need_table("work", "author")
