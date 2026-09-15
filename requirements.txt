@@ -1,13 +1,22 @@
-# Install everything with:   pip install -r requirements.txt
-#
-# All of these are free and open source. Nothing here costs money.
-#
-# Only what the pipeline and the app actually import. Test-only packages live in
-# requirements-dev.txt, so a deployment does not build scikit-learn it never runs.
-pandas>=2.0
-numpy>=1.24            # imported directly by the fallback graph layout
-requests>=2.31
-duckdb>=1.0            # the database engine (falls back to sqlite3 if missing)
-streamlit>=1.49        # the theme keys in .streamlit/config.toml need 1.46+
-plotly>=5.20           # interactive charts
-networkx>=3.2          # co-authorship graph layout (analytics.py falls back without it)
+# --- where to get the small CPU-only build of PyTorch ---
+# (an index option must sit on its OWN line; it cannot follow a package name)
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# --- core: download, database, app ---
+requests
+numpy
+pandas
+duckdb
+streamlit>=1.49
+plotly
+
+# --- weekly snapshot charts ---
+matplotlib
+
+# --- testing FP-Growth against a second implementation ---
+mlxtend>=0.23
+
+# --- machine learning & graph analysis (link prediction) ---
+torch
+gensim
+scikit-learn

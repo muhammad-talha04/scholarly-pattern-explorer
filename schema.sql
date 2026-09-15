@@ -10,6 +10,9 @@
 -- Runs unchanged on both DuckDB and SQLite.
 -- ============================================================
 
+DROP TABLE IF EXISTS work_countries;
+DROP TABLE IF EXISTS country_patterns;
+DROP TABLE IF EXISTS country_rules;
 DROP TABLE IF EXISTS work_topics;
 DROP TABLE IF EXISTS work_authors;
 DROP TABLE IF EXISTS patterns;
@@ -59,6 +62,15 @@ CREATE TABLE work_authors (
     author_id     VARCHAR,
     author_pos    INTEGER,
     PRIMARY KEY (work_id, author_id)
+);
+
+-- Bridge table: which countries took part in which paper -------------
+-- A country "took part" if any author had an institution there.
+-- This is what the country dropdown in the app filters on.
+CREATE TABLE work_countries (
+    work_id  VARCHAR,
+    country  VARCHAR,   -- ISO 3166 alpha-2, e.g. 'PK', 'CA'
+    PRIMARY KEY (work_id, country)
 );
 
 -- Mining RESULTS are stored in the database too, not just printed.

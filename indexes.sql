@@ -16,3 +16,5 @@ CREATE INDEX IF NOT EXISTS idx_wt_work         ON work_topics (work_id);
 CREATE INDEX IF NOT EXISTS idx_wa_author       ON work_authors (author_id);
 CREATE INDEX IF NOT EXISTS idx_patterns_window ON patterns (window_start);
 CREATE INDEX IF NOT EXISTS idx_patterns_k      ON patterns (k);
+CREATE INDEX IF NOT EXISTS idx_wc_country     ON work_countries (country);
+CREATE INDEX IF NOT EXISTS idx_wa_work         ON work_authors (work_id);

@@ -29,6 +29,7 @@ def short_id(url: str | None) -> str | None:
 def load(input_path: str, db_path: str):
     works, topics, authors = {}, {}, {}
     work_topics, work_authors = {}, {}
+    work_countries = {}      # (work_id, country) -> row; a paper can have many
     skipped = 0
     t0 = time.perf_counter()
 
@@ -87,7 +88,17 @@ def load(input_path: str, db_path: str):
                 )
                 work_authors[(wid, aid)] = (wid, aid, pos)
 
-    return works, topics, authors, work_topics, work_authors, skipped
+            # Every country of every author's institutions on THIS paper.
+            # (authors.country keeps only one institution per author, so it
+            # cannot answer "which countries worked on this paper".)
+            for a in auths:
+                codes = set(a.get("countries") or [])
+                codes.update(i.get("country_code") for i in (a.get("institutions") or []))
+                for cc in codes:
+                    if cc:
+                        work_countries[(wid, cc.upper())] = (wid, cc.upper())
+
+    return works, topics, authors, work_topics, work_authors, work_countries, skipped
 
 def main():
     ap = argparse.ArgumentParser()
@@ -97,13 +108,14 @@ def main():
 
     Path("data").mkdir(exist_ok=True)
     print(f"reading {args.input} ...")
-    works, topics, authors, work_topics, work_authors, skipped = load(args.input, args.db)
+    works, topics, authors, work_topics, work_authors, work_countries, skipped = load(args.input, args.db)
 
     print(f"  works        {len(works):>9,}")
     print(f"  topics       {len(topics):>9,}")
     print(f"  authors      {len(authors):>9,}")
     print(f"  work_topics  {len(work_topics):>9,}")
     print(f"  work_authors {len(work_authors):>9,}")
+    print(f"  work_countries {len(work_countries):>7,}")
     if skipped:
         print(f"  skipped bad or year-less lines: {skipped:,}")
 
@@ -118,6 +130,7 @@ def main():
         ("authors",      4, authors),
         ("work_topics",  3, work_topics),
         ("work_authors", 3, work_authors),
+        ("work_countries", 2, work_countries),
     ]:
         marks = ",".join("?" * cols)
         t0 = time.perf_counter()
@@ -157,7 +170,7 @@ def main():
     print(orphans.to_string(index=False))
 
     db.close()
-    print("\ndone. next:  python mine_windows.py")
+    print("\ndone. next:  python mine_windows.py  then  python mine_countries.py")
 
 
 if __name__ == "__main__":

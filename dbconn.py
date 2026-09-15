@@ -35,12 +35,14 @@ _SIMPLE_INSERT = re.compile(
 class DB:
     """One object that talks to either DuckDB or SQLite with the same methods."""
 
-    def __init__(self, path: str, prefer: str = "duckdb"):
+    def __init__(self, path: str, prefer: str = "duckdb", read_only: bool = False):
         self.kind = "duckdb" if (HAVE_DUCKDB and prefer == "duckdb") else "sqlite"
         path = str(path)
         if self.kind == "duckdb":
             self.path = path
-            self.con = duckdb.connect(self.path)
+            # read_only=True is what the web app uses: it can never damage the
+            # database, and several read-only viewers can share one file.
+            self.con = duckdb.connect(self.path, read_only=read_only)
         else:
             # keep a separate file name so the two engines never fight
             self.path = path[:-7] + ".sqlite" if path.endswith(".duckdb") else path
@@ -111,8 +113,19 @@ class DB:
     def df(self, sql: str, params=None) -> pd.DataFrame:
         """Run a SELECT and get a pandas DataFrame back."""
         if self.kind == "duckdb":
-            cur = self.con.execute(sql, params) if params else self.con.execute(sql)
-            return cur.df()
+            # A DuckDB connection must not be used by two threads at once, and
+            # Streamlit serves every browser tab (and every rerun) on its own
+            # thread. Sharing one connection is what made view switches hang.
+            # A cursor is a cheap, independent handle on the same database.
+            cur = self.con.cursor()
+            try:
+                if params:
+                    cur.execute(sql, params)
+                else:
+                    cur.execute(sql)
+                return cur.df()
+            finally:
+                cur.close()
         return pd.read_sql_query(sql, self.con, params=params or [])
 
     def script(self, sql_text: str):

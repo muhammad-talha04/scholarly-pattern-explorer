@@ -1,0 +1,30 @@
+name: tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: FP-Growth matches brute force
+        run: python test_fpgrowth.py
+
+      - name: Link-prediction self-check
+        run: python test_linkpred.py
+
+      - name: Whole pipeline on synthetic data (no API key needed)
+        run: |
+          python make_sample_data.py
+          python build_db.py --input data/works_sample.jsonl --db data/ci.duckdb
+          python mine_windows.py --db data/ci.duckdb
+          python export_snapshot.py --db data/ci.duckdb --out ci_docs

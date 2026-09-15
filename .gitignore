@@ -9,7 +9,7 @@ __pycache__/
 # Data and databases. Keep these out of git: they are large and regenerable.
 # Anyone can rebuild them with:
 #   python make_sample_data.py && python build_db.py && python mine_windows.py
-data/
+/data/
 *.duckdb
 *.sqlite
 *.sqlite-journal
@@ -31,3 +31,23 @@ Thumbs.db
 # The private build/strategy guide - notes to self, not part of the project
 BUILD_GUIDE.md
 scratch.py
+
+# --- added Sept 2026 ---
+# Logs from the scheduled jobs (they can contain your email)
+logs/
+*.tmp
+ci_docs/
+data/*.backup*
+
+# Leftover one-off debugging scripts
+debug_api.py`
+
+# EXCEPTION: the weekly snapshot CSVs in docs/ ARE meant for GitHub.
+# ("/data/" above has a leading slash so it only means the ROOT data folder,
+#  not docs/data.)
+# (The rule "*.csv" above would otherwise hide them silently.)
+!docs/data/*.csv
+
+# personal folders, never publish
+_old/
+_fixes_2026_09/
