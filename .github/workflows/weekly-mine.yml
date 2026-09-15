@@ -1,0 +1,109 @@
+name: Weekly re-mine and publish
+
+# Runs on GitHub's own servers, once a week. For each dataset: catch-up fetch
+# (last 3 years, in case a paper only just crossed the citation threshold),
+# rebuild + re-mine (whole corpus AND per country), retrain link prediction,
+# export the small public snapshot into docs/, commit that to the repo, and
+# save the database back to the release. The two datasets run one at a time
+# (max-parallel: 1) so their git commits never collide.
+
+on:
+  schedule:
+    - cron: "0 4 * * 0"   # 04:00 UTC every Sunday
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  mine:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        include:
+          - name: openalex
+            db: data/openalex.duckdb
+            jsonl: data/works_real.jsonl
+            state: data/fetch_state.json
+            corpus_args: --subfield-id 1702 --min-cited 20
+            mine_args: --min-support 0.005
+            out_dir: docs
+            readme: README.md
+          - name: canada
+            db: data/canada.duckdb
+            jsonl: data/works_canada.jsonl
+            state: data/fetch_state_canada.json
+            corpus_args: --min-cited 10 --extra-filter authorships.institutions.country_code:ca
+            mine_args: --min-support 0.02
+            out_dir: docs/canada
+            readme: docs/canada/_no_readme_marker_here.md
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore this dataset's database from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data
+          gh release download data-store \
+            -p "$(basename ${{ matrix.jsonl }})" \
+            -p "$(basename ${{ matrix.db }})" \
+            -p "$(basename ${{ matrix.state }})" \
+            -D data --clobber \
+          || echo "no matching release assets yet (first run) - continuing with nothing on disk"
+
+      - name: Catch-up fetch (last 3 years)
+        env:
+          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+          OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
+        run: |
+          set +e
+          python refresh.py --sync-mode published --lookback-days 1095 \
+            --output ${{ matrix.jsonl }} --state ${{ matrix.state }} \
+            ${{ matrix.corpus_args }}
+          echo "refresh.py exit $?: continuing regardless (1=failure just means we mine what's already on disk)"
+
+      - name: Rebuild + mine + link prediction
+        run: |
+          python build_db.py --input ${{ matrix.jsonl }} --db ${{ matrix.db }}
+          python mine_windows.py --db ${{ matrix.db }} ${{ matrix.mine_args }}
+          python mine_countries.py --db ${{ matrix.db }}
+          python linkpred.py --db ${{ matrix.db }} --graph-split 2021
+
+      - name: Export the small public snapshot
+        run: |
+          mkdir -p ${{ matrix.out_dir }}
+          python export_snapshot.py --db ${{ matrix.db }} --out ${{ matrix.out_dir }} --readme ${{ matrix.readme }}
+
+      - name: Commit and push the snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash
+          git add ${{ matrix.out_dir }} README.md
+          if git diff --cached --quiet; then
+            echo "nothing changed for ${{ matrix.name }}; skipping commit"
+          else
+            git commit -m "Weekly data snapshot: ${{ matrix.name }} ($(date -u +%Y-%m-%d))"
+            git push
+          fi
+
+      - name: Save this dataset's database back to the release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload data-store \
+            ${{ matrix.jsonl }} ${{ matrix.db }} ${{ matrix.state }} \
+            --clobber

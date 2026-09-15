@@ -1,0 +1,90 @@
+name: Daily data fetch
+
+# Runs on GitHub's own servers - your PC does not need to be on.
+# For each dataset: pull yesterday's database + raw data from the "data-store"
+# release, fetch new papers, re-mine ONLY if something new arrived, then save
+# everything back to that release. Nothing here touches docs/ or README.md -
+# that only happens in the weekly workflow, so the public site doesn't churn
+# every single day.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 03:00 UTC every day
+  workflow_dispatch: {}    # lets you click "Run workflow" manually on GitHub
+
+permissions:
+  contents: write   # needed to upload files onto the release
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: openalex
+            db: data/openalex.duckdb
+            jsonl: data/works_real.jsonl
+            state: data/fetch_state.json
+            corpus_args: --subfield-id 1702 --min-cited 20
+            mine_args: --min-support 0.005
+          - name: canada
+            db: data/canada.duckdb
+            jsonl: data/works_canada.jsonl
+            state: data/fetch_state_canada.json
+            corpus_args: --min-cited 10 --extra-filter authorships.institutions.country_code:ca
+            mine_args: --min-support 0.02
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore this dataset's database from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data
+          gh release download data-store \
+            -p "$(basename ${{ matrix.jsonl }})" \
+            -p "$(basename ${{ matrix.db }})" \
+            -p "$(basename ${{ matrix.state }})" \
+            -D data --clobber \
+          || echo "no matching release assets yet (first run) - continuing with nothing on disk"
+
+      - name: Fetch new papers (last 45 days, duplicates skipped automatically)
+        id: refresh
+        env:
+          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+          OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
+        run: |
+          set +e
+          python refresh.py --sync-mode published --lookback-days 45 \
+            --output ${{ matrix.jsonl }} --state ${{ matrix.state }} \
+            ${{ matrix.corpus_args }}
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "refresh.py exited with $code (0=new data, 2=nothing new, 1=failure)"
+          if [ "$code" -eq 1 ]; then exit 1; fi
+
+      - name: Rebuild database + re-mine (only when new data arrived)
+        if: steps.refresh.outputs.code == '0'
+        run: |
+          python build_db.py --input ${{ matrix.jsonl }} --db ${{ matrix.db }}
+          python mine_windows.py --db ${{ matrix.db }} ${{ matrix.mine_args }}
+          python mine_countries.py --db ${{ matrix.db }}
+
+      - name: Save this dataset's database back to the release
+        if: always() && steps.refresh.outcome != 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload data-store \
+            ${{ matrix.jsonl }} ${{ matrix.db }} ${{ matrix.state }} \
+            --clobber
