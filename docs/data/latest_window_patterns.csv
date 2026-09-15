@@ -1,26 +1,26 @@
 itemset,k,support_count,n_tx,support
-Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography,2,620,9432,0.06573367260390162
-Natural Language Processing Techniques | Topic Modeling,2,424,9432,0.04495335029686175
-AI in cancer detection | Radiomics and Machine Learning in Medical Imaging,2,388,9432,0.041136556403731976
-Cryptography and Data Security | Privacy-Preserving Technologies in Data,2,288,9432,0.030534351145038167
-Quantum Information and Cryptography | Quantum Mechanics and Applications,2,237,9432,0.025127226463104325
-Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,2,235,9432,0.02491518235793045
-Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection,2,230,9432,0.02438507209499576
-Energy Load and Power Forecasting | Solar Radiation and Photovoltaics,2,229,9432,0.02427905004240882
-Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2,212,9432,0.022476675148430873
-Quantum Computing Algorithms and Architecture | Quantum Mechanics and Applications,2,189,9432,0.020038167938931296
-Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare,2,188,9432,0.01993214588634436
-Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum Mechanics and Applications,3,180,9432,0.019083969465648856
-Advanced Multi-Objective Optimization Algorithms | Metaheuristic Optimization Algorithms Research,2,178,9432,0.018871925360474977
-AI in Service Interactions | Digital Marketing and Social Media,2,172,9432,0.01823579304495335
-Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,3,164,9432,0.017387616624257845
-Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques,2,164,9432,0.017387616624257845
-Advanced Text Analysis Techniques | Sentiment Analysis and Opinion Mining,2,163,9432,0.017281594571670906
-Machine Learning in Healthcare | Topic Modeling,2,159,9432,0.016857506361323157
-Quantum Computing Algorithms and Architecture | Quantum and electron transport phenomena,2,154,9432,0.016327396098388465
-AI in Service Interactions | Social Robot Interaction and HRI,2,152,9432,0.016115351993214587
-Quantum Information and Cryptography | Quantum and electron transport phenomena,2,151,9432,0.01600932994062765
-Artificial Intelligence in Healthcare and Education | Explainable Artificial Intelligence (XAI),2,148,9432,0.015691263782866838
-Sentiment Analysis and Opinion Mining | Topic Modeling,2,140,9432,0.014843087362171332
-Artificial Intelligence in Healthcare and Education | Topic Modeling,2,136,9432,0.01441899915182358
-AI in Service Interactions | Artificial Intelligence in Healthcare and Education,2,134,9432,0.014206955046649703
+Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography,2,613,9398,0.06522664396680145
+Natural Language Processing Techniques | Topic Modeling,2,422,9398,0.04490317088742286
+AI in cancer detection | Radiomics and Machine Learning in Medical Imaging,2,385,9398,0.04096616301340711
+Cryptography and Data Security | Privacy-Preserving Technologies in Data,2,289,9398,0.03075122366460949
+Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,2,235,9398,0.025005320280910834
+Quantum Information and Cryptography | Quantum Mechanics and Applications,2,234,9398,0.02489891466269419
+Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection,2,230,9398,0.024473292189827623
+Energy Load and Power Forecasting | Solar Radiation and Photovoltaics,2,229,9398,0.02436688657161098
+Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2,211,9398,0.02245158544371143
+Quantum Computing Algorithms and Architecture | Quantum Mechanics and Applications,2,186,9398,0.01979144498829538
+Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare,2,186,9398,0.01979144498829538
+Advanced Multi-Objective Optimization Algorithms | Metaheuristic Optimization Algorithms Research,2,178,9398,0.018940200042562246
+Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum Mechanics and Applications,3,177,9398,0.018833794424345605
+AI in Service Interactions | Digital Marketing and Social Media,2,172,9398,0.018301766333262397
+Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,3,164,9398,0.017450521387529262
+Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques,2,164,9398,0.017450521387529262
+Advanced Text Analysis Techniques | Sentiment Analysis and Opinion Mining,2,162,9398,0.01723771015109598
+Machine Learning in Healthcare | Topic Modeling,2,158,9398,0.01681208767822941
+Quantum Computing Algorithms and Architecture | Quantum and electron transport phenomena,2,154,9398,0.016386465205362844
+AI in Service Interactions | Social Robot Interaction and HRI,2,152,9398,0.016173653968929558
+Quantum Information and Cryptography | Quantum and electron transport phenomena,2,151,9398,0.016067248350712916
+Artificial Intelligence in Healthcare and Education | Explainable Artificial Intelligence (XAI),2,148,9398,0.015748031496062992
+Sentiment Analysis and Opinion Mining | Topic Modeling,2,139,9398,0.014790380932113215
+Artificial Intelligence in Healthcare and Education | Topic Modeling,2,135,9398,0.014364758459246648
+AI in Service Interactions | Artificial Intelligence in Healthcare and Education,2,134,9398,0.014258352841030006

@@ -1,26 +1,26 @@
 itemset,first_window,first_support,last_window,last_support,change
-Quantum Information and Cryptography | Quantum Mechanics and Applications,2000,0.0853,2024,0.0251,-0.0602
-Quantum Computing Algorithms and Architecture | Quantum Mechanics and Applications,2000,0.0575,2024,0.02,-0.0375
-Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum Mechanics and Applications,2000,0.0566,2024,0.0191,-0.0375
-"Logic, Reasoning, and Knowledge | Logic, programming, and type systems",2000,0.0344,2016,0.0062,-0.0282
-Fuzzy Logic and Control Systems | Neural Networks and Applications,2000,0.0336,2020,0.0058,-0.0278
-Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography,2000,0.085,2024,0.0657,-0.0193
-"Logic, Reasoning, and Knowledge | Semantic Web and Ontologies",2000,0.0255,2015,0.0068,-0.0187
-"Formal Methods in Verification | Logic, programming, and type systems",2000,0.0247,2015,0.0061,-0.0186
-"Logic, Reasoning, and Knowledge | Multi-Agent Systems and Negotiation",2000,0.0237,2016,0.006,-0.0177
-Natural Language Processing Techniques | Speech and dialogue systems,2000,0.0204,2018,0.005,-0.0154
-Geochemistry and Geologic Mapping | Geological and Geochemical Analysis,2000,0.0208,2020,0.0065,-0.0143
-Coding theory and cryptography | graph theory and CDMA systems,2000,0.0169,2018,0.0056,-0.0113
-Quantum Information and Cryptography | Quantum optics and atomic interactions,2000,0.0204,2024,0.0094,-0.0109
-"AI-based Problem Solving and Planning | Logic, Reasoning, and Knowledge",2000,0.0163,2009,0.0054,-0.0109
-"Formal Methods in Verification | Logic, Reasoning, and Knowledge",2000,0.0162,2011,0.0055,-0.0107
-Advanced Database Systems and Queries | Semantic Web and Ontologies,2000,0.0154,2015,0.0052,-0.0102
-"Advanced Algebra and Logic | Logic, Reasoning, and Knowledge",2000,0.0146,2014,0.0056,-0.0089
-"Formal Methods in Verification | Logic, Reasoning, and Knowledge | Logic, programming, and type systems",2000,0.0141,2010,0.0055,-0.0087
-Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2000,0.0311,2024,0.0225,-0.0087
-Semantic Web and Ontologies | Service-Oriented Architecture and Web Services,2000,0.0141,2016,0.0054,-0.0087
-Face and Expression Recognition | Neural Networks and Applications,2000,0.0151,2017,0.0064,-0.0087
-Natural Language Processing Techniques | Semantic Web and Ontologies,2000,0.014,2015,0.0062,-0.0078
-Bayesian Methods and Mixture Models | Statistical Methods and Bayesian Inference,2000,0.0124,2017,0.0051,-0.0073
-Speech and dialogue systems | Topic Modeling,2000,0.0123,2018,0.0051,-0.0071
-Multi-Agent Systems and Negotiation | Semantic Web and Ontologies,2000,0.0128,2011,0.0057,-0.0071
+Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography,2023,0.0682,2024,0.0652,-0.003
+Mobile Crowdsensing and Crowdsourcing | Privacy-Preserving Technologies in Data,2023,0.0081,2024,0.0057,-0.0023
+Quantum Computing Algorithms and Architecture | Quantum and electron transport phenomena,2023,0.0186,2024,0.0164,-0.0022
+Advanced Multi-Objective Optimization Algorithms | Metaheuristic Optimization Algorithms Research,2023,0.0209,2024,0.0189,-0.0019
+Domain Adaptation and Few-Shot Learning | Multimodal Machine Learning Applications,2023,0.0095,2024,0.0077,-0.0018
+Quantum Information and Cryptography | Quantum and electron transport phenomena,2023,0.0179,2024,0.0161,-0.0018
+Internet Traffic Analysis and Secure E-voting | Privacy-Preserving Technologies in Data,2023,0.0081,2024,0.0064,-0.0017
+Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum and electron transport phenomena,2023,0.0158,2024,0.0142,-0.0017
+Neural Networks and Reservoir Computing | Quantum Computing Algorithms and Architecture,2023,0.0071,2024,0.0054,-0.0016
+Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2023,0.0129,2024,0.0114,-0.0015
+Adversarial Robustness in Machine Learning | Anomaly Detection Techniques and Applications,2023,0.0102,2024,0.0087,-0.0015
+Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications,2023,0.0132,2024,0.0117,-0.0015
+Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2023,0.0239,2024,0.0225,-0.0015
+AI in cancer detection | Digital Imaging for Blood Diseases,2023,0.0106,2024,0.0093,-0.0014
+Privacy-Preserving Technologies in Data | Stochastic Gradient Optimization Techniques,2023,0.0139,2024,0.0127,-0.0012
+Text and Document Classification Technologies | Topic Modeling,2023,0.0068,2024,0.0056,-0.0012
+Sentiment Analysis and Opinion Mining | Text and Document Classification Technologies,2023,0.0075,2024,0.0064,-0.0011
+Neural Networks and Reservoir Computing | Quantum Information and Cryptography,2023,0.0089,2024,0.008,-0.001
+Geochemistry and Geologic Mapping | Remote-Sensing Image Classification,2023,0.0068,2024,0.006,-0.0009
+Quantum Computing Algorithms and Architecture | Quantum many-body systems,2023,0.0072,2024,0.0064,-0.0009
+AI in cancer detection | COVID-19 diagnosis using AI,2023,0.0095,2024,0.0089,-0.0006
+Advanced Memory and Neural Computing | Neural Networks and Reservoir Computing,2023,0.01,2024,0.0095,-0.0006
+Adversarial Robustness in Machine Learning | Privacy-Preserving Technologies in Data,2023,0.0107,2024,0.0101,-0.0006
+Anomaly Detection Techniques and Applications | Imbalanced Data Classification Techniques,2023,0.0066,2024,0.0061,-0.0006
+Cryptography and Data Security | Privacy-Preserving Technologies in Data,2023,0.0313,2024,0.0308,-0.0006
