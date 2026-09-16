@@ -84,6 +84,12 @@ jobs:
         continue-on-error: true
         run: python linkpred.py --db ${{ matrix.db }} --graph-split 2021
 
+      - name: Sync with origin before writing generated files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
+
       - name: Export the small public snapshot
         run: |
           mkdir -p ${{ matrix.out_dir }}
@@ -91,9 +97,6 @@ jobs:
 
       - name: Commit and push the snapshot
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase --autostash
           git add ${{ matrix.out_dir }} README.md
           if git diff --cached --quiet; then
             echo "nothing changed for ${{ matrix.name }}; skipping commit"
