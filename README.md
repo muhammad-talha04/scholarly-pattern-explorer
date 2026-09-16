@@ -207,7 +207,6 @@ tab with "Run workflow", no local setup required.
 | `mine_countries.py` | per-country patterns and rules, for the sidebar's country filter |
 | `countries.py` | country name/code lookups shared by the app and the miner |
 | `linkgraph.py` / `linkpred.py` | co-authorship graph, temporal train/test split, and the link-prediction models |
-| `linkpred_view.py` | a Streamlit view for link-prediction results; not currently imported by `app.py` (the Link prediction tab is rendered inline there instead) |
 | `test_linkpred.py` | self-check for the link-prediction heuristics on a tiny synthetic graph |
 | `export_snapshot.py` | writes the small public snapshot (`docs/`) that `weekly-mine.yml` commits |
 | `check_setup.py` | environment check |
