@@ -1,7 +1,7 @@
 # Scholarly Pattern Explorer
 
 Sliding-window frequent-pattern mining over the OpenAlex scholarly graph, with a
-four-view visual analytics front end.
+six-view visual analytics front end.
 
 The question this answers: **which combinations of research topics are emerging,
 and which is the field abandoning?** Counting single topics cannot answer that —
@@ -24,8 +24,11 @@ falling to the floor is one the field left behind.
 3. Treats each paper as a *transaction* whose *items* are its topics, then runs
    FP-Growth over overlapping three-year windows and writes every frequent
    itemset and association rule back into the same database.
-4. Serves four linked views over those stored results, either for the whole
-   corpus or filtered to a single country from a searchable sidebar dropdown.
+4. Serves six linked views over those stored results — a world map of where
+   the research comes from, the raw topic data, the mined patterns themselves,
+   their lifecycles, the co-authorship graph, and link-prediction model
+   performance — either for the whole corpus or filtered to a single country
+   from a searchable sidebar dropdown.
 5. Refreshes itself: a scheduled GitHub Actions workflow re-fetches new papers
    daily and re-mines weekly, so the corpus and patterns stay current without
    anyone running a script by hand.
@@ -35,26 +38,30 @@ interactive, and what makes pattern *lifecycles* possible at all: the support of
 one itemset can be drawn across 25 windows because all 25 answers are already on
 disk.
 
-## The four views
+## The six views
 
 | View | What it shows |
 |---|---|
-| 1. Raw data | topic frequency, plus a topic-by-topic co-occurrence heatmap built with a self-join |
-| 2. Mined patterns | frequent itemsets for the selected window, and association rules plotted confidence against lift |
-| 3. Pattern lifecycles | support of any chosen itemsets across every window |
-| 4. Co-authorship network | the collaboration graph behind the papers that contain one mined pattern |
+| 1. World | a choropleth of where the research comes from, plus international-collaboration strength and output over time |
+| 2. Raw data | topic frequency, plus a topic-by-topic co-occurrence heatmap built with a self-join |
+| 3. Mined patterns | frequent itemsets for the selected window, and association rules plotted confidence against lift |
+| 4. Pattern lifecycles | support of any chosen itemsets across every window |
+| 5. Co-authorship network | the collaboration graph behind the papers that contain one mined pattern |
+| 6. Link prediction | AUC/AP of five models (common neighbours, Adamic-Adar, node2vec, topic similarity, a graph-aware MLP) at predicting who will co-author next |
 
 <p align="center">
+  <img src="screenshots/world_map.png" width="45%">
   <img src="screenshots/tab1_topic_distribution.png" width="45%">
-  <img src="screenshots/tab1_cooccurrence_heatmap.png" width="45%">
   <img src="screenshots/tab2_frequent_itemsets.png" width="45%">
   <img src="screenshots/tab4_coauthor_network.png" width="45%">
+  <img src="screenshots/link_metrics.png" width="45%">
+  <img src="screenshots/tab1_cooccurrence_heatmap.png" width="45%">
 </p>
 
-Every screenshot here is the Canadian corpus described below, in the 2020–2022
-window.
+Every screenshot here is the AI · global corpus described below, in the
+2024–2026 window.
 
-View 4 is the part I did not expect to work. Scope the network to the itemset
+View 5 is the part I did not expect to work. Scope the network to the itemset
 *Quantum Computing Algorithms + Quantum Information and Cryptography* in the
 2020–2022 window and it returns 206 authors and 501 collaboration links, drawn as
 two dense clusters joined by a single thin bridge. The most connected author is
@@ -113,7 +120,7 @@ one-window spike is not evidence of anything.
 
 **Support says nothing about causation.** Two topics co-occurring frequently may
 share a venue, a funding programme, or a single prolific group, which is exactly
-why view 4 exists — it shows you *whose* papers produced the pattern.
+why view 5 exists — it shows you *whose* papers produced the pattern.
 
 ## Quick start
 
