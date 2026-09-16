@@ -19,7 +19,7 @@ falling to the floor is one the field left behind.
 
 1. Pulls papers from the OpenAlex API into JSONL, resuming from a saved cursor if
    the connection drops.
-2. Loads them into a normalised database (DuckDB or SQLite) — seven tables, bulk
+2. Loads them into a normalised database (DuckDB or SQLite) — eight tables, bulk
    inserted, indexed *after* the load.
 3. Treats each paper as a *transaction* whose *items* are its topics, then runs
    FP-Growth over overlapping three-year windows and writes every frequent
@@ -56,6 +56,7 @@ disk.
   <img src="screenshots/tab4_coauthor_network.png" width="45%">
   <img src="screenshots/link_metrics.png" width="45%">
   <img src="screenshots/tab1_cooccurrence_heatmap.png" width="45%">
+  <img src="screenshots/tab2_association_rules.png" width="45%">
 </p>
 
 Every screenshot here is the AI · global corpus described below, in the
@@ -149,7 +150,9 @@ python analytics.py --db data/openalex.duckdb     # every query, with row counts
 `pip install -r requirements-dev.txt` adds mlxtend, which makes
 `test_fpgrowth.py` additionally compare the miner against a second, independent
 FP-Growth implementation. It is deliberately not in `requirements.txt`, since
-nothing the app runs imports it.
+nothing the app runs imports it — torch, gensim and scikit-learn *are* in
+`requirements.txt`, but only because `linkpred.py` needs them for the
+link-prediction view.
 
 `python check_setup.py` checks the environment first if anything looks wrong.
 
@@ -189,7 +192,7 @@ tab with "Run workflow", no local setup required.
 | File | Role |
 |---|---|
 | `dbconn.py` | one adapter over DuckDB and SQLite, with a bulk-load fast path |
-| `schema.sql` / `indexes.sql` | seven tables; indexes deliberately kept separate |
+| `schema.sql` / `indexes.sql` | eight tables; indexes deliberately kept separate |
 | `fpgrowth.py` | FP-Growth and association-rule generation, written from scratch |
 | `test_fpgrowth.py` | checks it against brute force, and against mlxtend if installed |
 | `make_sample_data.py` | synthetic corpus with planted signals |
@@ -197,14 +200,21 @@ tab with "Run workflow", no local setup required.
 | `mine_windows.py` | sliding windows, constraint push-down, results persisted |
 | `analytics.py` | every SQL query in the project, with a command-line self-test |
 | `app.py` | the Streamlit front end — contains no SQL at all |
-| `.streamlit/config.toml` | the theme; the app injects no CSS |
+| `ui_style.py` | CSS, colour palette, Plotly styling and HTML cards for `app.py` — kept apart so `app.py` reads as "what is shown" and this reads as "how it looks" |
+| `.streamlit/config.toml` | base theme colours, kept in sync by hand with the palette in `ui_style.py` |
 | `fetch_openalex.py` | resumable OpenAlex downloader — one-shot bulk download to start a new corpus |
 | `refresh.py` | incremental fetch used by the automation — appends only new papers since the last run |
 | `mine_countries.py` | per-country patterns and rules, for the sidebar's country filter |
 | `countries.py` | country name/code lookups shared by the app and the miner |
 | `linkgraph.py` / `linkpred.py` | co-authorship graph, temporal train/test split, and the link-prediction models |
+| `linkpred_view.py` | a Streamlit view for link-prediction results; not currently imported by `app.py` (the Link prediction tab is rendered inline there instead) |
+| `test_linkpred.py` | self-check for the link-prediction heuristics on a tiny synthetic graph |
 | `export_snapshot.py` | writes the small public snapshot (`docs/`) that `weekly-mine.yml` commits |
 | `check_setup.py` | environment check |
+| `check_corpus.py` | read-only report on what's actually inside `works_real.jsonl` |
+| `clean_corpus.py` | writes a filtered copy of a JSONL corpus; never overwrites the original |
+| `diagnose_429.py` | sends six minimal requests to isolate why OpenAlex is rejecting a request |
+| `pipeline_common.ps1` / `refresh_daily.ps1` / `weekly_pipeline.ps1` / `publish_github.ps1` | the original Windows Task Scheduler automation; superseded by `daily-fetch.yml` / `weekly-mine.yml` but kept for running the pipeline by hand on a local machine |
 
 The split between `analytics.py` and `app.py` is intentional. UI code is hard to
 test and query code is easy to test, so all the SQL lives in one module with its

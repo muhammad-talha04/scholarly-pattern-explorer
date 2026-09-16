@@ -13,9 +13,6 @@ plotly
 # --- weekly snapshot charts ---
 matplotlib
 
-# --- testing FP-Growth against a second implementation ---
-mlxtend>=0.23
-
 # --- machine learning & graph analysis (link prediction) ---
 torch
 gensim
