@@ -47,7 +47,7 @@ disk.
 | 3. Mined patterns | frequent itemsets for the selected window, and association rules plotted confidence against lift |
 | 4. Pattern lifecycles | support of any chosen itemsets across every window |
 | 5. Co-authorship network | the collaboration graph behind the papers that contain one mined pattern |
-| 6. Link prediction | AUC/AP of five models (common neighbours, Adamic-Adar, node2vec, topic similarity, a graph-aware MLP) at predicting who will co-author next |
+| 6. Link prediction | AUC/AP of seven models (common neighbours, Jaccard, Adamic-Adar, preferential attachment, node2vec, topic similarity, a graph-aware MLP) at predicting who will co-author next; on the Canadian corpus the graph-aware MLP reaches AUC 0.91 against 0.67 for common neighbours |
 
 <p align="center">
   <img src="screenshots/world_map.png" width="45%">
@@ -62,17 +62,18 @@ disk.
 Every screenshot here is the AI · global corpus described below, in the
 2024–2026 window.
 
-View 5 is the part I did not expect to work. Scope the network to the itemset
-*Quantum Computing Algorithms + Quantum Information and Cryptography* in the
-2020–2022 window and it returns 206 authors and 501 collaboration links, drawn as
-two dense clusters joined by a single thin bridge. The most connected author is
-Alexandre Blais with 29 collaborators; the other cluster is R. Harris, Fabio
-Altomare, Emile Hoskinson and T. Lanting, each around 20. Looked up by hand
-afterwards, those are two of Canada's superconducting-qubit groups — Blais's
-circuit-QED theory group at Sherbrooke, and the hardware team at D-Wave in
-Burnaby. The pipeline surfaced two real, nameable laboratories *and* the fact that
-they are separate communities; no affiliation or institution data is used
-anywhere in it.
+View 5 is the part I did not expect to work. In the Canadian corpus, scope the
+co-authorship network to papers carrying both *Quantum Computing Algorithms and
+Architecture* and *Quantum Information and Cryptography* in 2020–2022, and
+Louvain community detection on the full graph (604 authors, 5,393 links)
+separates a 37-author community around Alexandre Blais at Sherbrooke from a
+59-author community around D-Wave's hardware team (R. Harris, M. H. S. Amin,
+Isil Ozfidan). The two communities share no direct co-authorship link; the
+shortest path from Blais to Harris runs through four collaborations.
+
+No affiliation or institution data is used anywhere in the pipeline.
+`python verify_quantum_communities.py` reproduces these numbers. The dashboard
+caps the graph at the top 800 co-author pairs, so it shows a smaller slice.
 
 ## Findings
 
@@ -140,11 +141,12 @@ python mine_windows.py          # FP-Growth per window, results back into the DB
 streamlit run app.py            # http://localhost:8501
 ```
 
-Two commands verify the work without opening a browser:
+Three commands verify the work without opening a browser:
 
 ```bash
 python test_fpgrowth.py                          # miner vs brute force
 python analytics.py --db data/openalex.duckdb     # every query, with row counts
+python verify_quantum_communities.py             # the View 5 and link-prediction numbers above
 ```
 
 `pip install -r requirements-dev.txt` adds mlxtend, which makes
@@ -208,6 +210,7 @@ tab with "Run workflow", no local setup required.
 | `countries.py` | country name/code lookups shared by the app and the miner |
 | `linkgraph.py` / `linkpred.py` | co-authorship graph, temporal train/test split, and the link-prediction models |
 | `test_linkpred.py` | self-check for the link-prediction heuristics on a tiny synthetic graph |
+| `verify_quantum_communities.py` | reproduces the View 5 community finding (Louvain on the full 2020–2022 quantum co-authorship graph) and prints the stored link-prediction metrics |
 | `export_snapshot.py` | writes the small public snapshot (`docs/`) that `weekly-mine.yml` commits |
 | `check_setup.py` | environment check |
 | `check_corpus.py` | read-only report on what's actually inside `works_real.jsonl` |
