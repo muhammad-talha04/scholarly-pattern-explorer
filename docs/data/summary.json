@@ -1,9 +1,5 @@
 {
-<<<<<<< Updated upstream
-  "generated_at": "2026-09-15 18:39",
-=======
-  "generated_at": "2026-09-15 18:40",
->>>>>>> Stashed changes
+  "generated_at": "2026-09-20 09:14",
   "year_range": [
     2023,
     2026
@@ -12,9 +8,9 @@
     2024,
     2026
   ],
-  "works": 12453,
-  "topics": 1112,
-  "authors": 51529,
+  "works": 12621,
+  "topics": 1117,
+  "authors": 52066,
   "patterns": 401,
   "rules": 160
 }

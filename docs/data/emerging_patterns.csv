@@ -1,38 +1,26 @@
 itemset,first_window,first_support,last_window,last_support,change
-Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare,2023,0.0171,2024,0.0198,0.0027
-Natural Language Processing Techniques | Topic Modeling,2023,0.0424,2024,0.0449,0.0025
+Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare,2023,0.017,2024,0.0196,0.0026
+Natural Language Processing Techniques | Topic Modeling,2023,0.0425,2024,0.045,0.0025
 Machine Learning in Healthcare | Topic Modeling,2023,0.0145,2024,0.0168,0.0023
-Energy Load and Power Forecasting | Solar Radiation and Photovoltaics,2023,0.0225,2024,0.0244,0.0019
-AI in cancer detection | Brain Tumor Detection and Classification,2023,0.0122,2024,0.0138,0.0017
-Artificial Intelligence in Healthcare and Education | Explainable Artificial Intelligence (XAI),2023,0.014,2024,0.0157,0.0017
-AI in Service Interactions | Online Learning and Analytics,2023,0.0092,2024,0.0107,0.0016
-<<<<<<< Updated upstream
-AI in Service Interactions | Technology Adoption and User Behaviour,2023,0.0112,2024,0.0129,0.0016
-Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,2023,0.0162,2024,0.0175,0.0013
-AI in Service Interactions | Social Robot Interaction and HRI,2023,0.0149,2024,0.0162,0.0013
-=======
-Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare | Topic Modeling,2023,0.005,2024,0.0063,0.0013
->>>>>>> Stashed changes
-Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques,2023,0.0162,2024,0.0175,0.0013
-AI in Service Interactions | Social Robot Interaction and HRI,2023,0.0149,2024,0.0162,0.0013
-Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,2023,0.0162,2024,0.0175,0.0013
+Energy Load and Power Forecasting | Solar Radiation and Photovoltaics,2023,0.0224,2024,0.0242,0.0018
+AI in cancer detection | Brain Tumor Detection and Classification,2023,0.0123,2024,0.0139,0.0017
+Artificial Intelligence in Healthcare and Education | Explainable Artificial Intelligence (XAI),2023,0.0139,2024,0.0155,0.0016
+AI in Service Interactions | Technology Adoption and User Behaviour,2023,0.0113,2024,0.0129,0.0016
+AI in Service Interactions | Online Learning and Analytics,2023,0.0091,2024,0.0106,0.0015
 Quantum Computing Algorithms and Architecture | Quantum Mechanics and Applications,2023,0.0185,2024,0.0198,0.0013
-Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare | Topic Modeling,2023,0.005,2024,0.0063,0.0013
+Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,2023,0.0162,2024,0.0174,0.0012
 Explainable Artificial Intelligence (XAI) | Machine Learning in Healthcare,2023,0.0117,2024,0.0129,0.0012
+Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques,2023,0.0162,2024,0.0174,0.0012
+AI in Service Interactions | Social Robot Interaction and HRI,2023,0.0148,2024,0.016,0.0012
 Artificial Intelligence in Healthcare and Education | Topic Modeling,2023,0.0132,2024,0.0144,0.0012
-Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum Mechanics and Applications,2023,0.0177,2024,0.0188,0.0011
-Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection,2023,0.0234,2024,0.0245,0.0011
-AI in Service Interactions | Ethics and Social Impacts of AI,2023,0.0112,2024,0.0121,0.001
-AI in Service Interactions | Organizational and Employee Performance,2023,0.0052,2024,0.0062,0.001
+Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare | Topic Modeling,2023,0.005,2024,0.0063,0.0012
+Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum Mechanics and Applications,2023,0.0177,2024,0.0189,0.0011
+AI in Service Interactions | Ethics and Social Impacts of AI,2023,0.0111,2024,0.0121,0.001
+AI in Service Interactions | Organizational and Employee Performance,2023,0.0051,2024,0.0061,0.001
+Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection,2023,0.0237,2024,0.0247,0.001
+Intelligent Tutoring Systems and Adaptive Learning | Online Learning and Analytics,2023,0.008,2024,0.0089,0.0009
 Artificial Intelligence in Healthcare and Education | Ethics and Social Impacts of AI,2023,0.0058,2024,0.0067,0.0009
-<<<<<<< Updated upstream
-Intelligent Tutoring Systems and Adaptive Learning | Online Learning and Analytics,2023,0.0079,2024,0.0087,0.0008
-AI in Service Interactions | Artificial Intelligence in Healthcare and Education,2023,0.0135,2024,0.0143,0.0008
-Anomaly Detection Techniques and Applications | Fault Detection and Control Systems,2023,0.0066,2024,0.0073,0.0008
-=======
-AI in Service Interactions | Artificial Intelligence in Healthcare and Education,2023,0.0135,2024,0.0143,0.0008
-Anomaly Detection Techniques and Applications | Fault Detection and Control Systems,2023,0.0066,2024,0.0073,0.0008
-Intelligent Tutoring Systems and Adaptive Learning | Online Learning and Analytics,2023,0.0079,2024,0.0087,0.0008
->>>>>>> Stashed changes
-Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,2023,0.0243,2024,0.025,0.0007
-Anomaly Detection Techniques and Applications | Data Stream Mining Techniques,2023,0.0059,2024,0.0065,0.0006
+Anomaly Detection Techniques and Applications | Fault Detection and Control Systems,2023,0.0066,2024,0.0074,0.0008
+AI in Service Interactions | Artificial Intelligence in Healthcare and Education,2023,0.0134,2024,0.0143,0.0008
+Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics,2023,0.0245,2024,0.0252,0.0007
+Anomaly Detection Techniques and Applications | Data Stream Mining Techniques,2023,0.0058,2024,0.0064,0.0006
