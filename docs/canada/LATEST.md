@@ -1,51 +1,51 @@
 # Weekly snapshot
 
-_Generated 2026-09-15 18:41. Corpus: 2,717 papers, 12,844 authors,
-854 topics, publication years 2023-2026._
+_Generated 2026-09-20 09:15. Corpus: 2,743 papers, 12,947 authors,
+860 topics, publication years 2023-2026._
 
 ![papers per year](charts/papers_per_year.png)
 
 ## Emerging topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0267 | 2024 | 0.0299 | 0.0032 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.0248 | 2024 | 0.0261 | 0.0013 |
-| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.0212 | 2024 | 0.0212 | 0.0 |
-| Blockchain Technology Applications and Security | IoT and Edge/Fog Computing | 2023 | 0.0208 | 2023 | 0.0208 | 0.0 |
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0456 | 2024 | 0.043 | -0.0026 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0269 | 2024 | 0.0301 | 0.0032 |
+| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.0249 | 2024 | 0.0263 | 0.0013 |
+| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.021 | 2024 | 0.021 | 0.0 |
+| Blockchain Technology Applications and Security | IoT and Edge/Fog Computing | 2023 | 0.021 | 2023 | 0.021 | 0.0 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0452 | 2024 | 0.0425 | -0.0027 |
 
 ![lifecycles](charts/pattern_lifecycles.png)
 
 ## Declining topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0456 | 2024 | 0.043 | -0.0026 |
-| Blockchain Technology Applications and Security | IoT and Edge/Fog Computing | 2023 | 0.0208 | 2023 | 0.0208 | 0.0 |
-| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.0212 | 2024 | 0.0212 | 0.0 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.0248 | 2024 | 0.0261 | 0.0013 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0267 | 2024 | 0.0299 | 0.0032 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0452 | 2024 | 0.0425 | -0.0027 |
+| Blockchain Technology Applications and Security | IoT and Edge/Fog Computing | 2023 | 0.021 | 2023 | 0.021 | 0.0 |
+| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.021 | 2024 | 0.021 | 0.0 |
+| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.0249 | 2024 | 0.0263 | 0.0013 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0269 | 2024 | 0.0301 | 0.0032 |
 
 ## Strongest patterns in 2024-2026
 | itemset | k | support_count | n_tx | support |
 |---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 89 | 2072 | 0.04295366795366795 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 62 | 2072 | 0.029922779922779922 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2 | 54 | 2072 | 0.026061776061776062 |
-| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2 | 44 | 2072 | 0.021235521235521235 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 89 | 2095 | 0.04248210023866349 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 63 | 2095 | 0.03007159904534606 |
+| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2 | 55 | 2095 | 0.026252983293556086 |
+| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2 | 44 | 2095 | 0.02100238663484487 |
 
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |
 |---|---|---|
-| Xuemin Shen | 21 | 113 |
-| Dusit Niyato | 18 | 106 |
-| Habib Hamam | 17 | 87 |
-| Jiawen Kang | 12 | 73 |
-| Roberto Morandotti | 12 | 39 |
+| Xuemin Shen | 19 | 109 |
+| Dusit Niyato | 19 | 108 |
+| Habib Hamam | 14 | 81 |
+| Jiawen Kang | 13 | 75 |
+| F. Richard Yu | 11 | 41 |
+| Witold Pedrycz | 11 | 40 |
 | Rongxing Lu | 10 | 40 |
+| Roberto Morandotti | 10 | 35 |
 | Hongyang Du | 9 | 60 |
-| F. Richard Yu | 9 | 37 |
-| Witold Pedrycz | 9 | 36 |
-| David Moss | 9 | 28 |
+| Nicola Montaut | 9 | 25 |
 
 ![network](charts/coauthor_network.png)
 
