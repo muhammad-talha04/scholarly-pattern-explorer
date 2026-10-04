@@ -1,67 +1,67 @@
 # Weekly snapshot
 
-_Generated 2026-09-27 09:58. Corpus: 12,854 papers, 52,971 authors,
-1,123 topics, publication years 2023-2026._
+_Generated 2026-10-04 10:32. Corpus: 13,129 papers, 53,931 authors,
+1,129 topics, publication years 2023-2026._
 
 ![papers per year](charts/papers_per_year.png)
 
 ## Emerging topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
+| Natural Language Processing Techniques | Topic Modeling | 2023 | 0.0424 | 2024 | 0.045 | 0.0026 |
 | Artificial Intelligence in Healthcare and Education | Machine Learning in Healthcare | 2023 | 0.0169 | 2024 | 0.0195 | 0.0026 |
-| Natural Language Processing Techniques | Topic Modeling | 2023 | 0.0426 | 2024 | 0.0453 | 0.0026 |
-| Machine Learning in Healthcare | Topic Modeling | 2023 | 0.0142 | 2024 | 0.0164 | 0.0022 |
-| Energy Load and Power Forecasting | Solar Radiation and Photovoltaics | 2023 | 0.0228 | 2024 | 0.0247 | 0.0019 |
-| AI in cancer detection | Brain Tumor Detection and Classification | 2023 | 0.0121 | 2024 | 0.0138 | 0.0016 |
-| Artificial Intelligence in Healthcare and Education | Explainable Artificial Intelligence (XAI) | 2023 | 0.0138 | 2024 | 0.0154 | 0.0016 |
-| AI in Service Interactions | Technology Adoption and User Behaviour | 2023 | 0.0112 | 2024 | 0.0127 | 0.0016 |
-| AI in Service Interactions | Online Learning and Analytics | 2023 | 0.0091 | 2024 | 0.0106 | 0.0015 |
-| Quantum Computing Algorithms and Architecture | Quantum Mechanics and Applications | 2023 | 0.0183 | 2024 | 0.0196 | 0.0013 |
-| Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | 2023 | 0.0165 | 2024 | 0.0179 | 0.0013 |
+| Machine Learning in Healthcare | Topic Modeling | 2023 | 0.0141 | 2024 | 0.0162 | 0.0021 |
+| Energy Load and Power Forecasting | Solar Radiation and Photovoltaics | 2023 | 0.0228 | 2024 | 0.0248 | 0.0019 |
+| Artificial Intelligence in Healthcare and Education | Explainable Artificial Intelligence (XAI) | 2023 | 0.0136 | 2024 | 0.0152 | 0.0016 |
+| AI in cancer detection | Brain Tumor Detection and Classification | 2023 | 0.012 | 2024 | 0.0135 | 0.0015 |
+| AI in Service Interactions | Online Learning and Analytics | 2023 | 0.0091 | 2024 | 0.0105 | 0.0015 |
+| AI in Service Interactions | Technology Adoption and User Behaviour | 2023 | 0.0111 | 2024 | 0.0125 | 0.0014 |
+| Energy Load and Power Forecasting | Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics | 2023 | 0.0166 | 2024 | 0.0179 | 0.0013 |
+| AI in Service Interactions | Social Robot Interaction and HRI | 2023 | 0.0146 | 2024 | 0.0158 | 0.0013 |
 
 ![lifecycles](charts/pattern_lifecycles.png)
 
 ## Declining topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0677 | 2024 | 0.0648 | -0.003 |
-| Mobile Crowdsensing and Crowdsourcing | Privacy-Preserving Technologies in Data | 2023 | 0.0081 | 2024 | 0.0057 | -0.0023 |
-| Quantum Computing Algorithms and Architecture | Quantum and electron transport phenomena | 2023 | 0.0184 | 2024 | 0.0163 | -0.0021 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0691 | 2024 | 0.0664 | -0.0027 |
+| Mobile Crowdsensing and Crowdsourcing | Privacy-Preserving Technologies in Data | 2023 | 0.008 | 2024 | 0.0057 | -0.0023 |
+| Quantum Computing Algorithms and Architecture | Quantum and electron transport phenomena | 2023 | 0.0186 | 2024 | 0.0166 | -0.002 |
+| Advanced Multi-Objective Optimization Algorithms | Metaheuristic Optimization Algorithms Research | 2023 | 0.0207 | 2024 | 0.0188 | -0.0018 |
 | Internet Traffic Analysis and Secure E-voting | Privacy-Preserving Technologies in Data | 2023 | 0.0081 | 2024 | 0.0064 | -0.0017 |
-| Advanced Multi-Objective Optimization Algorithms | Metaheuristic Optimization Algorithms Research | 2023 | 0.0207 | 2024 | 0.019 | -0.0017 |
-| Domain Adaptation and Few-Shot Learning | Multimodal Machine Learning Applications | 2023 | 0.0097 | 2024 | 0.008 | -0.0017 |
-| Quantum Information and Cryptography | Quantum and electron transport phenomena | 2023 | 0.0178 | 2024 | 0.0161 | -0.0017 |
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum and electron transport phenomena | 2023 | 0.0158 | 2024 | 0.0142 | -0.0016 |
-| Neural Networks and Reservoir Computing | Quantum Computing Algorithms and Architecture | 2023 | 0.007 | 2024 | 0.0054 | -0.0016 |
-| Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications | 2023 | 0.013 | 2024 | 0.0115 | -0.0015 |
+| Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research | 2023 | 0.0233 | 2024 | 0.0218 | -0.0016 |
+| Quantum Information and Cryptography | Quantum and electron transport phenomena | 2023 | 0.018 | 2024 | 0.0163 | -0.0016 |
+| Domain Adaptation and Few-Shot Learning | Multimodal Machine Learning Applications | 2023 | 0.0096 | 2024 | 0.008 | -0.0016 |
+| Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research | 2023 | 0.0126 | 2024 | 0.011 | -0.0015 |
+| Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications | 2023 | 0.013 | 2024 | 0.0114 | -0.0015 |
 
 ## Strongest patterns in 2024-2026
 | itemset | k | support_count | n_tx | support |
 |---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 631 | 9744 | 0.06475779967159277 |
-| Natural Language Processing Techniques | Topic Modeling | 2 | 441 | 9744 | 0.04525862068965517 |
-| AI in cancer detection | Radiomics and Machine Learning in Medical Imaging | 2 | 396 | 9744 | 0.04064039408866995 |
-| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2 | 297 | 9744 | 0.030480295566502464 |
-| Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics | 2 | 250 | 9744 | 0.025656814449917898 |
-| Energy Load and Power Forecasting | Solar Radiation and Photovoltaics | 2 | 241 | 9744 | 0.024733169129720855 |
-| Quantum Information and Cryptography | Quantum Mechanics and Applications | 2 | 240 | 9744 | 0.024630541871921183 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 239 | 9744 | 0.024527914614121512 |
-| Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research | 2 | 215 | 9744 | 0.022064860426929393 |
-| Quantum Computing Algorithms and Architecture | Quantum Mechanics and Applications | 2 | 191 | 9744 | 0.019601806239737275 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 662 | 9975 | 0.06636591478696742 |
+| Natural Language Processing Techniques | Topic Modeling | 2 | 449 | 9975 | 0.0450125313283208 |
+| AI in cancer detection | Radiomics and Machine Learning in Medical Imaging | 2 | 401 | 9975 | 0.040200501253132834 |
+| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2 | 302 | 9975 | 0.030275689223057643 |
+| Photovoltaic System Optimization Techniques | Solar Radiation and Photovoltaics | 2 | 255 | 9975 | 0.02556390977443609 |
+| Quantum Information and Cryptography | Quantum Mechanics and Applications | 2 | 250 | 9975 | 0.02506265664160401 |
+| Energy Load and Power Forecasting | Solar Radiation and Photovoltaics | 2 | 247 | 9975 | 0.024761904761904763 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 244 | 9975 | 0.024461152882205513 |
+| Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research | 2 | 217 | 9975 | 0.02175438596491228 |
+| Quantum Computing Algorithms and Architecture | Quantum Mechanics and Applications | 2 | 199 | 9975 | 0.01994987468671679 |
 
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |
 |---|---|---|
-| Andreas Bengtsson | 24 | 103 |
-| Alejandro Grajales Dau | 22 | 90 |
+| Andreas Bengtsson | 27 | 115 |
+| Alejandro Grajales Dau | 23 | 94 |
 | Brian Burkett | 22 | 90 |
 | Hung-Shen Chang | 22 | 90 |
-| Joseph C. Bardin | 21 | 84 |
-| Ilya Drozdov | 20 | 80 |
-| Raja Gosula | 20 | 80 |
-| Alexandre Bourassa | 19 | 81 |
-| Abraham Asfaw | 19 | 76 |
-| Brooks Foxen | 19 | 76 |
+| Ilya Drozdov | 19 | 76 |
+| Jonathan A. Gross | 19 | 76 |
+| Leslie Flores Burgos | 19 | 76 |
+| Abraham Asfaw | 18 | 72 |
+| Joseph C. Bardin | 18 | 72 |
+| M. Ansmann | 18 | 72 |
 
 ![network](charts/coauthor_network.png)
 

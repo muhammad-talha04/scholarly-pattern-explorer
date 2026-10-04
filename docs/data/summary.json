@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27 09:58",
+  "generated_at": "2026-10-04 10:32",
   "year_range": [
     2023,
     2026
@@ -8,9 +8,9 @@
     2024,
     2026
   ],
-  "works": 12854,
-  "topics": 1123,
-  "authors": 52971,
+  "works": 13129,
+  "topics": 1129,
+  "authors": 53931,
   "patterns": 396,
-  "rules": 160
+  "rules": 157
 }
