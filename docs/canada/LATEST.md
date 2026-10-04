@@ -1,51 +1,50 @@
 # Weekly snapshot
 
-_Generated 2026-09-27 10:00. Corpus: 2,784 papers, 13,162 authors,
-866 topics, publication years 2023-2026._
+_Generated 2026-10-04 10:33. Corpus: 2,880 papers, 13,485 authors,
+877 topics, publication years 2023-2026._
 
 ![papers per year](charts/papers_per_year.png)
 
 ## Emerging topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0265 | 2024 | 0.0296 | 0.0031 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.025 | 2024 | 0.0263 | 0.0014 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0268 | 2024 | 0.0298 | 0.003 |
+| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.0249 | 2024 | 0.0262 | 0.0013 |
 | Blockchain Technology Applications and Security | IoT and Edge/Fog Computing | 2023 | 0.0208 | 2023 | 0.0208 | 0.0 |
-| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.0208 | 2024 | 0.0207 | -0.0001 |
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.045 | 2024 | 0.0423 | -0.0026 |
+| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.0201 | 2023 | 0.0201 | 0.0 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0465 | 2024 | 0.0434 | -0.0031 |
 
 ![lifecycles](charts/pattern_lifecycles.png)
 
 ## Declining topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.045 | 2024 | 0.0423 | -0.0026 |
-| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.0208 | 2024 | 0.0207 | -0.0001 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0465 | 2024 | 0.0434 | -0.0031 |
+| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2023 | 0.0201 | 2023 | 0.0201 | 0.0 |
 | Blockchain Technology Applications and Security | IoT and Edge/Fog Computing | 2023 | 0.0208 | 2023 | 0.0208 | 0.0 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.025 | 2024 | 0.0263 | 0.0014 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0265 | 2024 | 0.0296 | 0.0031 |
+| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2023 | 0.0249 | 2024 | 0.0262 | 0.0013 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0268 | 2024 | 0.0298 | 0.003 |
 
 ## Strongest patterns in 2024-2026
 | itemset | k | support_count | n_tx | support |
 |---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 90 | 2126 | 0.04233301975540922 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 63 | 2126 | 0.029633113828786452 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2 | 56 | 2126 | 0.02634054562558796 |
-| Cryptography and Data Security | Privacy-Preserving Technologies in Data | 2 | 44 | 2126 | 0.020696142991533398 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 96 | 2213 | 0.04338002711251695 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 66 | 2213 | 0.0298237686398554 |
+| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2 | 58 | 2213 | 0.026208766380478987 |
 
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |
 |---|---|---|
-| Xuemin Shen | 20 | 111 |
-| Habib Hamam | 15 | 83 |
+| Xuemin Shen | 21 | 113 |
+| Habib Hamam | 17 | 94 |
 | Dusit Tao Niyato | 14 | 92 |
 | Jiawen Kang | 13 | 72 |
-| Roberto Morandotti | 13 | 41 |
-| F. Richard Yu | 11 | 41 |
-| David Moss | 11 | 32 |
-| Robert L. Moore | 11 | 22 |
+| Roberto Morandotti | 12 | 39 |
 | Hongyang Du | 9 | 60 |
+| F. Richard Yu | 9 | 37 |
 | Witold Pedrycz | 9 | 36 |
+| David Moss | 9 | 28 |
+| Kai Zhang | 9 | 18 |
 
 ![network](charts/coauthor_network.png)
 
