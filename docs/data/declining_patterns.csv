@@ -1,26 +1,26 @@
 itemset,first_window,first_support,last_window,last_support,change
-Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography,2023,0.0691,2024,0.0664,-0.0027
-Mobile Crowdsensing and Crowdsourcing | Privacy-Preserving Technologies in Data,2023,0.008,2024,0.0057,-0.0023
-Quantum Computing Algorithms and Architecture | Quantum and electron transport phenomena,2023,0.0186,2024,0.0166,-0.002
-Advanced Multi-Objective Optimization Algorithms | Metaheuristic Optimization Algorithms Research,2023,0.0207,2024,0.0188,-0.0018
-Internet Traffic Analysis and Secure E-voting | Privacy-Preserving Technologies in Data,2023,0.0081,2024,0.0064,-0.0017
-Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2023,0.0233,2024,0.0218,-0.0016
-Quantum Information and Cryptography | Quantum and electron transport phenomena,2023,0.018,2024,0.0163,-0.0016
-Domain Adaptation and Few-Shot Learning | Multimodal Machine Learning Applications,2023,0.0096,2024,0.008,-0.0016
-Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2023,0.0126,2024,0.011,-0.0015
-Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications,2023,0.013,2024,0.0114,-0.0015
-Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum and electron transport phenomena,2023,0.0159,2024,0.0143,-0.0015
-Neural Networks and Reservoir Computing | Quantum Computing Algorithms and Architecture,2023,0.007,2024,0.0055,-0.0015
-AI in cancer detection | Digital Imaging for Blood Diseases,2023,0.0106,2024,0.0092,-0.0014
-Adversarial Robustness in Machine Learning | Anomaly Detection Techniques and Applications,2023,0.0101,2024,0.0087,-0.0014
-Privacy-Preserving Technologies in Data | Stochastic Gradient Optimization Techniques,2023,0.014,2024,0.0129,-0.0011
-Sentiment Analysis and Opinion Mining | Text and Document Classification Technologies,2023,0.0073,2024,0.0062,-0.0011
-Text and Document Classification Technologies | Topic Modeling,2023,0.0066,2024,0.0054,-0.0011
-Neural Networks and Reservoir Computing | Quantum Information and Cryptography,2023,0.009,2024,0.0081,-0.0009
-Quantum Computing Algorithms and Architecture | Quantum many-body systems,2023,0.0074,2024,0.0066,-0.0008
-Geochemistry and Geologic Mapping | Remote-Sensing Image Classification,2023,0.0068,2024,0.006,-0.0008
-AI in cancer detection | COVID-19 diagnosis using AI,2023,0.0095,2024,0.0088,-0.0007
-Cryptography and Data Security | Privacy-Preserving Technologies in Data,2023,0.0309,2024,0.0303,-0.0006
-"Privacy, Security, and Data Protection | Privacy-Preserving Technologies in Data",2023,0.0086,2024,0.008,-0.0006
-Adversarial Robustness in Machine Learning | Privacy-Preserving Technologies in Data,2023,0.0104,2024,0.0097,-0.0006
-Advanced Memory and Neural Computing | Neural Networks and Reservoir Computing,2023,0.0098,2024,0.0092,-0.0006
+Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography,2023,0.0576,2024,0.0548,-0.0027
+Quantum Computing Algorithms and Architecture | Quantum and electron transport phenomena,2023,0.0139,2024,0.0122,-0.0017
+Domain Adaptation and Few-Shot Learning | Multimodal Machine Learning Applications,2023,0.0088,2024,0.0072,-0.0015
+Quantum Information and Cryptography | Quantum and electron transport phenomena,2023,0.0135,2024,0.0121,-0.0014
+Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | Quantum and electron transport phenomena,2023,0.0119,2024,0.0105,-0.0013
+Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications,2023,0.0108,2024,0.0095,-0.0013
+Advanced Multi-Objective Optimization Algorithms | Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2023,0.0104,2024,0.0091,-0.0013
+Adversarial Robustness in Machine Learning | Anomaly Detection Techniques and Applications,2023,0.0078,2024,0.0066,-0.0012
+Evolutionary Algorithms and Applications | Metaheuristic Optimization Algorithms Research,2023,0.0194,2024,0.0181,-0.0012
+AI in cancer detection | Digital Imaging for Blood Diseases,2023,0.0088,2024,0.0078,-0.001
+Advanced Multi-Objective Optimization Algorithms | Metaheuristic Optimization Algorithms Research,2023,0.0208,2024,0.0198,-0.001
+Privacy-Preserving Technologies in Data | Stochastic Gradient Optimization Techniques,2023,0.0113,2024,0.0104,-0.0009
+Neural Networks and Reservoir Computing | Quantum Information and Cryptography,2023,0.0067,2024,0.0059,-0.0008
+Text and Document Classification Technologies | Topic Modeling,2023,0.006,2024,0.0051,-0.0008
+Advanced Neural Network Applications | Domain Adaptation and Few-Shot Learning,2023,0.0111,2024,0.0105,-0.0007
+Artificial Intelligence in Healthcare | Machine Learning in Healthcare,2023,0.0123,2024,0.0116,-0.0007
+Quantum Information and Cryptography | Quantum optics and atomic interactions,2023,0.0097,2024,0.0091,-0.0006
+Cryptography and Data Security | Privacy-Preserving Technologies in Data,2023,0.024,2024,0.0234,-0.0006
+Adversarial Robustness in Machine Learning | Privacy-Preserving Technologies in Data,2023,0.0094,2024,0.0089,-0.0005
+Advanced Memory and Neural Computing | Neural Networks and Reservoir Computing,2023,0.0085,2024,0.008,-0.0005
+Advanced Clustering Algorithms Research | Face and Expression Recognition,2023,0.0085,2024,0.008,-0.0005
+Neural Networks and Reservoir Computing | Optical Network Technologies,2023,0.0094,2024,0.0091,-0.0004
+AI in cancer detection | COVID-19 diagnosis using AI,2023,0.0091,2024,0.0087,-0.0004
+Solar Radiation and Photovoltaics | Solar Thermal and Photovoltaic Systems,2023,0.0074,2024,0.007,-0.0004
+"Privacy, Security, and Data Protection | Privacy-Preserving Technologies in Data",2023,0.0072,2024,0.0068,-0.0004
