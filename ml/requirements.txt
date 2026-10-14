@@ -2,7 +2,7 @@
 numpy
 fastapi>=0.110
 pydantic>=2
-uvicorn
+
 --extra-index-url https://download.pytorch.org/whl/cpu
 sentence-transformers>=2.6     # all-MiniLM-L6-v2, runs on CPU
 # optional backends

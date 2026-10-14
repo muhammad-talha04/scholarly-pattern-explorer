@@ -1,24 +1,22 @@
 """Command line entry points (used by cron / GitHub Actions).
 
-  python -m ml.cli index  --jsonl data/works.jsonl         # embed papers
-  python -m ml.cli update --jsonl data/works.jsonl         # incremental patterns
+  python -m ml.cli index                                   # embed data/works_v2.jsonl
+  python -m ml.cli update                                  # incremental patterns
+  python -m ml.cli index  --jsonl data/works.jsonl         # old JSONL fallback
   python -m ml.cli update --db data/openalex.duckdb
 """
 from __future__ import annotations
 
 import argparse
-import json
 import os
 from pathlib import Path
 
-from .papers import Paper
+from .papers import read_works
 
 
-def read_jsonl(path):
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                yield Paper.from_openalex(json.loads(line))
+def read_jsonl(path=None):
+    """data/works_v2.jsonl by default; old OpenAlex-shaped JSONL still works."""
+    return read_works(path)
 
 
 def main(argv=None):

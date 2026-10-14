@@ -16,6 +16,7 @@ class VectorStore(Protocol):
     def upsert(self, ids: list[str], vectors: np.ndarray, meta: list[dict]) -> None: ...
     def search(self, query: np.ndarray, k: int = 10) -> list[tuple[str, float, dict]]: ...
     def get(self, work_id: str) -> dict | None: ...
+    def vector(self, work_id: str): ...
     def __len__(self) -> int: ...
 
 
@@ -80,6 +81,12 @@ class LocalStore:
     def get(self, work_id):
         return self.meta.get(work_id)
 
+    def vector(self, work_id):
+        try:
+            return self.vecs[self.ids.index(work_id)]
+        except ValueError:
+            return None
+
 
 PG_SCHEMA = """
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -138,6 +145,12 @@ class PgVectorStore:
         if not row:
             return None
         return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+
+    def vector(self, work_id):
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT embedding::text FROM paper_embeddings WHERE work_id = %s", (work_id,))
+            row = cur.fetchone()
+        return None if not row else np.array(json.loads(row[0]), dtype=np.float32)
 
 
 def get_store():

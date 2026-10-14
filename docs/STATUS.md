@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 03:55 PKT by olli.
+Last updated: 2026-10-15 04:10 PKT by tom (ML row); earlier by olli.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -32,7 +32,10 @@ incrementally twice a month from OpenAlex. Design: `docs/architecture/`.
 Nothing is merged into main yet.
 - [ ] #1 (olli): ready for review, waiting for Prince to merge
 - [ ] #3 (grok): draft; fractional-counting change and STATUS entry not pushed yet, waiting on Prince's OK in 1:1
-- [ ] #2 (tom): draft; rebasing onto #1, switching to `data/works_v2.jsonl`, wiring `core.py` routes
+- [ ] #2 (tom): draft. Merge after #1 and #3, because the branch already contains both (merged, not rebased).
+  - Done: `ml/` reads `data/works_v2.jsonl` and falls back to the old JSONL. Contract routes in `core.py` are wired to `ml/`: search (with country and year filters), papers, ask, related, patterns and runs. Incremental FP-Growth produces dated snapshots. Tests pass: ml 17, api 7, pipeline included in that run, plus the old `test_fpgrowth` and `test_linkpred`.
+  - Next: index the real `works_v2.jsonl` on the pgvector store, wire the ingest workflow to run `python -m ml.cli index/update`, add the `/patterns?trend=gap` handler (currently 501; michal owns this).
+  - Blockers: the real all-MiniLM-L6-v2 model and pgvector are untested. The tests use a lightweight offline embedder and a fake database connection. A live run needs a Supabase `DATABASE_URL`.
 - [ ] Front end (harry): not started on the shared base (`v2-rebuild` will not be merged); waiting on "start the front end" in 1:1
 - [ ] Cross-PR tests (ami): not started; waiting on "start the tests" in 1:1
 - [ ] Gap finder + search query set (michal): not started; waiting on "start the gap finder" in 1:1

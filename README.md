@@ -275,10 +275,10 @@ A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
 |---|---|
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU) |
 | Vector storage | `ML_VECTOR_BACKEND=pgvector` (Supabase, `DATABASE_URL`, HNSW cosine index) or local numpy files with optional FAISS (default) |
-| Semantic search | `POST /ml/search {"query","k"}` / `GET /ml/search?q=` → top-k with score, OpenAlex URL and DOI URL |
-| Summaries | `GET /ml/papers/{work_id}/summary`; generated once per paper and cached in `data/ml/summaries.sqlite` |
-| Paper chat | `POST /ml/papers/{work_id}/ask {"question","history"}`; grounded in the paper's abstract, returns evidence sentences |
-| Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /ml/patterns`, `GET /ml/patterns/timeline` |
+| Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
+| Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite` |
+| Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences |
+| Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /api/v1/patterns`, `GET /api/v1/runs` |
 
 **Free LLM, optional.** Summaries and chat work offline with extractive methods
 (term-frequency sentence ranking and BM25-style evidence retrieval). To get
@@ -298,7 +298,7 @@ progress timeline.
 
 ```bash
 pip install -r ml/requirements.txt
-python -m ml.cli index --jsonl data/works.jsonl     # embed papers
-uvicorn ml.router:app --reload                      # standalone API (or include ml.router.router in api/)
+python -m ml.cli index      # embeds data/works_v2.jsonl (falls back to data/works.jsonl)
+(cd apps/api && uvicorn app.main:app --reload)      # API routes are in apps/api/app/routers/core.py
 ML_EMBEDDER=hash python -m pytest ml -q             # offline tests, no model download
 ```

@@ -42,8 +42,25 @@ class SummaryCache:
 
 
 def _link(meta: dict) -> dict:
-    p = Paper(**{k: meta.get(k) for k in ("work_id", "title", "abstract", "pub_year", "doi")})
-    return {"openalex_url": p.openalex_url, "doi_url": p.doi_url}
+    p = Paper(**{k: meta.get(k) for k in ("work_id", "title", "abstract", "pub_year", "doi",
+                                          "original_url")})
+    return {"openalex_url": p.openalex_url, "doi_url": p.doi_url,
+            "original_url": p.best_original_url}
+
+
+def _hit(wid: str, score: float, meta: dict) -> dict:
+    return {"work_id": wid, "title": meta.get("title"), "pub_year": meta.get("pub_year"),
+            "score": round(score, 4), "topics": meta.get("topics", []),
+            "authors": meta.get("authors", []), "countries": meta.get("countries", []),
+            "cited_by": meta.get("cited_by") or 0, **_link(meta)}
+
+
+def _keep(meta: dict, country: str | None, year_from: int | None) -> bool:
+    if country and country.upper() not in [c.upper() for c in meta.get("countries") or []]:
+        return False
+    if year_from is not None and (meta.get("pub_year") or 0) < year_from:
+        return False
+    return True
 
 
 class MLService:
@@ -62,17 +79,34 @@ class MLService:
             self.store.upsert([p.work_id for p in chunk], vecs, [p.to_dict() for p in chunk])
         return len(papers)
 
+    @staticmethod
+    def links(meta: dict) -> dict:
+        return _link(meta)
+
     def get_paper(self, work_id: str) -> dict | None:
         return self.store.get(work_id)
 
     # ---- 2. semantic search ----
-    def search(self, query: str, k: int = 10) -> list[dict]:
+    def search(self, query: str, k: int = 10, country: str | None = None,
+               year_from: int | None = None) -> list[dict]:
+        if len(self.store) == 0:          # nothing indexed: don't load the model
+            return []
         q = self.embedder.encode([query])[0]
-        out = []
-        for wid, score, meta in self.store.search(q, k):
-            out.append({"work_id": wid, "title": meta.get("title"), "pub_year": meta.get("pub_year"),
-                        "score": round(score, 4), "topics": meta.get("topics", []), **_link(meta)})
-        return out
+        filtered = bool(country or year_from)
+        hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
+        return [_hit(w, s, m) for w, s, m in hits if _keep(m, country, year_from)][:k]
+
+    def related(self, work_id: str, k: int = 10) -> list[dict] | None:
+        if self.store.get(work_id) is None:
+            return None
+        v = self.store.vector(work_id)
+        if v is None:
+            return []
+        return [_hit(w, s, m) for w, s, m in self.store.search(v, k + 1) if w != work_id][:k]
+
+    def cached_summary(self, work_id: str) -> str | None:
+        c = self.cache.get(work_id)
+        return c["summary"] if c else None
 
     # ---- 3. summaries (cached once per paper) ----
     def summarize(self, work_id: str) -> dict | None:

@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timezone
 from math import ceil
 from pathlib import Path
 
@@ -113,7 +113,9 @@ class IncrementalMiner:
     def update(self, papers: list[dict], run_date: str | None = None,
                embedder=None, topic_centroids=None) -> dict:
         """papers: dicts with work_id, pub_year, topics (title/abstract if assigning)."""
+        started = datetime.now(timezone.utc).isoformat()
         run_date = run_date or date.today().isoformat()
+        before = {k: {p["itemset"] for p in w["patterns"]} for k, w in self.state["windows"].items()}
         new = [p for p in papers if p.get("work_id") and p["work_id"] not in self.state["seen"]
                and p.get("pub_year") is not None]
         if embedder is not None and topic_centroids:
@@ -131,9 +133,13 @@ class IncrementalMiner:
                     "baskets": {}, "patterns": [], "rules": [], "n_tx": 0})
                 win["baskets"][key] = win["baskets"].get(key, 0) + 1
                 touched.add(str(y0))
+        changed = 0
         for y0 in touched:
             self._mine_window(y0, self.state["windows"][y0])
-        summary = {"run_date": run_date, "new_papers": len(new),
+            changed += len(before.get(y0, set()) ^ {p["itemset"] for p in self.state["windows"][y0]["patterns"]})
+        summary = {"id": len(self.state["runs"]) + 1, "run_date": run_date,
+                   "started_at": started, "finished_at": datetime.now(timezone.utc).isoformat(),
+                   "status": "success", "new_papers": len(new), "patterns_changed": changed,
                    "windows_updated": sorted(int(t) for t in touched),
                    "total_papers": len(self.state["seen"])}
         self.state["last_run"] = run_date
@@ -150,6 +156,9 @@ class IncrementalMiner:
                 rows.append({"window_start": win["window_start"], "window_end": win["window_end"],
                              "n_tx": win["n_tx"], **p})
         return rows
+
+    def runs(self) -> list[dict]:
+        return list(self.state["runs"])
 
     def write_snapshot(self, run_date):
         snap_dir = self.dir / "snapshots"
