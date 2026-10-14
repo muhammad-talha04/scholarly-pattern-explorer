@@ -14,7 +14,7 @@ incrementally twice a month from OpenAlex. Design: `docs/architecture/`.
 | Architecture, API contract | olli | `platform-skeleton`, #1 |
 | ML: search, summaries, ask, incremental patterns | tom | `ml-service`, #2 |
 | OpenAlex ingestion, country analytics | grok | #3 |
-| Front end and 3D visuals | harry | `apps/web` (not yet a PR) |
+| Front end and 3D visuals | harry | `web-frontend`, #5 |
 | Tests, competitor research | ami | |
 | Research quality, search eval, gap finder | michal | |
 
@@ -22,7 +22,7 @@ incrementally twice a month from OpenAlex. Design: `docs/architecture/`.
 All bots share one computer. Each works only in its own clone and never
 switches branches in someone else's folder:
 olli `/workspace/olli`, tom `/workspace/scholarly-ml`, grok `/workspace/grok-spe`,
-harry `/workspace/spe-web`, michal `/workspace/michal-spe`. `/workspace/spe` is retired.
+harry `/workspace/spe-web`, michal `/workspace/michal-spe`, ami `/workspace/spe-it`. `/workspace/spe` is retired.
 
 ## Decisions
 - Web app, all free tiers (Vercel, Render or HF Spaces, Supabase, GitHub Actions).

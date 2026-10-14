@@ -1,6 +1,6 @@
 """Stub routes that fix the contract. Teams replace the bodies, not the signatures."""
 from fastapi import APIRouter, HTTPException
-from ..schemas import (AskRequest, AskResponse, CountryStats, PaperDetail,
+from ..schemas import (AskRequest, Collaboration, CountingMethod, AskResponse, CountryStats, PaperDetail,
                        PaperSummary, Pattern, Run, SearchResponse)
 
 router = APIRouter()
@@ -38,7 +38,12 @@ def patterns(window: int | None = None) -> list[Pattern]:
 
 
 @router.get("/countries", response_model=list[CountryStats])
-def countries() -> list[CountryStats]:
+def countries(counting: CountingMethod = "fractional") -> list[CountryStats]:
+    return []
+
+
+@router.get("/countries/collaborations", response_model=list[Collaboration])
+def collaborations(counting: CountingMethod = "fractional") -> list[Collaboration]:
     return []
 
 
