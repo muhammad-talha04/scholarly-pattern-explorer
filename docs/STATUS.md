@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-14 23:25 PKT by olli.
+Last updated: 2026-10-15 03:55 PKT by olli.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -29,9 +29,11 @@ incrementally twice a month from OpenAlex. Design: `docs/architecture/`.
   side-by-side comparison, influential citations.
 
 ## Where we left off
-- [ ] Prince to merge #1
-- [ ] Grok to push fractional-counting change to #3 (needs Prince's OK in 1:1)
-- [ ] Merge #3, then Tom rebases #2 and wires routes in `core.py`
-- [ ] Harry's front end on mock data, then live API
-- [ ] Michal's search query set and gap finder (`/patterns?trend=gap`)
+Nothing is merged into main yet.
+- [ ] #1 (olli): ready for review, waiting for Prince to merge
+- [ ] #3 (grok): draft; fractional-counting change and STATUS entry not pushed yet, waiting on Prince's OK in 1:1
+- [ ] #2 (tom): draft; rebasing onto #1, switching to `data/works_v2.jsonl`, wiring `core.py` routes
+- [ ] Front end (harry): not started on the shared base (`v2-rebuild` will not be merged); waiting on "start the front end" in 1:1
+- [ ] Cross-PR tests (ami): not started; waiting on "start the tests" in 1:1
+- [ ] Gap finder + search query set (michal): not started; waiting on "start the gap finder" in 1:1
 - [ ] Optional: `OPENALEX_MAILTO` repo secret
