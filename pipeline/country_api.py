@@ -21,7 +21,7 @@ def snapshot() -> dict:
 def countries(counting: str = "fractional") -> list[dict]:
     s = snapshot()
     rows = s.get("countries_full" if counting == "full" else "countries", [])
-    return [{k: r[k] for k in ("code", "name", "papers", "growth_pct", "top_topics")} for r in rows]
+    return [{k: r[k] for k in ("code", "name", "papers", "growth_pct", "top_topics", "counting")} for r in rows]
 
 
 def country(code: str, counting: str = "fractional") -> dict | None:

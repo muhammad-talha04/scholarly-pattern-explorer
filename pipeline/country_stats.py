@@ -69,7 +69,7 @@ def snapshot(t: dict) -> dict:
         "tally": t,
         "countries": to_stats(t),
         "countries_full": to_stats(t, counting="full"),
-        "collaborations": [{"a": p.split("-")[0], "b": p.split("-")[1], "papers": n}
+        "collaborations": [{"source": p.split("-")[0], "target": p.split("-")[1], "papers": n}
                            for p, n in t["pairs"].most_common(200)],
         # Michal's gap finder: {topic: {year: count}} and top countries per topic
         "topic_year_counts": {tp: dict(ys) for tp, ys in t["topic_years"].items()},

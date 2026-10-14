@@ -46,7 +46,7 @@ def test_incremental_matches_full_and_counting():
     assert all(None not in r["top_topics"] for r in full["countries"])
     assert full["topic_year_counts"]["AI"] == {"2025": 1, "2026": 1}
     assert full["topic_top_countries"]["AI"][0] == "PK"
-    assert full["collaborations"] == [{"a": "CA", "b": "PK", "papers": 1}]
+    assert full["collaborations"] == [{"source": "CA", "target": "PK", "papers": 1}]
 
 
 def test_partial_run_keeps_pages(tmp_path, monkeypatch):
@@ -68,4 +68,4 @@ def test_country_api(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "SNAPSHOT", p)
     assert api.country("pk")["papers"] == 1.5
     assert api.country("PK", "full")["papers"] == 2
-    assert api.collaborations()[0]["b"] == "PK"
+    assert api.collaborations()[0]["target"] == "PK"
