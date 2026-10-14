@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
 from .. import ml_bridge as ml
-from ..schemas import (AskRequest, AskResponse, CountryStats, PaperDetail,
+from ..schemas import (AskRequest, AskResponse, Collaboration, CountingMethod, CountryStats, PaperDetail,
                        PaperSummary, Pattern, Run, SearchResponse)
 
 router = APIRouter()
@@ -86,7 +86,12 @@ def patterns(window: int | None = None, trend: str | None = None) -> list[Patter
 
 
 @router.get("/countries", response_model=list[CountryStats])
-def countries() -> list[CountryStats]:
+def countries(counting: CountingMethod = "fractional") -> list[CountryStats]:
+    return []
+
+
+@router.get("/countries/collaborations", response_model=list[Collaboration])
+def collaborations(counting: CountingMethod = "fractional") -> list[Collaboration]:
     return []
 
 
