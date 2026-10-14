@@ -1,0 +1,45 @@
+name: v2 ingest (twice a month)
+on:
+  schedule:
+    - cron: "0 3 1,15 * *"   # 03:00 UTC on the 1st and 15th
+  workflow_dispatch: {}
+  push:
+    paths: ["pipeline/**"]
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install requests pytest && python -m pytest -q pipeline/tests
+  ingest:
+    if: github.event_name != 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install requests
+      - name: Restore previous data
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          mkdir -p data
+          gh release download data-store -p works_v2.jsonl -p ingest_state.json -p country_snapshot.json -D data --clobber || echo "first run"
+      - name: Fetch only new works
+        env:
+          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+          OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
+        run: |
+          wc -l < data/works_v2.jsonl > before.txt 2>/dev/null || echo 0 > before.txt
+          set +e; python -m pipeline.ingest; code=$?; set -e
+          [ "$code" -eq 1 ] && exit 1
+          tail -n +$(( $(cat before.txt) + 1 )) data/works_v2.jsonl > data/new.jsonl
+      - name: Update country analytics with the new works only
+        run: python -m pipeline.country_stats --new data/new.jsonl --prev data/country_snapshot.json --out data/country_snapshot.json
+      - name: Save back
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json --clobber
