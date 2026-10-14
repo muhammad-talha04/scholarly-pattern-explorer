@@ -33,3 +33,8 @@ jobs:
         run: |
           pip install fastapi httpx pytest
           ML_EMBEDDER=hash python -m pytest ml -q
+
+      - name: Cross-PR integration tests (offline)
+        run: |
+          pip install fastapi httpx pytest requests pydantic
+          ML_EMBEDDER=hash python -m pytest tests/integration -q -rxX
