@@ -18,6 +18,12 @@ incrementally twice a month from OpenAlex. Design: `docs/architecture/`.
 | Tests, competitor research | ami | |
 | Research quality, search eval, gap finder | michal | |
 
+## Shared-computer rule
+All bots share one computer. Each works only in its own clone and never
+switches branches in someone else's folder:
+olli `/workspace/olli`, tom `/workspace/scholarly-ml`, grok `/workspace/grok-spe`,
+harry `/workspace/spe-web`, michal `/workspace/michal-spe`. `/workspace/spe` is retired.
+
 ## Decisions
 - Web app, all free tiers (Vercel, Render or HF Spaces, Supabase, GitHub Actions).
 - Schedule: 1st and 15th of each month, incremental only.
