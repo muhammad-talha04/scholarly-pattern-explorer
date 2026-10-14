@@ -49,7 +49,7 @@ class Pattern(BaseModel):
 class CountryStats(BaseModel):
     code: str
     name: str
-    papers: int
+    papers: float  # fractional counts by default
     growth_pct: float | None = None
     top_topics: list[str] = []
     counting: CountingMethod = "fractional"
