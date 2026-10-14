@@ -1,6 +1,9 @@
 """Single source of truth for API types. The web client is generated from these."""
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel, HttpUrl
+
+CountingMethod = Literal["fractional", "full"]
 
 
 class PaperSummary(BaseModel):
@@ -54,6 +57,7 @@ class CountryStats(BaseModel):
     papers: int
     growth_pct: float | None = None
     top_topics: list[str] = []
+    counting: CountingMethod = "fractional"
 
 
 class Run(BaseModel):
@@ -63,3 +67,9 @@ class Run(BaseModel):
     status: str
     papers_added: int = 0
     patterns_changed: int = 0
+
+
+class Collaboration(BaseModel):
+    source: str   # ISO 3166 alpha-2
+    target: str
+    papers: float  # fractional or full, per the request's counting method
