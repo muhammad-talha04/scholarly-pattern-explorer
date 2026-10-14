@@ -28,3 +28,8 @@ jobs:
           python build_db.py --input data/works_sample.jsonl --db data/ci.duckdb
           python mine_windows.py --db data/ci.duckdb
           python export_snapshot.py --db data/ci.duckdb --out ci_docs
+
+      - name: ML service tests (offline)
+        run: |
+          pip install fastapi httpx pytest
+          ML_EMBEDDER=hash python -m pytest ml -q
