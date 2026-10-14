@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app import ml_bridge
 from app.main import app
-from app.schemas import (AskResponse, CountryStats, PaperDetail, PaperSummary, Pattern, Run,
+from app.schemas import (AskResponse, Collaboration, CountryStats, PaperDetail, PaperSummary, Pattern, Run,
                          SearchResponse)
 from ml.embeddings import HashEmbedder
 from ml.gaps import counts_from_works, find_gaps, load_inputs
@@ -16,6 +16,12 @@ from ml.service import MLService, SummaryCache
 from ml.store import LocalStore
 from pipeline import country_stats as cs
 from pipeline.ingest import merge, normalize
+
+PAPERS_INT = pytest.mark.xfail(
+    reason="CONTRACT MISMATCH: schemas.CountryStats.papers is int (#1) but fractional counting in "
+           "pipeline/country_stats.to_stats (#3) yields non-integer papers (e.g. 2.5); "
+           "papers should become float or be rounded by contract", strict=True)
+COUNTINGS = ["full", pytest.param("fractional", marks=PAPERS_INT)]
 
 V2_REQUIRED = {"id": str, "title": str, "year": int, "cited_by": int, "authors": list,
                "countries": list, "topics": list}
@@ -74,48 +80,49 @@ def test_ml_works_path_prefers_v2(tmp_path, monkeypatch, works_v2):
 
 # ---------- country_stats -> schemas.CountryStats ----------
 
-def test_country_stats_full_counting_validates(works_v2):
-    stats = cs.to_stats(cs.tally(rows(works_v2)))
+@pytest.mark.parametrize("counting", COUNTINGS)
+def test_country_stats_validates_both_counting_modes(works_v2, counting):
+    stats = cs.to_stats(cs.tally(rows(works_v2)), counting=counting)
     assert stats
     for s in stats:
-        CountryStats.model_validate(s)
+        m = CountryStats.model_validate(s)
+        assert m.counting == counting
     pk = next(s for s in stats if s["code"] == "PK")
-    assert pk["name"] == "Pakistan" and pk["papers"] == 4  # W1, W4, W5, W7
+    assert pk["name"] == "Pakistan"
+    if counting == "full":
+        assert pk["papers"] == 4  # W1, W4, W5, W7
 
 
-def test_country_stats_snapshot_file_validates(tmp_path, works_v2):
+@pytest.mark.parametrize("counting", COUNTINGS)
+def test_country_stats_snapshot_file_validates(tmp_path, works_v2, counting):
     out = tmp_path / "snap.json"
     cs.main(["--new", str(works_v2), "--out", str(out)])
     snap = json.loads(out.read_text())
-    for s in snap["countries"]:
-        CountryStats.model_validate(s)
+    key = "countries_full" if counting == "full" else "countries"
+    if True:
+        assert snap[key]
+        for s in snap[key]:
+            assert CountryStats.model_validate(s).counting == counting
+    for c in snap["collaborations"]:
+        Collaboration.model_validate(c)
 
 
-def _fractional_tally(works):
-    """Call country_stats with fractional counting, whatever the final API name is."""
-    import inspect
-    params = inspect.signature(cs.tally).parameters
-    if "counting" in params:
-        return cs.tally(works, counting="fractional")
-    if "fractional" in params:
-        return cs.tally(works, fractional=True)
-    pytest.xfail("pipeline/country_stats.py has no fractional counting mode on ml-service yet "
-                 "(#3 change not pushed, see STATUS.md)")
-
-
-def test_country_stats_fractional_counting(works_v2):
+def test_country_stats_fractional_shares_sum_to_one_per_paper(works_v2):
+    """pipeline/country_stats.py: each paper with countries contributes exactly 1 in total."""
+    for w in rows(works_v2):
+        t = cs.tally([w])
+        total = sum(sum(v.values()) for v in t["frac"].values())
+        assert total == pytest.approx(1.0 if w["countries"] else 0.0)
     works = rows(works_v2)
-    t = _fractional_tally(works)
-    stats = cs.to_stats(t)
-    for s in stats:
-        CountryStats.model_validate(s)
-    # every paper with countries contributes exactly 1 in total
-    total = sum(sum(v.values()) for v in t["by_year"].values())
-    assert total == pytest.approx(sum(1 for w in works if w["countries"]))
+    t = cs.tally(works)
+    assert sum(sum(v.values()) for v in t["frac"].values()) == pytest.approx(
+        sum(1 for w in works if w["countries"]))
+    full = sum(sum(v.values()) for v in t["by_year"].values())
+    assert full == sum(len(w["countries"]) for w in works)
 
 
-def test_fractional_shares_sum_to_one_per_paper(works_v2):
-    """Fractional shares as ml/gaps.py computes them (the only fractional code on this branch)."""
+def test_fractional_shares_sum_to_one_per_paper_in_gaps(works_v2):
+    """Fractional shares as ml/gaps.py computes them (its works_v2 fallback)."""
     for w in rows(works_v2):
         _, top = counts_from_works([w])
         if w["countries"] and w["topics"]:
@@ -123,17 +130,15 @@ def test_fractional_shares_sum_to_one_per_paper(works_v2):
                 assert sum(v for _, v in top[t]) == pytest.approx(1.0, abs=1e-3)
 
 
-@pytest.mark.xfail(reason="BUG (#3): pipeline/ingest.py normalize() keeps None topic names and "
-                          "pipeline/country_stats.py tally() counts them, so top_topics can contain "
-                          "None and fails schemas.CountryStats (list[str])", strict=True)
 def test_country_stats_tolerates_missing_topic_names():
-    """OpenAlex topics without display_name become None in works_v2 rows."""
+    """OpenAlex topics without display_name must not leak None into top_topics."""
     w = normalize({"id": "https://openalex.org/W9", "display_name": "x", "publication_year": 2024,
                    "topics": [{"display_name": None}, {"display_name": "AI"}],
                    "authorships": [{"author": {"display_name": "A"}, "countries": ["PK"]}]})
-    stats = cs.to_stats(cs.tally([w]))
-    for s in stats:
-        CountryStats.model_validate(s)
+    assert None not in w["topics"]
+    for counting in ("fractional", "full"):
+        for s in cs.to_stats(cs.tally([w]), counting=counting):
+            CountryStats.model_validate(s)
 
 
 def test_incremental_country_stats_equals_full_rebuild(tmp_path, raw_batches):
@@ -254,14 +259,76 @@ def test_api_runs_validates(client):
     assert len(runs) == 1 and runs[0].papers_added == 8 and runs[0].status == "success"
 
 
-@pytest.mark.xfail(reason="/api/v1/countries is still a stub returning [] (apps/api/app/routers/"
-                          "core.py); not yet wired to pipeline/country_stats snapshot", strict=True)
-def test_api_countries_served_from_snapshot(client):
-    r = client.get("/api/v1/countries")
+@pytest.fixture
+def country_snapshot(tmp_path, monkeypatch, works_v2):
+    out = tmp_path / "country_snapshot.json"
+    cs.main(["--new", str(works_v2), "--out", str(out)])
+    from pipeline import country_api
+    monkeypatch.setattr(country_api, "SNAPSHOT", out)  # module reads the env var at import time
+    monkeypatch.setenv("COUNTRY_SNAPSHOT", str(out))
+    return json.loads(out.read_text())
+
+
+@pytest.mark.parametrize("counting", COUNTINGS)
+def test_country_api_helpers_validate(country_snapshot, counting):
+    from pipeline import country_api
+    if True:
+        rs = country_api.countries(counting)
+        assert rs and all(CountryStats.model_validate(r).counting == counting for r in rs)
+    assert country_api.country("pk")["code"] == "PK"
+    for c in country_api.collaborations():
+        Collaboration.model_validate(c)
+
+
+STUB = ("apps/api/app/routers/core.py /countries routes are still stubs (return [] / 404) and "
+        "do not call pipeline/country_api.py")
+
+
+@pytest.mark.xfail(reason=STUB, strict=True)
+@pytest.mark.parametrize("counting", ["fractional", "full"])
+def test_api_countries_by_counting(client, country_snapshot, counting):
+    r = client.get("/api/v1/countries", params={"counting": counting})
     assert r.status_code == 200
     stats = [CountryStats.model_validate(x) for x in r.json()]
-    assert stats, "expected countries from data/country_snapshot.json"
-    assert client.get("/api/v1/countries/PK").status_code == 200
+    assert stats and all(s.counting == counting for s in stats)
+    full = {s["code"]: s["papers"] for s in country_snapshot["countries_full"]}
+    if counting == "full":
+        assert {s.code: s.papers for s in stats} == full
+
+
+def test_api_countries_rejects_unknown_counting(client):
+    assert client.get("/api/v1/countries", params={"counting": "bogus"}).status_code == 422
+
+
+@pytest.mark.xfail(reason=STUB, strict=True)
+def test_api_country_detail(client, country_snapshot):
+    r = client.get("/api/v1/countries/PK")
+    assert r.status_code == 200
+    assert CountryStats.model_validate(r.json()).code == "PK"
+
+
+def test_api_collaborations_shape(client):
+    r = client.get("/api/v1/countries/collaborations", params={"counting": "full"})
+    assert r.status_code == 200
+    for x in r.json():
+        Collaboration.model_validate(x)
+
+
+@pytest.mark.xfail(reason=STUB, strict=True)
+def test_api_collaborations_served_from_snapshot(client, country_snapshot):
+    r = client.get("/api/v1/countries/collaborations", params={"counting": "full"})
+    got = [Collaboration.model_validate(x) for x in r.json()]
+    assert got and {(c.source, c.target) for c in got} >= {("CA", "PK"), ("CN", "PK")}
+
+
+@pytest.mark.xfail(reason="pipeline/country_stats.py collaborations are full counts only and "
+                          "pipeline/country_api.collaborations() takes no counting argument, so "
+                          "/countries/collaborations?counting=fractional cannot differ from full",
+                   strict=True)
+def test_collaborations_fractional_counting_supported():
+    import inspect
+    from pipeline import country_api
+    assert "counting" in inspect.signature(country_api.collaborations).parameters
 
 
 # ---------- gap finder: topic_year_counts contract ----------
@@ -305,13 +372,29 @@ def test_api_gap_patterns_from_snapshot(client, tmp_path, monkeypatch):
     assert load_inputs(snap)[2] == "snapshot"
 
 
-@pytest.mark.xfail(reason="pipeline/country_stats.py does not write topic_year_counts / "
-                          "topic_top_countries into country_snapshot.json yet (requested of grok in "
-                          "STATUS.md); gap finder falls back to works_v2.jsonl", strict=True)
 def test_country_snapshot_has_gap_inputs(tmp_path, works_v2):
     out = tmp_path / "snap.json"
     cs.main(["--new", str(works_v2), "--out", str(out)])
     snap = json.loads(out.read_text())
-    assert snap["topic_year_counts"] and snap["topic_top_countries"]
-    tyc, top = counts_from_works(read_works(works_v2))
-    assert {t: {int(y): n for y, n in v.items()} for t, v in snap["topic_year_counts"].items()} == tyc
+    tyc, top = snap["topic_year_counts"], snap["topic_top_countries"]
+    assert tyc and top
+    for topic, by_year in tyc.items():
+        assert all(str(y).isdigit() and isinstance(n, int) for y, n in by_year.items())
+    assert load_inputs(out)[2] == "snapshot"
+    assert find_gaps(tyc, top, last_year=2025, min_total=1, min_last=0) is not None
+    # same yearly counts as ml/gaps.py's own fallback over works_v2.jsonl
+    mine, _ = counts_from_works(read_works(works_v2))
+    assert {t: {int(y): n for y, n in v.items()} for t, v in tyc.items()} == mine
+
+
+@pytest.mark.xfail(reason="STATUS.md asks for topic_top_countries as [[code, fractional_count], ...] "
+                          "sorted desc; pipeline/country_stats.snapshot() writes a plain list of "
+                          "codes ranked by full counts", strict=True)
+def test_topic_top_countries_are_fractional_pairs(tmp_path, works_v2):
+    out = tmp_path / "snap.json"
+    cs.main(["--new", str(works_v2), "--out", str(out)])
+    top = json.loads(out.read_text())["topic_top_countries"]
+    _, expected = counts_from_works(read_works(works_v2))
+    for t, pairs in top.items():
+        assert all(isinstance(p, list) and len(p) == 2 for p in pairs)
+        assert [c for c, _ in pairs] == [c for c, _ in expected[t]][:len(pairs)]
