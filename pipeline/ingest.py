@@ -41,9 +41,9 @@ def normalize(w: dict) -> dict:
         "abstract": abstract_from_index(w.get("abstract_inverted_index")),
         "original_url": oa.get("oa_url") or loc.get("landing_page_url") or w.get("doi"),
         "openalex_url": w["id"],
-        "authors": [(a.get("author") or {}).get("display_name") for a in w.get("authorships") or []],
+        "authors": [n for a in w.get("authorships") or [] if (n := (a.get("author") or {}).get("display_name"))],
         "countries": countries,
-        "topics": [t.get("display_name") for t in w.get("topics") or []],
+        "topics": [t["display_name"] for t in w.get("topics") or [] if t.get("display_name")],
         "raw": w,  # kept so build_db.py / Tom's ml/ can read the original shape
     }
 
@@ -76,6 +76,8 @@ def fetch(since: str, filters: list[str], max_records: int, session=requests):
             r = session.get(API, params={**params, "cursor": cursor}, timeout=60)
             if r.status_code == 200:
                 break
+            if r.status_code in (401, 403):
+                raise SystemExit(f"OpenAlex HTTP {r.status_code}: set OPENALEX_API_KEY")
             time.sleep(2 ** attempt)
         else:
             raise SystemExit(f"OpenAlex kept failing: HTTP {r.status_code}")
@@ -101,7 +103,18 @@ def main(argv=None):
     last = json.loads(state.read_text())["last_run"] if state.exists() else None
     since = (date.fromisoformat(last) - timedelta(days=a.overlap_days)) if last \
         else date.today() - timedelta(days=a.first_lookback_days)
-    added = merge(out, list(fetch(since.isoformat(), a.filter, a.max_records)))
+    added, batch, failed = 0, [], None
+    try:
+        for r in fetch(since.isoformat(), a.filter, a.max_records):
+            batch.append(r)
+            if len(batch) >= 200:  # save each page as it arrives
+                added += merge(out, batch); batch = []
+    except SystemExit as e:
+        failed = e
+    added += merge(out, batch)
+    if failed:  # keep what we got, but don't advance last_run so the gap is retried
+        print(f"stopped early ({failed}); saved {added} works")
+        return 1
     state.write_text(json.dumps({"last_run": date.today().isoformat(), "last_added": added}))
     print(f"since {since}: {added} new works")
     return 0 if added else 2
