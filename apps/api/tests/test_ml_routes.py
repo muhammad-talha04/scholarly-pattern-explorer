@@ -70,10 +70,25 @@ def test_related(client):
     assert client.get("/api/v1/papers/NOPE/related").status_code == 404
 
 
-def test_patterns_runs_and_gap_hook(client):
+def test_patterns_runs_and_gap_hook(client, monkeypatch):
     p = client.get("/api/v1/patterns").json()
     assert any(x["items"] == ["DL", "Proteins"] for x in p)
     assert all(x["window_start"] == 2021 for x in client.get("/api/v1/patterns", params={"window": 2021}).json())
-    assert client.get("/api/v1/patterns", params={"trend": "gap"}).status_code == 501
+    monkeypatch.setattr(ml_bridge, "get_gaps", lambda limit=20: [])   # gap handler now implemented
+    assert client.get("/api/v1/patterns", params={"trend": "gap"}).status_code == 200
     runs = client.get("/api/v1/runs").json()
     assert runs[0]["id"] == 1 and runs[0]["papers_added"] == 3 and runs[0]["status"] == "success"
+
+
+def test_patterns_gap(client, monkeypatch):
+    from ml.gaps import find_gaps
+    tyc = {"QML": {2022: 6, 2023: 12, 2024: 24, 2025: 48},
+           "NLP": {2022: 900, 2023: 910, 2024: 905, 2025: 915}}
+    monkeypatch.setattr(ml_bridge, "get_gaps",
+                        lambda limit=20: find_gaps(tyc, {"QML": [["CA", 2.5]]}, last_year=2025))
+    r = client.get("/api/v1/patterns", params={"trend": "gap"})
+    assert r.status_code == 200
+    body = r.json()
+    assert [p["items"] for p in body] == [["QML"]]
+    assert body[0]["paper_count"] == 90 and body[0]["top_countries"] == ["CA"]
+    assert body[0]["growth_rate"] > 0.5

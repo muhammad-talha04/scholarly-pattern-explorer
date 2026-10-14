@@ -77,8 +77,13 @@ def related(paper_id: str, limit: int = 10) -> list[PaperSummary]:
 @router.get("/patterns", response_model=list[Pattern])
 def patterns(window: int | None = None, trend: str | None = None) -> list[Pattern]:
     if trend == "gap":
-        # Hook for the research-gap finder (owner: michal). Not implemented here.
-        raise HTTPException(501, "trend=gap is not implemented yet")
+        # Research-gap finder (owner: michal): fast-growing, still-small topics.
+        gaps = ml.get_gaps()
+        return [Pattern(items=[g["topic"]], support=g["gap_score"],
+                        window_start=g["window_start"], window_end=g["window_end"],
+                        gap_score=g["gap_score"], growth_rate=g["growth_rate"],
+                        paper_count=g["paper_count"], top_countries=g["top_countries"])
+                for g in gaps if window is None or g["window_start"] == window]
     rows = ml.get_miner().patterns()
     return [Pattern(items=r["itemset"].split(" | "), support=r["support"],
                     window_start=r["window_start"], window_end=r["window_end"])
