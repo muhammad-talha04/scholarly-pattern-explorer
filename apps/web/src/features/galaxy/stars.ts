@@ -315,7 +315,7 @@ function linkBand(nodes: PlexusNode[], rand: () => number): NetEdge[] {
       a: nodes[pair.i].pos,
       b: nodes[pair.j].pos,
       span: pair.d,
-      alpha: 0.08 + 0.42 * fade * fade,
+      alpha: 0.14 + 0.4 * fade * fade,
     });
   }
   return edges;

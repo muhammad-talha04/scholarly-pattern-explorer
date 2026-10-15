@@ -9,8 +9,8 @@ import type { TopicLink } from "@/lib/graph";
 import { accent, gap as gapColor, ink, plexusGold } from "@/lib/theme";
 import { heroNetwork, neighborIds, networkLinks, plexusCore, plexusDrift, plexusTint, type Star } from "./stars";
 
-/** Above the band, far enough that the diagonal ribbon fills the pane without cropping. */
-const CAMERA_POS = new Vector3(0.35, 26, 11);
+/** Nearly overhead so the XZ diagonal reads lower-left to upper-right, with a little parallax. */
+const CAMERA_POS = new Vector3(0.2, 22.5, 2.8);
 const CAMERA_FOV = 46;
 
 const DRIFT = `
@@ -74,16 +74,17 @@ void main() {
   if (d > 1.0) discard;
   vec4 outc;
   if (vWash > 0.5) {
-    float a = exp(-2.4 * d * d) * 0.2;
+    float a = exp(-2.6 * d * d) * 0.075;
     outc = vec4(vTint, a);
   } else {
-    float core = smoothstep(0.42, 0.02, d);
-    float glow = exp(-5.2 * d * d) * 0.32;
+    float core = smoothstep(0.5, 0.08, d);
+    float glow = exp(-4.4 * d * d) * 0.4;
     float tw = uMotion * vTwinkle * pow(max(sin(uTime * 1.7 + vPhase), 0.0), 28.0);
     float lit = clamp(vGlow, 0.0, 1.0);
-    vec3 col = mix(vTint, vCore, 0.4 + 0.6 * core);
-    col = mix(col, vec3(1.0), lit * 0.4 + tw);
-    float alpha = clamp((glow * (1.0 - core) + core) * vFade * (1.0 + lit * 0.85) + tw, 0.0, 1.0);
+    vec3 col = mix(vTint, vCore, 0.25 + 0.75 * core);
+    col = mix(col, vec3(1.0), lit * 0.35 + tw);
+    float alpha = max(core * (0.45 + 0.55 * vFade), glow * vFade);
+    alpha = clamp(alpha * (1.0 + lit) + tw, 0.0, 1.0);
     outc = vec4(col, alpha);
   }
   if (outc.a < 0.012) discard;
@@ -126,7 +127,7 @@ void main() {
 function CameraRig({ look, reduce, controls }: { look: [number, number, number]; reduce: boolean; controls: React.RefObject<OrbitControlsImpl | null> }) {
   const { camera } = useThree();
   const intro = useRef(reduce ? 1 : 0.65);
-  const from = useRef(new Vector3(0.35, 32, 14));
+  const from = useRef(new Vector3(0.2, 28, 4.2));
   const to = useRef(new Vector3());
   const lookV = useRef(new Vector3());
   useEffect(() => {
@@ -175,7 +176,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
     const core = new Float32Array((n + 1) * 3);
     const hub = net.hub;
     positions[0] = hub[0]; positions[1] = hub[1]; positions[2] = hub[2];
-    sizes[0] = 280;
+    sizes[0] = 150;
     wash[0] = 1;
     fades[0] = 1;
     color.set(accent);
@@ -186,7 +187,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
     nodes.forEach((node, i) => {
       const o = i + 1;
       positions[o * 3] = node.pos[0]; positions[o * 3 + 1] = node.pos[1]; positions[o * 3 + 2] = node.pos[2];
-      sizes[o] = 6.4;
+      sizes[o] = 7.5;
       phases[o] = node.phase;
       fades[o] = node.fade;
       twinkle[o] = node.twinkle;
