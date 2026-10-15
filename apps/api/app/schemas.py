@@ -117,6 +117,7 @@ class GalaxyCluster(BaseModel):
     label: str
     centroid: GalaxyCentroid
     size: int
+    color_index: int
 
 
 class GalaxyNode(BaseModel):
@@ -131,6 +132,7 @@ class GalaxyNode(BaseModel):
     cluster_label: str = ""
     year: int | None = None
     support: float
+    color_index: int
 
 
 class GalaxyLink(BaseModel):
