@@ -28,7 +28,7 @@ def test_minilm_indexes_and_searches(tmp_path):
     assert svc.index_papers(papers) == len(papers)
     hits = svc.search("quantum error correction with surface codes", k=5)
     assert hits[0]["work_id"] in {"W01", "W02"}
-    points = {p["id"]: p for p in svc.galaxy()}
+    points = {p["id"]: p for p in svc.rebuild_galaxy()["nodes"]}
     assert set(points) == {p.work_id for p in papers}
 
     def dist(a, b):

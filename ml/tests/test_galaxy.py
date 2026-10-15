@@ -1,7 +1,8 @@
 import numpy as np
 
 from ml.embeddings import HashEmbedder
-from ml.galaxy import GalaxyMap, cluster_ids, ctfidf_labels, resolve_method
+from ml.galaxy import (GalaxyMap, cluster_ids, ctfidf_labels, empty_graph, graph_from_layout,
+                       knn_links, resolve_method)
 from ml.papers import Paper
 from ml.service import MLService, SummaryCache
 from ml.store import LocalStore
@@ -96,6 +97,8 @@ def test_new_paper_below_centroid_threshold_is_unclustered(tmp_path):
 
 def test_cli_index_writes_a_galaxy(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ML_EMBEDDER", "hash")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "local")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
     papers = tmp_path / "works.jsonl"
     papers.write_text('{"id": "W1", "title": "Protein folding", "abstract": "transformers predict structure", "year": 2020}\n',
@@ -105,21 +108,76 @@ def test_cli_index_writes_a_galaxy(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "ml" / "galaxy" / "state.json").exists()
     assert "indexed 1 papers" in capsys.readouterr().out
     main(["galaxy"])
-    assert "galaxy 1 points" in capsys.readouterr().out
+    assert "galaxy 1 nodes" in capsys.readouterr().out
+    main(["update", "--jsonl", str(papers)])
+    assert "galaxy 1 nodes" in capsys.readouterr().out
+    stored = LocalStore(tmp_path / "ml" / "vectors").get_document("galaxy")
+    assert stored["nodes"] and stored["nodes"][0]["id"] == "W1"
 
 
 def test_service_galaxy_round_trip(tmp_path):
     papers = [
-        Paper("W1", "Transformers for protein structure", "Attention predicts protein folding contacts.", 2021),
-        Paper("W2", "Surface codes correct quantum errors", "Stabilizers protect logical qubits from noise.", 2020),
+        Paper("W1", "Transformers for protein structure", "Attention predicts protein folding contacts.", 2021,
+              topics=["Protein folding"], cited_by=4),
+        Paper("W2", "Surface codes correct quantum errors", "Stabilizers protect logical qubits from noise.", 2020,
+              topics=["Quantum codes"], cited_by=0),
     ]
-    svc = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
+    store = LocalStore(tmp_path / "v")
+    svc = MLService(embedder=HashEmbedder(), store=store,
                     cache=SummaryCache(":memory:"), galaxy_dir=tmp_path / "g")
-    assert svc.galaxy() == []
+    assert svc.read_galaxy() == empty_graph()
     svc.index_papers(papers)
-    points = svc.galaxy()
-    assert {p["id"] for p in points} == {"W1", "W2"}
-    assert svc.galaxy() == points
+    assert svc.read_galaxy() == empty_graph()
+    calls = {"rows": 0}
+    real_rows = store.rows
+
+    def counting_rows():
+        calls["rows"] += 1
+        return real_rows()
+
+    store.rows = counting_rows
+    graph = svc.rebuild_galaxy()
+    assert calls["rows"] == 1
+    assert {n["id"] for n in graph["nodes"]} == {"W1", "W2"}
+    by_id = {n["id"]: n for n in graph["nodes"]}
+    assert by_id["W1"]["year"] == 2021 and by_id["W2"]["year"] == 2020
+    assert by_id["W1"]["topic_id"] == "protein-folding"
+    assert by_id["W1"]["topic_name"] == "Transformers for protein structure"
+    assert by_id["W1"]["support"] == 1.0
+    assert isinstance(by_id["W1"]["cluster_id"], str)
+    assert {c["id"] for c in graph["clusters"]} >= {n["cluster_id"] for n in graph["nodes"]}
+    for cluster in graph["clusters"]:
+        assert set(cluster) == {"id", "name", "label", "centroid", "size"}
+        assert cluster["name"] == cluster["label"]
+        assert set(cluster["centroid"]) == {"x", "y", "z"}
+    names = {n["topic_name"] for n in graph["nodes"]}
+    for link in graph["links"]:
+        assert link["source"] in names and link["target"] in names
+    assert svc.read_galaxy() == graph
+    assert calls["rows"] == 1
     again = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
-                      cache=SummaryCache(":memory:"), galaxy_dir=tmp_path / "g").galaxy()
-    assert again == points
+                      cache=SummaryCache(":memory:"), galaxy_dir=tmp_path / "g").read_galaxy()
+    assert again == graph
+
+
+def test_graph_links_are_capped_nearest_neighbours():
+    points = []
+    metas = []
+    vectors = []
+    for i in range(6):
+        vec = np.zeros(4, dtype=np.float64)
+        vec[0] = 1.0
+        vec[1] = i / 10
+        vectors.append(vec)
+        points.append({"id": f"W{i}", "x": float(i), "y": 0.0, "z": 0.0,
+                       "cluster_id": 0, "cluster_label": "shared, topic", "year": 2020})
+        metas.append({"title": "Same title", "topics": ["Shared topic"], "cited_by": i or 0, "pub_year": 2020})
+    graph = graph_from_layout(points, np.stack(vectors), metas, neighbours=2, max_edges=3)
+    assert len(graph["links"]) == 3
+    assert graph["links"] == sorted(graph["links"], key=lambda link: -link["weight"])
+    names = {n["topic_name"] for n in graph["nodes"]}
+    assert names == {"Same title"} | {f"Same title (W{i})" for i in range(1, 6)}
+    assert graph["clusters"][0]["size"] == 6
+    assert graph["clusters"][0]["id"] == "0"
+    assert knn_links(["a"], np.ones((1, 2))) == []
+    assert graph_from_layout([], np.zeros((0, 2)), []) == empty_graph()

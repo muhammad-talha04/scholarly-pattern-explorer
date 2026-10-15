@@ -42,8 +42,8 @@ def load_discoveries() -> dict | None:
     """Latest precomputed gaps, emerging topics, and similar papers.
 
     ``None`` means ``discover`` has not run yet. Callers filter this dict; they
-    do not recompute it. The read and write live in ``ml.discovery_store`` so
-    they can move onto the shared store later.
+    do not recompute it. ``ml.discovery_store`` reads ``discovery_snapshots``
+    when the shared store is Postgres, and the local JSON file otherwise.
     """
     return _load_discoveries()
 

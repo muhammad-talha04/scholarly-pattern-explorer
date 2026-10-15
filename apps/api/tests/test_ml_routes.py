@@ -35,11 +35,22 @@ def client(tmp_path, monkeypatch):
     svc = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
                     cache=SummaryCache(tmp_path / "s.sqlite"))
     svc.index_papers([Paper.from_record(r) for r in V2])
+    svc.rebuild_galaxy()
+    calls = {"rows": 0}
+    real_rows = svc.store.rows
+
+    def counting_rows():
+        calls["rows"] += 1
+        return real_rows()
+
+    svc.store.rows = counting_rows
     miner = IncrementalMiner(tmp_path / "p", min_support=0.1, min_baskets=1)
     miner.update([Paper.from_record(r).to_dict() for r in V2], run_date="2026-10-15")
     monkeypatch.setattr(ml_bridge, "get_service", lambda: svc)
     monkeypatch.setattr(ml_bridge, "get_miner", lambda: miner)
-    return TestClient(app)
+    client = TestClient(app)
+    client.row_calls = calls
+    return client
 
 
 def test_search_filters_and_links(client):
@@ -65,14 +76,46 @@ def test_paper_detail_summary_and_ask(client):
 
 
 def test_galaxy_layout(client):
-    rows = client.get("/api/v1/galaxy").json()
-    assert {r["id"] for r in rows} == {"W1", "W2", "W3"}
-    for row in rows:
-        assert set(row) == {"id", "x", "y", "z", "cluster_id", "cluster_label", "year"}
-        assert isinstance(row["cluster_id"], int) and row["cluster_label"]
-        assert isinstance(row["x"], float) and isinstance(row["y"], float) and isinstance(row["z"], float)
-    assert {r["id"]: r["year"] for r in rows} == {"W1": 2021, "W2": 2023, "W3": 2020}
-    assert client.get("/api/v1/galaxy").json() == rows
+    body = client.get("/api/v1/galaxy").json()
+    assert client.row_calls["rows"] == 0
+    assert set(body) == {"nodes", "clusters", "links"}
+    nodes = body["nodes"]
+    assert {n["id"] for n in nodes} == {"W1", "W2", "W3"}
+    names = {n["topic_name"] for n in nodes}
+    for node in nodes:
+        assert set(node) == {"id", "topic_id", "topic_name", "x", "y", "z",
+                             "cluster_id", "cluster_label", "year", "support"}
+        assert isinstance(node["cluster_id"], str) and node["cluster_label"]
+        assert isinstance(node["x"], float) and isinstance(node["y"], float) and isinstance(node["z"], float)
+        assert isinstance(node["support"], float) and 0 < node["support"] <= 1
+    assert {n["id"]: n["year"] for n in nodes} == {"W1": 2021, "W2": 2023, "W3": 2020}
+    by_id = {n["id"]: n for n in nodes}
+    assert by_id["W1"]["support"] == 1.0
+    assert by_id["W1"]["topic_name"] == "Transformers for protein structure prediction"
+    assert by_id["W1"]["topic_id"] == "proteins"
+    cluster_ids = {c["id"] for c in body["clusters"]}
+    assert {n["cluster_id"] for n in nodes} <= cluster_ids
+    for cluster in body["clusters"]:
+        assert set(cluster) == {"id", "name", "label", "centroid", "size"}
+        assert cluster["name"] == cluster["label"] and cluster["size"] >= 1
+        assert set(cluster["centroid"]) == {"x", "y", "z"}
+    assert len(body["links"]) <= 200
+    for link in body["links"]:
+        assert set(link) == {"source", "target", "weight"}
+        assert link["source"] in names and link["target"] in names
+        assert link["source"] != link["target"]
+    assert client.get("/api/v1/galaxy").json() == body
+    assert client.row_calls["rows"] == 0
+
+
+def test_galaxy_empty_before_rebuild(tmp_path, monkeypatch):
+    svc = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
+                    cache=SummaryCache(tmp_path / "s.sqlite"))
+    svc.index_papers([Paper.from_record(V2[0])])
+    monkeypatch.setattr(ml_bridge, "get_service", lambda: svc)
+    body = TestClient(app).get("/api/v1/galaxy")
+    assert body.status_code == 200
+    assert body.json() == {"nodes": [], "clusters": [], "links": []}
 
 
 def test_related(client):

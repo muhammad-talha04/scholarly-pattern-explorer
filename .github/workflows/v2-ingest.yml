@@ -41,10 +41,33 @@ jobs:
           tail -n +$(( $(cat before.txt) + 1 )) data/works_v2.jsonl > data/new.jsonl
       - name: Update country analytics with the new works only
         run: python -m pipeline.country_stats --new data/new.jsonl --prev data/country_snapshot.json --out data/country_snapshot.json --corpus data/works_v2.jsonl
-      - name: Precompute gaps, emerging topics, and similar papers
-        run: |
-          pip install numpy
-          python -m ml.cli discover
       - name: Save back
         env: {GH_TOKEN: "${{ github.token }}"}
-        run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json data/ml/discoveries.json --clobber
+        run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json --clobber
+      - name: Precompute embeddings and the galaxy graph
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ML_DATA_DIR: data/ml
+        run: |
+          pip install -r ml/requirements.txt
+          python -m ml.cli index
+          python -m ml.cli update || echo "pattern update failed"
+      - name: Save the galaxy payload
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          f=data/ml/vectors/documents/galaxy.json
+          if [ -f "$f" ]; then
+            gh release upload data-store "$f" --clobber
+          fi
+      - name: Precompute gaps, emerging topics, and similar papers
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ML_DATA_DIR: data/ml
+        run: python -m ml.cli discover
+      - name: Save discoveries
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          f=data/ml/discoveries.json
+          if [ -f "$f" ]; then
+            gh release upload data-store "$f" --clobber
+          fi

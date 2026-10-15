@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #070814;
+  --text: #eef3ff;
+  --muted: #c5d0e6;
+  --faint: #9aabc8;
+  --line: rgba(190, 214, 255, 0.16);
+  --accent: #7dd3fc;
+}
+body {
+  @apply bg-ink text-slate-100 antialiased;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.55), transparent 1.4px),
+    radial-gradient(1px 1px at 28% 68%, rgba(255, 255, 255, 0.35), transparent 1.2px),
+    radial-gradient(1.2px 1.2px at 72% 18%, rgba(255, 255, 255, 0.4), transparent 1.4px),
+    radial-gradient(1px 1px at 84% 74%, rgba(255, 255, 255, 0.28), transparent 1.2px),
+    radial-gradient(1px 1px at 46% 42%, rgba(255, 255, 255, 0.22), transparent 1.2px),
+    radial-gradient(ellipse at 12% -10%, rgba(125, 211, 252, 0.18), transparent 46%),
+    radial-gradient(ellipse at 90% 120%, rgba(196, 181, 253, 0.16), transparent 50%),
+    radial-gradient(ellipse at 50% 40%, rgba(249, 168, 212, 0.05), transparent 42%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+::selection { background: rgba(125, 211, 252, 0.35); color: white; }
+@layer components {
+  .glass {
+    @apply rounded-2xl border backdrop-blur-xl;
+    border-color: var(--line);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.03));
+    box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .chip { @apply rounded-full border px-2.5 py-0.5 text-xs text-mist; border-color: var(--line); background: rgba(255, 255, 255, 0.05); }
+  .btn {
+    @apply rounded-xl border px-4 py-2 text-sm font-medium transition hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink;
+    border-color: var(--line);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .input {
+    @apply rounded-xl border bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent/70;
+    border-color: var(--line);
+  }
+}
+.skip-link {
+  position: absolute; left: 1rem; top: -4rem; z-index: 80;
+  @apply rounded-lg bg-white px-3 py-2 text-sm font-semibold text-ink;
+}
+.skip-link:focus { top: 0.75rem; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
