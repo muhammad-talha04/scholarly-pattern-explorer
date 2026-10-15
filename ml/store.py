@@ -30,7 +30,7 @@ DOCUMENT_KINDS = (
 )
 
 _KIND = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-_MIGRATION = Path(__file__).resolve().parents[1] / "pipeline" / "migrations" / "001_ml_storage.sql"
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "db" / "migrations"
 
 
 def check_kind(kind: str) -> str:
@@ -61,8 +61,16 @@ def split_sql(sql: str) -> list[str]:
     return parts
 
 
+def migration_files() -> list[Path]:
+    """Numbered SQL files under db/migrations, in apply order."""
+    return sorted(p for p in _MIGRATIONS_DIR.glob("[0-9]*.sql") if p.is_file())
+
+
 def migration_sql() -> list[str]:
-    return split_sql(_MIGRATION.read_text(encoding="utf-8"))
+    statements: list[str] = []
+    for path in migration_files():
+        statements.extend(split_sql(path.read_text(encoding="utf-8")))
+    return statements
 
 
 class VectorStore(Protocol):
@@ -182,7 +190,11 @@ def _vec_literal(v) -> str:
 
 
 class PgVectorStore:
-    """Supabase Postgres + pgvector. Needs psycopg (v3) and DATABASE_URL."""
+    """Supabase Postgres + pgvector. Needs psycopg (v3) and DATABASE_URL.
+
+    Connecting applies every file in ``db/migrations`` in order. The same files
+    are what ``python -m db.apply`` runs.
+    """
 
     def __init__(self, dsn: str | None = None, conn=None):
         if conn is None:

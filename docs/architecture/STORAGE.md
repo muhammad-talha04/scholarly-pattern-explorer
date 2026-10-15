@@ -21,6 +21,21 @@ Offline tests leave `DATABASE_URL` unset (or set `ML_VECTOR_BACKEND=local`) and 
 
 ## Tables
 
+Every Postgres table is created by a numbered file in `db/migrations/`. Apply them in order:
+
+```bash
+DATABASE_URL=postgresql://... python -m db.apply   # from the repo root
+```
+
+`PgVectorStore` runs the same files when it connects. Each statement is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `ENABLE ROW LEVEL SECURITY`). Row level security is on and there are no policies, so the Supabase `anon` and `authenticated` roles cannot read or write. The API uses `DATABASE_URL`, and that role bypasses row level security.
+
+| file | tables |
+|---|---|
+| `001_vector_storage.sql` | `vector` extension, `paper_embeddings`, `documents` |
+| `002_topic_country_year.sql` | `topic_country_year`, view `topic_country_year_v` |
+| `003_discovery_snapshots.sql` | `discovery_snapshots` |
+| `004_runs_summaries_snapshots.sql` | `runs`, `paper_summaries`, `snapshots` |
+
 `paper_embeddings`
 
 | column | type |
@@ -30,7 +45,7 @@ Offline tests leave `DATABASE_URL` unset (or set `ML_VECTOR_BACKEND=local`) and 
 | `meta` | jsonb |
 | `model` | text, nullable |
 
-Index: `paper_embeddings_hnsw` on `embedding` with `vector_cosine_ops`.
+Index: `paper_embeddings_hnsw` on `embedding` with `vector_cosine_ops`. An older `schema_v2.sql` created `model TEXT NOT NULL`; `001` drops that constraint when it is still present.
 
 `documents`
 
@@ -40,11 +55,35 @@ Index: `paper_embeddings_hnsw` on `embedding` with `vector_cosine_ops`.
 | `payload` | jsonb, not null |
 | `updated_at` | timestamptz, default `now()` |
 
-DDL for a fresh database is in `pipeline/schema_v2.sql`. An existing database
-gets the same objects from `pipeline/migrations/001_ml_storage.sql`.
-`PgVectorStore` runs that migration when it connects. Each statement runs on
-its own, including the block that drops `NOT NULL` on `paper_embeddings.model`
-when an older `schema_v2.sql` created that column.
+`topic_country_year`
+
+| column | type |
+|---|---|
+| `topic_id` | varchar, primary key (with the next two) |
+| `topic_name` | varchar |
+| `country_code` | varchar |
+| `year` | integer |
+| `paper_count` | integer |
+| `fractional_count` | double precision |
+
+Primary key: `(topic_id, country_code, year)`. The view `topic_country_year_v` is `security_invoker` (Postgres 15, which Supabase provides), so it follows the table's row level security. The country pipeline still writes the same columns into SQLite `data/topic_country_year.sqlite`.
+
+`discovery_snapshots`
+
+| column | type |
+|---|---|
+| `id` | bigserial, primary key |
+| `run_date` | date, not null |
+| `kind` | text, not null (`gap`, `emerging`, and later kinds) |
+| `country_code` | text, optional |
+| `results` | jsonb, not null |
+| `created_at` | timestamptz, default `now()` |
+
+Indexes: `discovery_snapshots_run_date_idx` on `run_date`; `discovery_snapshots_kind_country_date_idx` on `(kind, country_code, run_date DESC)`; `discovery_snapshots_created_at_idx` on `created_at DESC`.
+
+`runs`, `paper_summaries`, and `snapshots` are the incremental-run tables that used to live only in `pipeline/schema_v2.sql`. That file now points here.
+
+The DuckDB corpus (`works`, `topics`, and the mining tables) stays in `schema.sql` and `indexes.sql`. Those files are not part of this Postgres rebuild.
 
 ## Document kinds
 
@@ -73,5 +112,8 @@ store.get_document("countries")
 
 The typed topic × country × year aggregate from the country pipeline still
 lives in SQLite `topic_country_year` (`data/topic_country_year.sqlite`, view
-`topic_country_year_v`). The `documents` row of kind `topic_country_year` is
-the shared JSON slot for the same counts.
+`topic_country_year_v`). The Postgres table of the same name is
+`db/migrations/002_topic_country_year.sql`. The `documents` row of kind
+`topic_country_year` is the shared JSON slot for the same counts.
+Gap and emerging runs can be stored in `discovery_snapshots` (`kind` is `gap`
+or `emerging`, `country_code` optional, `results` is the JSON payload).

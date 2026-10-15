@@ -274,7 +274,7 @@ A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
 | Feature | How |
 |---|---|
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU). Override with `ML_EMBED_MODEL` or `python -m ml.cli index --model <id>` |
-| Vector storage | Postgres + pgvector when `DATABASE_URL` is set (Supabase, HNSW cosine index). `ML_VECTOR_BACKEND=local` keeps the numpy files. Documents (galaxy, patterns, country and topic counts) use the same store. See `docs/architecture/STORAGE.md` |
+| Vector storage | Postgres + pgvector when `DATABASE_URL` is set (Supabase, HNSW cosine index). Rebuild with `python -m db.apply`. `ML_VECTOR_BACKEND=local` keeps the numpy files. Documents (galaxy, patterns, country and topic counts) use the same store. See `docs/architecture/STORAGE.md` |
 | Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
 | Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite` |
 | Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences |

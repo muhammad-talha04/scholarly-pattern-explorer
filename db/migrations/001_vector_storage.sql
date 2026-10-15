@@ -1,6 +1,6 @@
--- Idempotent pgvector storage for embeddings and JSON documents.
--- Applied by PgVectorStore on connect, and safe to run on a database that
--- already has pipeline/schema_v2.sql (model was NOT NULL and meta was absent).
+-- pgvector embeddings and JSON documents.
+-- Idempotent. Safe on a database created by the old pipeline/schema_v2.sql,
+-- where paper_embeddings.model was NOT NULL and meta was missing.
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS paper_embeddings (
 ALTER TABLE paper_embeddings ADD COLUMN IF NOT EXISTS meta JSONB;
 ALTER TABLE paper_embeddings ADD COLUMN IF NOT EXISTS model TEXT;
 
--- schema_v2.sql originally created model TEXT NOT NULL. The store writes meta
--- and leaves model unset, so an existing NOT NULL column has to become nullable.
+-- Older schema_v2.sql created model TEXT NOT NULL. The store writes meta and
+-- leaves model unset, so that column has to accept NULL.
 DO $$
 BEGIN
     IF EXISTS (
@@ -32,10 +32,15 @@ END $$;
 CREATE INDEX IF NOT EXISTS paper_embeddings_hnsw
     ON paper_embeddings USING hnsw (embedding vector_cosine_ops);
 
--- One row per document kind. payload is the JSON the API or a teammate stores.
--- Known kinds: galaxy, galaxy_state, patterns, countries, topics, topic_country_year.
+-- One row per document kind. Known kinds: galaxy, galaxy_state, patterns,
+-- countries, topics, topic_country_year.
 CREATE TABLE IF NOT EXISTS documents (
     kind       TEXT PRIMARY KEY,
     payload    JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- No policies: anon and authenticated see nothing. DATABASE_URL (the table
+-- owner / superuser) bypasses row level security and is how the API connects.
+ALTER TABLE paper_embeddings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
