@@ -11,6 +11,13 @@ it("full counting >= fractional counting", () => {
   const f = m.countries("fractional"), full = m.countries("full");
   f.forEach((c, i) => expect(full[i].papers).toBeGreaterThanOrEqual(c.papers));
 });
+it("galaxy fixtures are papers in topic clusters", () => {
+  const g = m.galaxy();
+  expect(g.clusters.map((c) => c.name).sort()).toEqual(["Methods", "Science", "Society", "Systems"]);
+  expect(g.nodes.length).toBeGreaterThan(0);
+  expect(g.nodes.every((n) => n.topic_name.includes("meets"))).toBe(true);
+  expect(g.nodes.every((n) => g.clusters.some((c) => c.id === n.cluster_id))).toBe(true);
+});
 it("search filters by country and year", () => {
   const res = m.search({ q: "learning", country: "PK", year_from: 2020 }).results;
   res.forEach((r) => { expect(m.paper(r.id).countries).toContain("PK"); expect(r.year!).toBeGreaterThanOrEqual(2020); });

@@ -82,9 +82,9 @@ function Scene({ nodes, links, showGaps, focus, onFocus, onPick }: Props) {
                 <Html center position={[0, s + 0.45, 0]} zIndexRange={[30, 0]} style={{ pointerEvents: "auto" }}>
                   <div className="glass w-48 p-2.5 text-left text-xs shadow-glow" onPointerDown={(e) => e.stopPropagation()}>
                     <div className="font-medium text-white">{n.id}</div>
-                    <p className="mt-0.5 text-mist">Support {n.support.toFixed(2)}{n.cluster ? ` · ${n.cluster}` : ""}</p>
+                    <p className="mt-0.5 text-mist">Paper{n.cluster ? ` · topic cluster ${n.cluster}` : ""}</p>
                     {showGaps && n.gap && <p className="text-pink-200">Research gap{n.gapScore != null ? ` · ${n.gapScore.toFixed(2)}` : ""}</p>}
-                    <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(n.id)}>Search this topic</button>
+                    <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(n.id)}>Search this paper</button>
                   </div>
                 </Html>
               )}

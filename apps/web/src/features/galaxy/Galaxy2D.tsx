@@ -26,7 +26,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, onFocus, onPick }: {
   const X = (v: number) => 400 + v * 55, Y = (v: number) => 280 + v * 36;
   return (
     <div className="relative h-full w-full">
-      <svg viewBox="0 0 800 560" className="h-full w-full" role="img" aria-label="Topic galaxy, flat drawing">
+      <svg viewBox="0 0 800 560" className="h-full w-full" role="img" aria-label="Paper galaxy. Each dot is a paper, colored by topic cluster.">
         {pairs.map(({ a, b, w }, i) => <line key={i} x1={X(a.pos[0])} y1={Y(a.pos[2])} x2={X(b.pos[0])} y2={Y(b.pos[2])} stroke="#7dd3fc" strokeOpacity={0.28} strokeWidth={0.6 + w * 7} />)}
         {placed.map((n) => {
           const r = 6 + 16 * Math.sqrt(n.support / maxS);
@@ -43,15 +43,15 @@ export function Galaxy2D({ nodes, links, showGaps, focus, onFocus, onPick }: {
       </svg>
       <ul className="sr-only">
         {placed.map((n) => (
-          <li key={n.id}><button onClick={() => { onFocus?.(n.id); onPick?.(n.id); }}>{n.id}{showGaps && n.gap ? ", research gap" : ""}</button></li>
+          <li key={n.id}><button onClick={() => { onFocus?.(n.id); onPick?.(n.id); }}>{n.id}, paper{n.cluster ? `, topic cluster ${n.cluster}` : ""}{showGaps && n.gap ? ", research gap" : ""}</button></li>
         ))}
       </ul>
       {active && (
         <div className="glass absolute left-3 top-24 z-10 w-52 p-3 text-xs sm:left-auto sm:right-4" role="tooltip">
           <p className="font-medium text-white">{active.id}</p>
-          <p className="mt-1 text-mist">Support {active.support.toFixed(2)}{active.cluster ? ` · ${active.cluster}` : ""}</p>
+          <p className="mt-1 text-mist">Paper{active.cluster ? ` · topic cluster ${active.cluster}` : ""}</p>
           {showGaps && active.gap && <p className="text-pink-200">Research gap</p>}
-          <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(active.id)}>Search this topic</button>
+          <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(active.id)}>Search this paper</button>
         </div>
       )}
     </div>

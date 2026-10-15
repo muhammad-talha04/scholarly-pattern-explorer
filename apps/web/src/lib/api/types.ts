@@ -77,7 +77,7 @@ export interface TopicCountryYear {
 }
 
 export interface GalaxyCluster { id: string; name: string }
-/** A topic placed in 3D, plus the cluster it belongs to (GET /galaxy). */
+/** One paper in the galaxy. `topic_name` is the label; `cluster_id` is its topic cluster. */
 export interface GalaxyPoint {
   topic_id: string;
   topic_name: string;

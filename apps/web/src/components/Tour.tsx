@@ -8,10 +8,10 @@ export function replayTour() {
   listeners.forEach((l) => l());
 }
 const STEPS = [
-  { title: "Welcome aboard", body: "Scholarly Pattern Explorer is a dark map of research: topics, countries, and the papers that connect them. This takes about a minute.", selector: "" },
+  { title: "Welcome aboard", body: "Each dot in the galaxy is a paper. Colors and groups are topic clusters, so papers sit together by theme. This takes about a minute.", selector: "" },
   { title: "Five rooms, one sky", body: "Galaxy, Search, Countries, Progress and Patterns are always in the menu. Saved keeps collections on this device.", selector: "[data-tour=nav]" },
   { title: "Search by meaning", body: "Type a question, not just keywords. Open a result for the summary, a chat about that paper, and a map of related work.", selector: "[data-tour=search]" },
-  { title: "A flatter sky", body: "3D mode draws the galaxy and the globe. 2D mode is the same data as a flat picture, and it turns on by itself if you prefer less motion.", selector: "[data-tour=power]" },
+  { title: "A flatter sky", body: "3D mode draws the paper galaxy and the globe. 2D mode is the same papers, grouped by theme, as a flat picture. It turns on by itself if you prefer less motion.", selector: "[data-tour=power]" },
   { title: "Keep what you find", body: "Save a paper into a collection, or pin two papers and open Compare. Both stay in this browser. Nothing is sent to a server.", selector: "[data-tour=saved]" },
 ];
 

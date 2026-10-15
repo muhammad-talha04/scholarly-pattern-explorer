@@ -16,6 +16,13 @@ import { SearchBar } from "@/features/search/SearchBar";
 
 const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () => <GalaxyLoading /> });
 
+const CLUSTER_COLORS = ["#7dd3fc", "#c4b5fd", "#6ee7b7", "#fcd34d", "#fb923c", "#f9a8d4"];
+function clusterColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i) * 13) % CLUSTER_COLORS.length;
+  return CLUSTER_COLORS[h];
+}
+
 type Placed = TopicNode & { pos?: [number, number, number] };
 
 function project(graph: { nodes: TopicNode[]; links: TopicLink[] }, galaxy: GalaxyGraph | undefined, useCoords: boolean): { nodes: Placed[]; links: TopicLink[] } {
@@ -49,6 +56,11 @@ export function GalaxyHero() {
   const graph = useMemo(() => buildTopicGraph(pats.data ?? [], gaps.data ?? []), [pats.data, gaps.data]);
   const useCoords = galaxy.source === "live" || (galaxy.source === "mock" && (prefersFixtures() || pats.source !== "live"));
   const view = useMemo(() => project(graph, galaxy.data, !!useCoords), [graph, galaxy.data, useCoords]);
+  const clusterLegend = useMemo(() => {
+    const names: string[] = [];
+    for (const n of view.nodes) if (n.cluster && !names.includes(n.cluster)) names.push(n.cluster);
+    return names;
+  }, [view.nodes]);
   const loading = (pats.loading && !pats.data) || (galaxy.loading && !galaxy.data);
   const pick = (t: string) => router.push(`/search?q=${encodeURIComponent(t)}`);
   return (
@@ -58,7 +70,7 @@ export function GalaxyHero() {
           <div className="flex h-full items-center justify-center px-6 pt-24"><ErrorNote msg={pats.error} onRetry={pats.reload} /></div>
         ) : loading && !previewEmpty ? <GalaxyLoading /> : (previewEmpty || view.nodes.length === 0) ? (
           <div className="flex h-full items-center justify-center px-6 pt-28" data-testid="galaxy-empty">
-            <EmptyState title="No topics in this snapshot" body="The galaxy fills in when the pattern miner publishes itemsets. You can still search papers, or open Patterns once a run has landed." action={<Link href="/search" className="btn bg-sky-400/20">Search papers</Link>} />
+            <EmptyState title="No papers in this snapshot" body="The galaxy groups papers by theme once they are indexed. You can still search, or open Patterns once a run has landed." action={<Link href="/search" className="btn bg-sky-400/20">Search papers</Link>} />
           </div>
         ) : lowPower ? (
           <Galaxy2D nodes={view.nodes} links={view.links} showGaps={showGaps} focus={focus} onFocus={setFocus} onPick={pick} />
@@ -72,18 +84,30 @@ export function GalaxyHero() {
           <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-white sm:text-5xl">
             Explore research <span className="text-accent">by meaning</span>
           </h1>
-          <p className="mx-auto mt-2 hidden max-w-md text-sm text-mist sm:block">Nodes are topics. Lines are papers that share them. Pink marks a research gap: growing fast, still small.</p>
+          <p className="mx-auto mt-2 max-w-md text-xs text-mist sm:text-sm">Each dot is a paper. Colors are topic clusters. The galaxy groups papers by theme.</p>
           <div className="mt-3"><SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} /></div>
         </div>
       </motion.div>
-      <div className="absolute inset-x-0 bottom-3 z-20 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5">
-        <label className="glass inline-flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-mist">
-          <input type="checkbox" checked={showGaps} onChange={(e) => setShowGaps(e.target.checked)} className="accent-pink-300" />
-          Highlight gaps
-          {gaps.data && <span className="chip">{gaps.data.length}</span>}
-        </label>
+      <div className="absolute inset-x-0 bottom-3 z-20 flex flex-wrap items-end justify-between gap-2 px-3 sm:px-5">
+        <div className="flex min-w-0 flex-col gap-2">
+          <label className="glass inline-flex w-fit cursor-pointer items-center gap-2 px-3 py-2 text-sm text-mist">
+            <input type="checkbox" checked={showGaps} onChange={(e) => setShowGaps(e.target.checked)} className="accent-pink-300" />
+            Highlight gaps
+            {gaps.data && <span className="chip">{gaps.data.length}</span>}
+          </label>
+          {clusterLegend.length > 0 && (
+            <ul aria-label="Topic clusters" className="glass flex max-w-xl flex-wrap gap-x-3 gap-y-1 px-3 py-2 text-xs text-mist">
+              {clusterLegend.map((name) => (
+                <li key={name} className="inline-flex items-center gap-1.5">
+                  <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: clusterColor(name) }} />
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <details className="glass max-h-40 overflow-auto px-3 py-2 text-sm text-mist">
-          <summary className="cursor-pointer text-white">Topics ({view.nodes.length})</summary>
+          <summary className="cursor-pointer text-white">Papers ({view.nodes.length})</summary>
           <ul className="mt-2 max-h-28 space-y-1 overflow-auto">
             {view.nodes.map((n) => (
               <li key={n.id}>
@@ -103,7 +127,7 @@ export function GalaxyLoading() {
   return (
     <div role="status" className="flex h-full flex-col items-center justify-center gap-4 bg-[radial-gradient(ellipse_at_center,rgba(125,211,252,0.16),transparent_55%)] text-sm text-mist">
       <StarMark />
-      <div className="flex items-center gap-2"><Spinner /> Charting topics</div>
+      <div className="flex items-center gap-2"><Spinner /> Placing papers</div>
     </div>
   );
 }
