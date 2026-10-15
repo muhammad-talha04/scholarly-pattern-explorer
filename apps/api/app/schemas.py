@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, HttpUrl
 
-CountingMethod = Literal["fractional", "full"]
+CountingMethod = Literal["fractional", "per_country", "full"]
 
 
 class PaperSummary(BaseModel):
