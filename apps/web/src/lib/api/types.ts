@@ -24,7 +24,15 @@ export interface PaperDetail extends PaperSummary {
   original_url: string | null;
   openalex_url: string | null;
 }
-export interface SearchResponse { query: string; results: PaperSummary[] }
+export interface SearchResponse {
+  query: string;
+  results: PaperSummary[];
+  /** Ranked hits in this window. Omitted by older APIs. */
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+export interface CorpusStats { papers: number }
 export interface AskRequest { question: string }
 export interface AskResponse { answer: string; sources: string[] }
 export interface Pattern {
@@ -101,5 +109,5 @@ export interface GalaxyGraph {
   links: { source: string; target: string; weight: number }[];
 }
 
-export interface SearchParams { q: string; limit?: number; country?: string; year_from?: number }
+export interface SearchParams { q: string; limit?: number; offset?: number; country?: string; year_from?: number }
 export interface TopicYearQuery { topic_id?: string; country?: string; year?: number; limit?: number }

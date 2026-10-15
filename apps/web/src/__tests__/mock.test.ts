@@ -1,7 +1,15 @@
 import * as m from "@/lib/api/mock";
 it("fixtures match schemas.py shapes", () => {
-  const p = m.paper(m.search({ q: "x" }).results[0].id);
+  const page = m.search({ q: "x", limit: 5, offset: 1 });
+  expect(page.total).toBe(m.FIXTURE_COUNT);
+  expect(page.results).toHaveLength(5);
+  expect(page.offset).toBe(1);
+  const p = m.paper(page.results[0].id);
   for (const k of ["id", "title", "authors", "year", "cited_by", "one_line_summary", "score", "abstract", "summary", "topics", "countries", "original_url", "openalex_url"]) expect(p).toHaveProperty(k);
+  const blob = JSON.stringify(m.search({ q: "a", limit: m.FIXTURE_COUNT }).results.map((r) => m.paper(r.id)));
+  expect(blob).not.toContain("10.1234");
+  expect(p.original_url).toBe(`https://openalex.org/works?search=${encodeURIComponent(p.title)}`);
+  expect(p.openalex_url).toBe(p.original_url);
   const g = m.gaps()[0];
   expect(g.items).toHaveLength(1); expect(g.gap_score).toBe(g.support);
   const r = m.runs()[0];

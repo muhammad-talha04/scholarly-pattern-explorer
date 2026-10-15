@@ -34,6 +34,28 @@ describe("api client fallback", () => {
     const ok = (async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 })) as unknown as typeof fetch;
     expect(await request("/health", () => ({ status: "m" }), undefined, ok)).toEqual({ data: { status: "ok" }, source: "live" });
   });
+  it("sends search limit and offset, and omits a galaxy limit unless one is set", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.test");
+    vi.stubEnv("NEXT_PUBLIC_API_MOCK", "");
+    vi.stubEnv("NEXT_PUBLIC_GALAXY_LIMIT", "");
+    const { api } = await import("@/lib/api/client");
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", (async (u: string) => {
+      urls.push(String(u));
+      if (String(u).includes("/search")) {
+        return new Response(JSON.stringify({ query: "privacy", results: [], total: 4, limit: 5, offset: 10 }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ nodes: [], clusters: [], links: [] }), { status: 200 });
+    }) as unknown as typeof fetch);
+    const found = await api.search({ q: "privacy", limit: 5, offset: 10 });
+    expect(urls[0]).toContain("/search?");
+    expect(urls[0]).toContain("limit=5");
+    expect(urls[0]).toContain("offset=10");
+    expect(found.data.total).toBe(4);
+    await api.galaxy();
+    expect(urls[1]).toBe("http://api.test/api/v1/galaxy");
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("normalizeGalaxy", () => {

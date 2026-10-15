@@ -3,10 +3,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .paths import REPO_ROOT, resolve
+
+# Fixture DOIs such as 10.1234/spe.0 are not registered and 404 at doi.org.
+_PLACEHOLDER_DOI = re.compile(r"10\.1234(?:/|$)", re.IGNORECASE)
 
 
 def abstract_from_inverted_index(inv: dict | None) -> str:
@@ -22,6 +26,22 @@ def abstract_from_inverted_index(inv: dict | None) -> str:
 
 def short_id(work_id: str) -> str:
     return work_id.rsplit("/", 1)[-1] if work_id else work_id
+
+
+def is_placeholder_doi(value: str | None) -> bool:
+    return bool(value and _PLACEHOLDER_DOI.search(value))
+
+
+def reader_url(doi: str | None, original_url: str | None, openalex_url: str | None) -> str | None:
+    """DOI page when the DOI is real. Otherwise the PDF, landing page, or OpenAlex work."""
+    if doi and not is_placeholder_doi(doi):
+        url = doi if doi.startswith("http") else f"https://doi.org/{doi}"
+        if not is_placeholder_doi(url):
+            return url
+    for candidate in (original_url, openalex_url):
+        if candidate and not is_placeholder_doi(candidate):
+            return candidate
+    return None
 
 
 @dataclass
@@ -52,10 +72,11 @@ class Paper:
 
     @property
     def doi_url(self) -> str | None:
-        if not self.doi:
+        if not self.doi or is_placeholder_doi(self.doi):
             return None
         d = self.doi
-        return d if d.startswith("http") else f"https://doi.org/{d}"
+        url = d if d.startswith("http") else f"https://doi.org/{d}"
+        return None if is_placeholder_doi(url) else url
 
     @classmethod
     def from_openalex(cls, w: dict) -> "Paper":

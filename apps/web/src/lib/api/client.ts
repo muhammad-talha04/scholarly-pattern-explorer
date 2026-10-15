@@ -1,5 +1,5 @@
 import type {
-  AskResponse, Collaboration, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
+  AskResponse, Collaboration, CorpusStats, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
   Pattern, Run, SearchParams, SearchResponse, TopicCountryYear, TopicYearQuery,
 } from "./types";
 import * as mock from "./mock";
@@ -9,6 +9,25 @@ const FORCE_MOCK = process.env.NEXT_PUBLIC_API_MOCK === "1";
 
 /** True when the app is configured to stay on fixtures (no gateway, or the mock flag). */
 export function prefersFixtures() { return !API_URL || FORCE_MOCK; }
+
+/** Page size for /search. NEXT_PUBLIC_SEARCH_LIMIT overrides the default of 20. */
+export function searchPageSize(): number {
+  const raw = Number(process.env.NEXT_PUBLIC_SEARCH_LIMIT);
+  if (Number.isFinite(raw) && raw >= 1) return Math.floor(raw);
+  return 20;
+}
+
+/**
+ * Optional cap sent as GET /galaxy?limit=. Unset means the client asks for the
+ * whole graph. The API also returns every node unless GALAXY_NODE_LIMIT is set.
+ */
+export function galaxyNodeLimit(): number | undefined {
+  const raw = process.env.NEXT_PUBLIC_GALAXY_LIMIT;
+  if (raw == null || raw.trim() === "") return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.floor(n);
+}
 
 export type Source = "live" | "mock";
 export interface Result<T> { data: T; source: Source }
@@ -175,7 +194,9 @@ export async function request<T>(path: string, fallback: () => T, init?: Request
 export const api = {
   health: () => request<{ status: string }>("/health", () => ({ status: "mock" })),
   search: (p: SearchParams) =>
-    request<SearchResponse>(`/search${qs({ q: p.q, limit: p.limit, country: p.country, year_from: p.year_from })}`, () => mock.search(p)),
+    request<SearchResponse>(`/search${qs({ q: p.q, limit: p.limit, offset: p.offset, country: p.country, year_from: p.year_from })}`, () => mock.search(p)),
+  /** Indexed paper count. Fixtures report the sample size, not a live corpus. */
+  stats: () => request<CorpusStats>("/stats", () => ({ papers: mock.FIXTURE_COUNT })),
   paper: (id: string) => request<PaperDetail>(`/papers/${encodeURIComponent(id)}`, () => mock.paper(id)),
   ask: (id: string, question: string) =>
     request<AskResponse>(`/papers/${encodeURIComponent(id)}/ask`, () => mock.ask(id, question), { method: "POST", body: JSON.stringify({ question }) }),
@@ -190,8 +211,9 @@ export const api = {
     request<Collaboration[]>(`/countries/collaborations${qs({ counting })}`, () => mock.collaborations(counting), undefined, fetch, { notFoundIsMock: true }),
   runs: () => request<Run[]>("/runs", () => mock.runs()),
   /** Paper or topic coordinates. Accepts the #8 list and `{nodes, clusters, links}`. */
-  galaxy: async () => {
-    const result = await request<unknown>("/galaxy", () => mock.galaxy(), undefined, fetch, { notFoundIsMock: true });
+  galaxy: async (limit?: number) => {
+    const cap = limit ?? galaxyNodeLimit();
+    const result = await request<unknown>(`/galaxy${qs({ limit: cap })}`, () => mock.galaxy(cap), undefined, fetch, { notFoundIsMock: true });
     return { data: normalizeGalaxy(result.data), source: result.source };
   },
   /** Topic × country × year rows. Mock until GET /topic-country-years exists (PR #6). */

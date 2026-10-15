@@ -12,7 +12,7 @@ npm run dev                  # http://localhost:3000
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-`NEXT_PUBLIC_API_MOCK=1`, or an empty `NEXT_PUBLIC_API_URL`, forces fixtures. The nav badge reads `live` or `mock data`.
+`NEXT_PUBLIC_API_MOCK=1`, or an empty `NEXT_PUBLIC_API_URL`, forces the built-in sample. The nav then shows a Demo data badge and a one-line note. Sample papers open an OpenAlex title search, not a DOI. When `NEXT_PUBLIC_API_URL` points at the API, the badge shows the indexed count from `GET /api/v1/stats`. Search page size is `NEXT_PUBLIC_SEARCH_LIMIT` (default 20), or `?limit=` and `?offset=` on `/search`. `NEXT_PUBLIC_GALAXY_LIMIT` is optional; unset, the client asks `/galaxy` for every node.
 
 ## Pages
 | Route | What it shows |

@@ -64,7 +64,7 @@ def test_search_filters_and_links(client):
 
 def test_paper_detail_summary_and_ask(client):
     d = client.get("/api/v1/papers/W1").json()
-    assert d["original_url"] == "https://example.org/w1.pdf"
+    assert d["original_url"] == "https://doi.org/10.1/a"
     assert d["openalex_url"] == "https://openalex.org/W1"
     assert d["summary"] and d["countries"] == ["PK"] and d["authors"] == ["A. One"]
     assert client.get("/api/v1/papers/NOPE").status_code == 404
@@ -106,6 +106,37 @@ def test_galaxy_layout(client):
         assert link["source"] != link["target"]
     assert client.get("/api/v1/galaxy").json() == body
     assert client.row_calls["rows"] == 0
+
+
+def test_stats_search_window_and_galaxy_limit(client, monkeypatch):
+    assert client.get("/api/v1/stats").json() == {"papers": 3}
+    first = client.get("/api/v1/search", params={"q": "protein", "limit": 1, "offset": 0}).json()
+    assert first["limit"] == 1 and first["offset"] == 0 and first["total"] == 3
+    assert len(first["results"]) == 1
+    second = client.get("/api/v1/search", params={"q": "protein", "limit": 1, "offset": 1}).json()
+    assert second["total"] == 3 and second["results"][0]["id"] != first["results"][0]["id"]
+    monkeypatch.setenv("SEARCH_MAX_LIMIT", "1")
+    capped = client.get("/api/v1/search", params={"q": "protein", "limit": 50}).json()
+    assert capped["limit"] == 1 and capped["total"] == 1 and len(capped["results"]) == 1
+    sliced = client.get("/api/v1/galaxy", params={"limit": 1}).json()
+    assert len(sliced["nodes"]) == 1 and client.row_calls["rows"] == 0
+    assert len(client.get("/api/v1/galaxy").json()["nodes"]) == 3
+    monkeypatch.setenv("GALAXY_NODE_LIMIT", "2")
+    assert len(client.get("/api/v1/galaxy").json()["nodes"]) == 2
+    assert len(client.get("/api/v1/galaxy", params={"limit": 1}).json()["nodes"]) == 1
+
+
+def test_placeholder_doi_is_not_returned(tmp_path, monkeypatch):
+    row = {**V2[1], "id": "W9", "doi": "https://doi.org/10.1234/spe.0",
+           "original_url": "https://doi.org/10.1234/spe.0"}
+    svc = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
+                    cache=SummaryCache(tmp_path / "s.sqlite"))
+    svc.index_papers([Paper.from_record(row)])
+    monkeypatch.setattr(ml_bridge, "get_service", lambda: svc)
+    d = TestClient(app).get("/api/v1/papers/W9").json()
+    assert "10.1234" not in str(d)
+    assert d["original_url"] == "https://openalex.org/W9"
+    assert d["openalex_url"] == "https://openalex.org/W9"
 
 
 def test_galaxy_empty_before_rebuild(tmp_path, monkeypatch):

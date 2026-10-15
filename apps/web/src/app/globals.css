@@ -79,6 +79,7 @@ body {
   @apply rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-ink;
 }
 .skip-link:focus { top: 0.75rem; }
+header:has([data-demo-note]) ~ main#content { padding-top: 8.75rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
