@@ -155,13 +155,16 @@ void main() {
 const LINK_VERT = `
 attribute float aT;
 attribute float aPulse;
+attribute float aPhase;
 attribute float aAlpha;
 varying float vT;
 varying float vPulse;
+varying float vPhase;
 varying float vAlpha;
 void main() {
   vT = aT;
   vPulse = aPulse;
+  vPhase = aPhase;
   vAlpha = aAlpha;
   gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
 }
@@ -171,12 +174,13 @@ const LINK_FRAG = `
 precision highp float;
 varying float vT;
 varying float vPulse;
+varying float vPhase;
 varying float vAlpha;
 uniform vec3 uColor;
 uniform float uTime;
 uniform float uMotion;
 void main() {
-  float phase = fract(uTime * 0.16);
+  float phase = fract(uTime * 0.16 + vPhase);
   float spark = uMotion * vPulse * exp(-pow((vT - phase) * 7.5, 2.0));
   gl_FragColor = vec4(uColor, min(0.8, vAlpha + spark * 0.5));
   #include <colorspace_fragment>
@@ -291,19 +295,25 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
     const pos: number[] = [];
     const t: number[] = [];
     const pulse: number[] = [];
+    const phase: number[] = [];
     const alpha: number[] = [];
-    const opacity = { near: 0.16, spoke: 0.2, hub: 0.26 };
+    const opacity = { near: 0.14, spoke: 0.18, hub: 0.22, cross: 0.09 };
+    let sparkN = 0;
     for (const edge of net.edges) {
       pos.push(edge.a[0], edge.a[1], edge.a[2], edge.b[0], edge.b[1], edge.b[2]);
       t.push(0, 1);
-      const spark = edge.kind === "hub" ? 1 : 0;
-      pulse.push(spark, spark);
+      const fire = edge.kind === "hub" || (edge.kind === "cross" && sparkN % 2 === 0);
+      const offset = fire ? (sparkN * 0.17) % 1 : 0;
+      if (edge.kind === "hub" || edge.kind === "cross") sparkN++;
+      pulse.push(fire ? 1 : 0, fire ? 1 : 0);
+      phase.push(offset, offset);
       alpha.push(opacity[edge.kind], opacity[edge.kind]);
     }
     const geo = new BufferGeometry();
     geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
     geo.setAttribute("aT", new Float32BufferAttribute(t, 1));
     geo.setAttribute("aPulse", new Float32BufferAttribute(pulse, 1));
+    geo.setAttribute("aPhase", new Float32BufferAttribute(phase, 1));
     geo.setAttribute("aAlpha", new Float32BufferAttribute(alpha, 1));
     return geo;
   }, [net.edges]);

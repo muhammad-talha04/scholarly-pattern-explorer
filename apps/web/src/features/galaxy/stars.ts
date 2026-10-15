@@ -54,7 +54,7 @@ export function centroid(nodes: { pos: [number, number, number] }[]): [number, n
 
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 /** Above this, the hero keeps a round-robin sample so the disc stays readable. */
-const NETWORK_CAP = 48;
+const NETWORK_CAP = 56;
 
 type Placed = { id: string; support: number; clusterId?: string; gap?: boolean; pos?: [number, number, number] };
 
@@ -64,7 +64,7 @@ export interface NetEdge {
   target: string;
   a: [number, number, number];
   b: [number, number, number];
-  kind: "near" | "spoke" | "hub";
+  kind: "near" | "spoke" | "hub" | "cross";
 }
 
 /** Amber shade for one paper. Stays on the cluster ramp, with a small per-paper shift. */
@@ -79,13 +79,13 @@ export function nodeAmber(colorIndex: number | null | undefined, clusterId: stri
 type Drawn<T> = T & { pos: [number, number, number]; center: [number, number, number]; role: NetRole };
 
 /**
- * Hero drawing. Up to 48 papers, seated as a few sub-clusters around a main hub.
- * Each sub-cluster has a secondary hub. Links are k-nearest, spokes to that hub,
- * and a short ring of hub-to-hub edges.
+ * Hero drawing. Up to 56 papers, seated as a few sub-clusters around a main hub.
+ * Each sub-cluster has a secondary hub. Links stay inside the cluster, and each
+ * cluster pair also gets a handful of dimmer cross edges.
  */
 export function heroNetwork<T extends Placed>(nodes: T[]): { nodes: Drawn<T>[]; edges: NetEdge[]; hub: [number, number, number] } {
   const hub: [number, number, number] = [0, 0, 0];
-  const picked = nodes.length > 50 ? pickNetwork(nodes) : nodes.slice();
+  const picked = nodes.length > NETWORK_CAP ? pickNetwork(nodes) : nodes.slice();
   const placed = placeNetwork(picked);
   return { nodes: placed, edges: buildEdges(placed, hub), hub };
 }
@@ -139,32 +139,26 @@ function placeNetwork<T extends Placed>(nodes: T[]): Drawn<T>[] {
   keys.forEach((key, gi) => {
     const list = groups.get(key)!;
     const ang = g === 1 ? 0.5 : (gi / g) * Math.PI * 2 - Math.PI / 2;
-    const ring = g === 1 ? 3.1 : 4.55;
+    const ring = g === 1 ? 3.1 : 5.05;
     const hx = ring * Math.cos(ang);
     const hz = ring * Math.sin(ang);
     const hy = ((gi % 5) - 2) * 0.06;
     const center: [number, number, number] = [hx, hy, hz];
     const satellites = Math.max(1, list.length - 1);
+    const localMax = Math.min(2.45, 0.95 + 0.32 * Math.sqrt(satellites));
     list.forEach((node, i) => {
       let pos: [number, number, number];
       if (i === 0) pos = [hx, hy, hz];
       else {
         const t = Math.sqrt((i - 1) / satellites);
-        const lr = 0.9 + t * 1.05;
+        const lr = 0.82 + t * (localMax - 0.82);
         const la = i * GOLDEN;
         pos = [hx + lr * Math.cos(la), hy + (((i * 3) % 5) - 2) * 0.035, hz + lr * Math.sin(la)];
       }
       out.push({ ...node, pos, center, role: i === 0 ? "secondary" : "node" });
     });
   });
-  separate(out, 0.78, 14);
-  for (const n of out) {
-    const d = Math.hypot(n.pos[0], n.pos[2]) || 0.001;
-    if (d < 1.45) {
-      const s = 1.45 / d;
-      n.pos = [n.pos[0] * s, n.pos[1], n.pos[2] * s];
-    }
-  }
+  separate(out, 0.8, 24);
   return out;
 }
 
@@ -183,6 +177,13 @@ function separate<T extends { pos: [number, number, number] }>(nodes: T[], min: 
         nodes[j].pos = [nodes[j].pos[0] + ux * push, nodes[j].pos[1], nodes[j].pos[2] + uz * push];
       }
     }
+    for (const n of nodes) {
+      const d = Math.hypot(n.pos[0], n.pos[2]) || 0.001;
+      if (d < 1.5) {
+        const s = 1.5 / d;
+        n.pos = [n.pos[0] * s, n.pos[1], n.pos[2] * s];
+      }
+    }
   }
 }
 
@@ -191,15 +192,19 @@ function buildEdges<T extends Placed>(nodes: Drawn<T>[], hub: [number, number, n
   const seen = new Set<string>();
   const add = (source: string, target: string, a: [number, number, number], b: [number, number, number], kind: NetEdge["kind"]) => {
     const key = [source, target].sort().join("|");
-    if (seen.has(key) || source === target) return;
+    if (seen.has(key) || source === target) return false;
     seen.add(key);
     edges.push({ source, target, a, b, kind });
+    return true;
   };
   const secondaries = nodes.filter((n) => n.role === "secondary");
   secondaries.forEach((s, i) => {
     add(s.id, "hub", s.pos, hub, "hub");
     const next = secondaries[(i + 1) % secondaries.length];
     if (next) add(s.id, next.id, s.pos, next.pos, "hub");
+    const mates = nodes.filter((n) => n.role !== "secondary" && (n.clusterId || "") === (s.clusterId || ""));
+    const outer = mates.slice().sort((a, b) => Math.hypot(b.pos[0], b.pos[2]) - Math.hypot(a.pos[0], a.pos[2]))[0];
+    if (outer) add(outer.id, "hub", outer.pos, hub, "hub");
   });
   for (const n of nodes) {
     if (n.role === "secondary") continue;
@@ -208,13 +213,50 @@ function buildEdges<T extends Placed>(nodes: Drawn<T>[], hub: [number, number, n
   }
   for (const n of nodes) {
     const nearest = nodes
-      .filter((o) => o.id !== n.id)
+      .filter((o) => o.id !== n.id && (o.clusterId || "") === (n.clusterId || ""))
       .map((o) => ({ o, d: Math.hypot(o.pos[0] - n.pos[0], o.pos[2] - n.pos[2]) }))
       .sort((p, q) => p.d - q.d)
       .slice(0, 2);
     for (const { o } of nearest) add(n.id, o.id, n.pos, o.pos, "near");
   }
+  addCrossLinks(nodes, add);
   return edges;
+}
+
+/** Facing-edge papers in every cluster pair. About eight links each, all six pairs when four clusters are present. */
+function addCrossLinks<T extends Placed>(
+  nodes: Drawn<T>[],
+  add: (source: string, target: string, a: [number, number, number], b: [number, number, number], kind: NetEdge["kind"]) => boolean,
+) {
+  const groups = new Map<string, Drawn<T>[]>();
+  for (const n of nodes) {
+    const list = groups.get(n.clusterId || "") ?? [];
+    list.push(n);
+    groups.set(n.clusterId || "", list);
+  }
+  const keys = [...groups.keys()].sort();
+  const facing = (list: Drawn<T>[], toward: [number, number, number]) => list
+    .filter((n) => n.role !== "secondary")
+    .map((n) => ({ n, d: Math.hypot(n.pos[0] - toward[0], n.pos[2] - toward[2]) }))
+    .sort((p, q) => p.d - q.d)
+    .slice(0, 8)
+    .map((p) => p.n);
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const a = groups.get(keys[i])!;
+      const b = groups.get(keys[j])!;
+      const faceA = facing(a, centroid(b));
+      const faceB = facing(b, centroid(a));
+      if (!faceA.length || !faceB.length) continue;
+      let made = 0;
+      const room = faceA.length * faceB.length;
+      for (let k = 0; made < 8 && k < room; k++) {
+        const u = faceA[k % faceA.length];
+        const v = faceB[(k * 3 + Math.floor(k / faceA.length)) % faceB.length];
+        if (add(u.id, v.id, u.pos, v.pos, "cross")) made++;
+      }
+    }
+  }
 }
 
 export function networkLinks(edges: NetEdge[]): TopicLink[] {

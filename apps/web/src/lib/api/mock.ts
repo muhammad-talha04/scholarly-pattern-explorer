@@ -18,9 +18,16 @@ const COUNTRY_META: [string, string, number, number][] = [
 
 function rng(seed: number) { seed = (seed * 9301 + 49297) % 233280 + 1; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); }
 
-const PAPERS: PaperDetail[] = Array.from({ length: 42 }, (_, i) => {
+/** Ten papers past the original 42, so each topic cluster gains a few nodes. */
+const EXTRA_TOPICS = [
+  "Large language models", "Climate modelling", "Edge computing", "Privacy",
+  "Graph neural networks", "Protein folding", "Robotics", "Energy systems",
+  "Reinforcement learning", "Drug discovery",
+];
+const PAPERS: PaperDetail[] = Array.from({ length: 52 }, (_, i) => {
   const r = rng(i + 7);
-  const t1 = TOPICS[i % TOPICS.length], t2 = TOPICS[(i * 5 + 3) % TOPICS.length];
+  const t1 = i < 42 ? TOPICS[i % TOPICS.length] : EXTRA_TOPICS[i - 42];
+  const t2 = TOPICS[(i * 5 + 3) % TOPICS.length];
   const c = [COUNTRY_META[i % COUNTRY_META.length][0], COUNTRY_META[(i * 3 + 1) % COUNTRY_META.length][0]];
   const id = `W${4100000000 + i * 7919}`;
   return {

@@ -54,7 +54,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
         {net.edges.map((edge, i) => {
           const [x1, y1] = project(edge.a);
           const [x2, y2] = project(edge.b);
-          const opacity = edge.kind === "hub" ? 0.28 : edge.kind === "spoke" ? 0.2 : 0.15;
+          const opacity = edge.kind === "hub" ? 0.24 : edge.kind === "spoke" ? 0.18 : edge.kind === "cross" ? 0.1 : 0.14;
           return <line key={`link-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={accent} strokeOpacity={opacity} strokeWidth={0.7} />;
         })}
         <circle cx={hub[0]} cy={hub[1]} r={15} fill={hubColor} opacity={0.95} />
