@@ -6,8 +6,8 @@ from pydantic import ValidationError
 
 from .. import ml_bridge as ml
 from pipeline import country_api  # repo root is on sys.path via ml_bridge
-from ..schemas import (AskRequest, AskResponse, Collaboration, CountingMethod, CountryStats, PaperDetail,
-                       PaperSummary, Pattern, Run, SearchResponse)
+from ..schemas import (AskRequest, AskResponse, Collaboration, CountingMethod, CountryStats, ExamplePaper,
+                       PaperDetail, PaperSummary, Pattern, Run, SearchResponse)
 
 router = APIRouter()
 
@@ -75,16 +75,81 @@ def related(paper_id: str, limit: int = 10) -> list[PaperSummary]:
     return [_summary_model(h) for h in hits]
 
 
+@router.get("/papers/{paper_id}/similar", response_model=list[PaperSummary])
+def similar(paper_id: str, limit: int = 10) -> list[PaperSummary]:
+    """Papers like this one. ``score`` is cosine similarity in the embedding index."""
+    hits = ml.get_service().similar(paper_id, k=max(1, min(limit, 50)))
+    if hits is None:
+        raise HTTPException(404, "paper not found")
+    return [_summary_model(h) for h in hits]
+
+
+def _example_models(raw) -> list[ExamplePaper] | None:
+    out = []
+    for row in raw or []:
+        if not row or not row.get("id"):
+            continue
+        year = row.get("year")
+        try:
+            year = int(year) if year is not None else None
+        except (TypeError, ValueError):
+            year = None
+        out.append(ExamplePaper(id=str(row["id"]), title=row.get("title") or "",
+                                year=year, score=row.get("score")))
+    return out or None
+
+
+def _gap_pattern(g: dict) -> Pattern:
+    if g.get("items"):
+        items = [str(x) for x in g["items"]]
+    else:
+        items = [str(g["topic"])]
+    examples = g.get("example_papers")
+    if not examples:
+        examples = ml.gap_examples(items)
+    explanation = g.get("explanation")
+    if not explanation and g.get("growth_rate") is not None and g.get("topic") and not g.get("items"):
+        explanation = ml.growth_explanation(g)
+    return Pattern(
+        items=items, support=g["gap_score"], window_start=g["window_start"],
+        window_end=g["window_end"], gap_score=g["gap_score"], growth_rate=g.get("growth_rate"),
+        paper_count=g.get("paper_count"), top_countries=g.get("top_countries"),
+        explanation=explanation, example_papers=_example_models(examples))
+
+
+def _in_window(g: dict, window: int | None) -> bool:
+    return window is None or g.get("window_start") == window
+
+
 @router.get("/patterns", response_model=list[Pattern])
-def patterns(window: int | None = None, trend: str | None = None) -> list[Pattern]:
+def patterns(window: int | None = None, trend: str | None = None,
+             country: str | None = None) -> list[Pattern]:
     if trend == "gap":
-        # Research-gap finder (owner: michal): fast-growing, still-small topics.
-        gaps = ml.get_gaps()
-        return [Pattern(items=[g["topic"]], support=g["gap_score"],
-                        window_start=g["window_start"], window_end=g["window_end"],
-                        gap_score=g["gap_score"], growth_rate=g["growth_rate"],
-                        paper_count=g["paper_count"], top_countries=g["top_countries"])
-                for g in gaps if window is None or g["window_start"] == window]
+        # Growing-but-small topics, plus embedding-space gaps (thin regions and
+        # related topics that rarely co-occur). Growth rows keep their score so
+        # a perfect growth gap stays ahead of an embedding gap with the same score.
+        growth = [g for g in ml.get_gaps() if _in_window(g, window)]
+        semantic = [g for g in ml.get_semantic_gaps() if _in_window(g, window)][:10]
+        merged = sorted(growth + semantic, key=lambda g: (
+            -float(g.get("gap_score") or 0),
+            0 if g.get("kind", "growth") == "growth" else 1,
+            -float(g.get("growth_rate") or 0),
+            " ".join(g.get("items") or [g.get("topic") or ""]),
+        ))
+        return [_gap_pattern(g) for g in merged]
+    if trend == "emerging":
+        rows = ml.get_emerging(country=country)
+        out = []
+        for row in rows:
+            if not _in_window(row, window):
+                continue
+            examples = ml.gap_examples([row["topic_name"]])
+            out.append(Pattern(
+                items=[row["topic_name"]], support=row["growth_score"],
+                window_start=row["window_start"], window_end=row["window_end"],
+                growth_rate=row["growth_rate"], paper_count=row["paper_count"],
+                explanation=row["explanation"], example_papers=_example_models(examples)))
+        return out
     rows = ml.get_miner().patterns()
     return [Pattern(items=r["itemset"].split(" | "), support=r["support"],
                     window_start=r["window_start"], window_end=r["window_end"])

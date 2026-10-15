@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 05:15 PKT by tom (ML row) and ami (integration tests row); earlier by michal, olli.
+Last updated: 2026-10-15 by the research-gap, similar-papers, and emerging-topics work; earlier the same day by tom, ami, michal, olli.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -36,6 +36,9 @@ harry `/workspace/spe-web`, michal `/workspace/michal-spe`, ami `/workspace/spe-
   side-by-side comparison, influential citations.
 
 ## Where we left off
+- [ ] Research gaps, similar papers, emerging topics:
+  - Done: `/api/v1/patterns?trend=gap` still returns fast-growing small topics, and now also ranks embedding-space gaps (related topics that rarely appear on the same paper, and topics that are thin next to their nearest neighbors). Each gap includes a short explanation and example papers. `GET /api/v1/papers/{id}/similar` returns nearest neighbours from the existing embedding index with cosine scores. `/api/v1/patterns?trend=emerging` ranks topics by smoothed year-over-year growth (`min` of the mean and the median, with a minimum-count threshold) and takes an optional `country`. Counts are read from `topic_country_year` (`topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`) when that SQLite table or the snapshot list is present, and otherwise computed from `works_v2.jsonl` in the same shape. `python -m ml.cli discover` (also run at the end of `update`) writes a dated snapshot under the repo-root ML data dir. Paths follow `ml/paths.py`.
+  - Next: once the topic-country-year table lands on main, the loader switches to it with no change. Call `python -m ml.cli discover` from the 1st/15th workflow after the vector index is in the data store, and let the front end add the gap and emerging views.
 Nothing is merged into main yet.
 - [ ] #1 (olli): ready for review, waiting for Prince to merge
 - [ ] #3 (grok): draft; fractional-counting change and STATUS entry not pushed yet, waiting on Prince's OK in 1:1

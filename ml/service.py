@@ -105,6 +105,13 @@ class MLService:
             return []
         return [_hit(w, s, m) for w, s, m in self.store.search(v, k + 1) if w != work_id][:k]
 
+    def similar(self, work_id: str, k: int = 10) -> list[dict] | None:
+        """Papers like this one: top-k nearest neighbours in the existing embedding index.
+
+        Scores are cosine similarity (vectors are L2-normalised). The paper itself is left out.
+        """
+        return self.related(work_id, k)
+
     def cached_summary(self, work_id: str) -> str | None:
         c = self.cache.get(work_id)
         return c["summary"] if c else None

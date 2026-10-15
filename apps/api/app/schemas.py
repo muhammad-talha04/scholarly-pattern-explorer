@@ -39,16 +39,26 @@ class AskResponse(BaseModel):
     sources: list[str] = []
 
 
+class ExamplePaper(BaseModel):
+    """A paper cited as an illustration on a gap or emerging-topic row."""
+    id: str
+    title: str = ""
+    year: int | None = None
+    score: float | None = None
+
+
 class Pattern(BaseModel):
     items: list[str]
     support: float
     window_start: int
     window_end: int
-    # Optional, filled only for trend=gap (research-gap finder, ml/gaps.py).
+    # Optional, filled for trend=gap and trend=emerging.
     gap_score: float | None = None
     growth_rate: float | None = None
     paper_count: int | None = None
     top_countries: list[str] | None = None
+    explanation: str | None = None
+    example_papers: list[ExamplePaper] | None = None
 
 
 class CountryStats(BaseModel):

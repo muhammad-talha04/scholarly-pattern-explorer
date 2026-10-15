@@ -21,6 +21,17 @@ def test_relative_paths_resolve_from_repo_root(monkeypatch, tmp_path):
     assert paths.ml_data_dir() == ROOT / "custom" / "ml"
 
 
+def test_topic_country_year_db_follows_snapshot(monkeypatch, tmp_path):
+    monkeypatch.delenv("TOPIC_COUNTRY_YEAR_DB", raising=False)
+    monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "snap.json"))
+    assert paths.topic_country_year_db() == tmp_path / "topic_country_year.sqlite"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", "custom/tcy.sqlite")
+    assert paths.topic_country_year_db() == paths.REPO_ROOT / "custom" / "tcy.sqlite"
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", str(tmp_path / "abs.sqlite"))
+    assert paths.topic_country_year_db() == tmp_path / "abs.sqlite"
+
+
 def test_absolute_env_paths_are_kept(monkeypatch, tmp_path):
     monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
     monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "s.json"))
