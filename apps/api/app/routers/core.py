@@ -76,15 +76,6 @@ def related(paper_id: str, limit: int = 10) -> list[PaperSummary]:
     return [_summary_model(h) for h in hits]
 
 
-@router.get("/papers/{paper_id}/similar", response_model=list[PaperSummary])
-def similar(paper_id: str, limit: int = 10) -> list[PaperSummary]:
-    """Papers like this one. ``score`` is cosine similarity in the embedding index."""
-    hits = ml.get_service().similar(paper_id, k=max(1, min(limit, 50)))
-    if hits is None:
-        raise HTTPException(404, "paper not found")
-    return [_summary_model(h) for h in hits]
-
-
 def _example_models(raw) -> list[ExamplePaper] | None:
     out = []
     for row in raw or []:
@@ -104,52 +95,109 @@ def _gap_pattern(g: dict) -> Pattern:
     if g.get("items"):
         items = [str(x) for x in g["items"]]
     else:
-        items = [str(g["topic"])]
-    examples = g.get("example_papers")
-    if not examples:
-        examples = ml.gap_examples(items)
+        items = [str(g.get("topic") or "")]
     explanation = g.get("explanation")
-    if not explanation and g.get("growth_rate") is not None and g.get("topic") and not g.get("items"):
-        explanation = ml.growth_explanation(g)
+    if not explanation and g.get("kind", "growth") == "growth":
+        topic = g.get("topic") or (items[0] if items else None)
+        explanation = ml.growth_explanation({**g, "topic": topic})
     return Pattern(
         items=items, support=g["gap_score"], window_start=g["window_start"],
         window_end=g["window_end"], gap_score=g["gap_score"], growth_rate=g.get("growth_rate"),
         paper_count=g.get("paper_count"), top_countries=g.get("top_countries"),
-        explanation=explanation, example_papers=_example_models(examples))
+        explanation=explanation, example_papers=_example_models(g.get("example_papers")))
 
 
 def _in_window(g: dict, window: int | None) -> bool:
     return window is None or g.get("window_start") == window
 
 
+def _country_code(country: str | None) -> str | None:
+    if not country or not country.strip():
+        return None
+    return country.strip().upper()
+
+
+def _saved_discoveries() -> dict:
+    return ml.load_discoveries() or {}
+
+
+def _gap_sort_key(g: dict):
+    return (
+        -float(g.get("gap_score") or 0),
+        0 if g.get("kind", "growth") == "growth" else 1,
+        -float(g.get("growth_rate") or 0),
+        " ".join(g.get("items") or [str(g.get("topic") or "")]),
+    )
+
+
+@router.get("/papers/{paper_id}/similar", response_model=list[PaperSummary])
+def similar(paper_id: str, limit: int = 10) -> list[PaperSummary]:
+    """Papers like this one. ``score`` is cosine similarity.
+
+    Neighbours are the top-k list saved by ``discover`` when that snapshot has
+    them. A snapshot with no ``similar`` key (discover has not indexed papers
+    yet) falls back to the embedding index.
+    """
+    k = max(1, min(limit, 50))
+    saved = ml.load_discoveries()
+    if saved is not None and "similar" in saved:
+        neighbours = saved.get("similar") or {}
+        hits = neighbours.get(paper_id) if isinstance(neighbours, dict) else None
+        if not isinstance(hits, list):
+            raise HTTPException(404, "paper not found")
+        return [_summary_model(h) for h in hits[:k]]
+    hits = ml.get_service().similar(paper_id, k=k)
+    if hits is None:
+        raise HTTPException(404, "paper not found")
+    return [_summary_model(h) for h in hits]
+
+
 @router.get("/patterns", response_model=list[Pattern])
 def patterns(window: int | None = None, trend: str | None = None,
              country: str | None = None) -> list[Pattern]:
     if trend == "gap":
-        # Growing-but-small topics, plus embedding-space gaps (thin regions and
-        # related topics that rarely co-occur). Growth rows keep their score so
-        # a perfect growth gap stays ahead of an embedding gap with the same score.
-        growth = [g for g in ml.get_gaps() if _in_window(g, window)]
-        semantic = [g for g in ml.get_semantic_gaps() if _in_window(g, window)][:10]
-        merged = sorted(growth + semantic, key=lambda g: (
-            -float(g.get("gap_score") or 0),
-            0 if g.get("kind", "growth") == "growth" else 1,
-            -float(g.get("growth_rate") or 0),
-            " ".join(g.get("items") or [g.get("topic") or ""]),
-        ))
-        return [_gap_pattern(g) for g in merged]
+        # Saved by discover: growth gaps and embedding gaps, already merged.
+        # A growth row stays ahead of an embedding gap with the same score.
+        code = _country_code(country)
+        rows = []
+        for g in _saved_discoveries().get("gaps") or []:
+            if not isinstance(g, dict) or g.get("gap_score") is None:
+                continue
+            if g.get("window_start") is None or g.get("window_end") is None:
+                continue
+            if not _in_window(g, window):
+                continue
+            if code:
+                tops = [str(c).strip().upper() for c in (g.get("top_countries") or [])]
+                if code not in tops:
+                    continue
+            rows.append(g)
+        rows.sort(key=_gap_sort_key)
+        return [_gap_pattern(g) for g in rows]
     if trend == "emerging":
-        rows = ml.get_emerging(country=country)
+        saved = _saved_discoveries()
+        code = _country_code(country)
+        if code:
+            raw = (saved.get("emerging_by_country") or {}).get(code) or []
+        else:
+            raw = saved.get("emerging") or []
         out = []
-        for row in rows:
+        for row in raw:
+            if not isinstance(row, dict) or row.get("growth_score") is None:
+                continue
+            if row.get("window_start") is None or row.get("window_end") is None:
+                continue
             if not _in_window(row, window):
                 continue
-            examples = ml.gap_examples([row["topic_name"]])
+            name = row.get("topic_name") or row.get("topic")
+            if not name:
+                continue
             out.append(Pattern(
-                items=[row["topic_name"]], support=row["growth_score"],
+                items=[str(name)], support=row["growth_score"],
                 window_start=row["window_start"], window_end=row["window_end"],
-                growth_rate=row["growth_rate"], paper_count=row["paper_count"],
-                explanation=row["explanation"], example_papers=_example_models(examples)))
+                growth_rate=row.get("growth_rate"), paper_count=row.get("paper_count"),
+                explanation=row.get("explanation"),
+                example_papers=_example_models(row.get("example_papers"))))
         return out
     rows = ml.get_miner().patterns()
     return [Pattern(items=r["itemset"].split(" | "), support=r["support"],

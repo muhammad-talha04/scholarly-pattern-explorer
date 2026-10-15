@@ -95,22 +95,28 @@ def test_similar(client):
     assert client.get("/api/v1/papers/NOPE/similar").status_code == 404
 
 
-def test_patterns_runs_and_gap_hook(client, monkeypatch):
+def test_patterns_runs_and_gap_hook(client):
     p = client.get("/api/v1/patterns").json()
     assert any(x["items"] == ["DL", "Proteins"] for x in p)
     assert all(x["window_start"] == 2021 for x in client.get("/api/v1/patterns", params={"window": 2021}).json())
-    monkeypatch.setattr(ml_bridge, "get_gaps", lambda limit=20: [])   # gap handler now implemented
     assert client.get("/api/v1/patterns", params={"trend": "gap"}).status_code == 200
     runs = client.get("/api/v1/runs").json()
     assert runs[0]["id"] == 1 and runs[0]["papers_added"] == 3 and runs[0]["status"] == "success"
 
 
-def test_patterns_gap(client, monkeypatch):
+def _boom(*_a, **_k):
+    raise AssertionError("request path scanned the index")
+
+
+def test_patterns_gap(client, tmp_path, monkeypatch):
+    from ml.discovery_store import save_discoveries
     from ml.gaps import find_gaps
     tyc = {"QML": {2022: 6, 2023: 12, 2024: 24, 2025: 48},
            "NLP": {2022: 900, 2023: 910, 2024: 905, 2025: 915}}
-    monkeypatch.setattr(ml_bridge, "get_gaps",
-                        lambda limit=20: find_gaps(tyc, {"QML": [["CA", 2.5]]}, last_year=2025))
+    monkeypatch.delenv("DISCOVERIES_PATH", raising=False)
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    save_discoveries({"date": "2026-10-15", "gaps": find_gaps(tyc, {"QML": [["CA", 2.5]]}, last_year=2025)})
+    monkeypatch.setattr("ml.gaps.find_gaps", _boom)
     r = client.get("/api/v1/patterns", params={"trend": "gap"})
     assert r.status_code == 200
     body = r.json()
@@ -120,16 +126,21 @@ def test_patterns_gap(client, monkeypatch):
     assert "QML" in body[0]["explanation"]
 
 
-def test_patterns_gap_includes_embedding_gaps(client, monkeypatch):
-    monkeypatch.setattr(ml_bridge, "get_gaps", lambda limit=20: [{
-        "topic": "QML", "gap_score": 0.2, "growth_rate": 0.3, "paper_count": 40,
-        "top_countries": ["CA"], "window_start": 2022, "window_end": 2025}])
-    monkeypatch.setattr(ml_bridge, "get_semantic_gaps", lambda limit=10: [{
-        "kind": "cooccurrence", "items": ["Alpha", "Beta"], "topic": "Alpha + Beta",
-        "gap_score": 0.91, "paper_count": 1, "growth_rate": None,
-        "window_start": 2022, "window_end": 2025,
-        "explanation": "Alpha and Beta cover closely related subjects. 1 papers study them together.",
-        "example_papers": [{"id": "W9", "title": "A bridge paper", "year": 2024}]}])
+def test_patterns_gap_includes_embedding_gaps(client, tmp_path, monkeypatch):
+    from ml.discovery_store import save_discoveries
+    monkeypatch.delenv("DISCOVERIES_PATH", raising=False)
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    # Saved out of order. The read path sorts and does not recompute.
+    save_discoveries({"date": "2026-10-15", "gaps": [
+        {"topic": "QML", "kind": "growth", "gap_score": 0.2, "growth_rate": 0.3, "paper_count": 40,
+         "top_countries": ["CA"], "window_start": 2022, "window_end": 2025},
+        {"kind": "cooccurrence", "items": ["Alpha", "Beta"], "topic": "Alpha + Beta",
+         "gap_score": 0.91, "paper_count": 1, "growth_rate": None,
+         "window_start": 2022, "window_end": 2025,
+         "explanation": "Alpha and Beta cover closely related subjects. 1 papers study them together.",
+         "example_papers": [{"id": "W9", "title": "A bridge paper", "year": 2024}]}]})
+    monkeypatch.setattr("ml.research_gaps.semantic_gaps_from_store", _boom)
+    monkeypatch.setattr("ml.gaps.find_gaps", _boom)
     body = client.get("/api/v1/patterns", params={"trend": "gap"}).json()
     assert [p["items"] for p in body] == [["Alpha", "Beta"], ["QML"]]
     assert body[0]["support"] == body[0]["gap_score"] == 0.91
@@ -153,8 +164,16 @@ def test_patterns_emerging_country_filter(client, tmp_path, monkeypatch):
     con.executemany("INSERT INTO topic_country_year VALUES (?, ?, ?, ?, ?, ?)", rows)
     con.commit()
     con.close()
+    monkeypatch.delenv("DISCOVERIES_PATH", raising=False)
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
     monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", str(db))
     monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "missing.json"))
+    from ml.discover import refresh_discoveries
+    refresh_discoveries("2026-10-15", last_year=2025, db_path=db,
+                        snapshot_path=tmp_path / "missing.json",
+                        works_path=tmp_path / "missing.jsonl",
+                        store=LocalStore(tmp_path / "v"))
+    monkeypatch.setattr("ml.emerging.rank_emerging", _boom)
     pk = client.get("/api/v1/patterns", params={"trend": "emerging", "country": "pk"})
     assert pk.status_code == 200
     body = pk.json()
@@ -163,3 +182,80 @@ def test_patterns_emerging_country_filter(client, tmp_path, monkeypatch):
     assert body[0]["paper_count"] == 150
     assert "in PK" in body[0]["explanation"]
     assert client.get("/api/v1/patterns", params={"trend": "emerging", "country": "US"}).json() == []
+
+
+def test_patterns_and_similar_read_saved_snapshot(client, tmp_path, monkeypatch):
+    """Gap, emerging, and similar answers come from the snapshot. Nothing rescans."""
+    from ml.discovery_store import save_discoveries
+    monkeypatch.delenv("DISCOVERIES_PATH", raising=False)
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    save_discoveries({
+        "date": "2026-10-15",
+        "gaps": [
+            {"kind": "growth", "topic": "QML", "items": ["QML"], "gap_score": 0.2,
+             "growth_rate": 0.4, "paper_count": 40, "top_countries": ["CA"],
+             "window_start": 2022, "window_end": 2025, "explanation": "QML grew."},
+            {"kind": "cooccurrence", "items": ["Alpha", "Beta"], "topic": "Alpha + Beta",
+             "gap_score": 0.91, "paper_count": 1, "growth_rate": None,
+             "window_start": 2022, "window_end": 2025,
+             "explanation": "Alpha and Beta are related.",
+             "example_papers": [{"id": "W9", "title": "A bridge paper", "year": 2024}]},
+            {"kind": "growth", "topic": "Old", "items": ["Old"], "gap_score": 0.5,
+             "growth_rate": 0.2, "paper_count": 30, "top_countries": ["US"],
+             "window_start": 2010, "window_end": 2013, "explanation": "Old."},
+        ],
+        "emerging": [{
+            "topic_name": "Growing Lasers", "growth_score": 0.8, "growth_rate": 0.8,
+            "paper_count": 150, "window_start": 2022, "window_end": 2025,
+            "explanation": "Growing Lasers grew about 80% a year.",
+        }],
+        "emerging_by_country": {
+            "PK": [{
+                "topic_name": "Growing Lasers", "growth_score": 0.7, "growth_rate": 0.7,
+                "paper_count": 150, "window_start": 2022, "window_end": 2025,
+                "explanation": "Growing Lasers in PK grew.",
+            }],
+            "US": [{
+                "topic_name": "Flat Graphs", "growth_score": 0.1, "growth_rate": 0.1,
+                "paper_count": 40, "window_start": 2022, "window_end": 2025,
+                "explanation": "Flat Graphs in US.",
+            }],
+        },
+        "similar": {
+            "W1": [
+                {"work_id": "W2", "title": "Protein language models at scale", "pub_year": 2023,
+                 "score": 0.9, "authors": ["B. Two"], "cited_by": 1},
+                {"work_id": "W3", "title": "Quantum", "pub_year": 2020, "score": 0.1,
+                 "authors": [], "cited_by": 0},
+            ],
+        },
+    })
+    monkeypatch.setattr("ml.store.LocalStore.search", _boom)
+    monkeypatch.setattr("ml.service.MLService.similar", _boom)
+    monkeypatch.setattr("ml.service.MLService.related", _boom)
+    monkeypatch.setattr("ml.emerging.rank_emerging", _boom)
+    monkeypatch.setattr("ml.research_gaps.semantic_gaps_from_store", _boom)
+    monkeypatch.setattr("ml.gaps.find_gaps", _boom)
+    monkeypatch.setattr("ml.research_gaps.examples_for_topics", _boom)
+    monkeypatch.setattr("ml.research_gaps.examples_from_works", _boom)
+
+    gaps = client.get("/api/v1/patterns", params={"trend": "gap"}).json()
+    assert [p["items"] for p in gaps] == [["Alpha", "Beta"], ["Old"], ["QML"]]
+    assert gaps[0]["support"] == gaps[0]["gap_score"] == 0.91
+    assert gaps[0]["example_papers"][0]["id"] == "W9"
+    ca = client.get("/api/v1/patterns", params={"trend": "gap", "country": "ca"}).json()
+    assert [p["items"] for p in ca] == [["QML"]]
+    windowed = client.get("/api/v1/patterns", params={"trend": "gap", "window": 2022}).json()
+    assert [p["items"] for p in windowed] == [["Alpha", "Beta"], ["QML"]]
+
+    pk = client.get("/api/v1/patterns", params={"trend": "emerging", "country": "pk"}).json()
+    assert [p["items"] for p in pk] == [["Growing Lasers"]]
+    assert "in PK" in pk[0]["explanation"] and pk[0]["support"] == 0.7
+    us = client.get("/api/v1/patterns", params={"trend": "emerging", "country": "us"}).json()
+    assert [p["items"] for p in us] == [["Flat Graphs"]]
+    assert client.get("/api/v1/patterns", params={"trend": "emerging", "window": 2010}).json() == []
+
+    sim = client.get("/api/v1/papers/W1/similar", params={"limit": 1})
+    assert sim.status_code == 200
+    assert sim.json()[0]["id"] == "W2" and sim.json()[0]["score"] == 0.9
+    assert client.get("/api/v1/papers/NOPE/similar").status_code == 404

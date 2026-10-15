@@ -345,10 +345,13 @@ def test_api_gap_patterns_from_snapshot(client, tmp_path, monkeypatch):
     snap = tmp_path / "country_snapshot.json"
     snap.write_text(json.dumps({"topic_year_counts": tyc, "topic_top_countries": top}))
     monkeypatch.setenv("COUNTRY_SNAPSHOT", str(snap))
-    # find_gaps defaults last_year to the last complete calendar year; pin it via the snapshot data
-    import ml.gaps as g
-    real = g.find_gaps
-    monkeypatch.setattr(ml_bridge, "find_gaps", lambda t, tp, **kw: real(t, tp, last_year=2025, **kw))
+    monkeypatch.delenv("DISCOVERIES_PATH", raising=False)
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    from ml.discover import refresh_discoveries
+    refresh_discoveries(
+        "2026-10-15", last_year=2025, snapshot_path=snap,
+        works_path=tmp_path / "missing.jsonl", db_path=tmp_path / "missing.sqlite",
+        store=LocalStore(tmp_path / "vempty"))
     r = client.get("/api/v1/patterns", params={"trend": "gap"})
     assert r.status_code == 200, r.text
     ps = [Pattern.model_validate(x) for x in r.json()]

@@ -5,7 +5,7 @@
   python -m ml.cli galaxy                                  # layout from the current index
   python -m ml.cli galaxy --refit                          # recompute layout (points may move)
   python -m ml.cli update                                  # incremental patterns, then discoveries
-  python -m ml.cli discover                                # emerging topics + embedding gaps only
+  python -m ml.cli discover                                # gaps, emerging topics, and similar papers
   python -m ml.cli index  --jsonl data/works.jsonl         # old JSONL fallback
   python -m ml.cli update --db data/openalex.duckdb
 """

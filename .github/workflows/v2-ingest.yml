@@ -27,8 +27,9 @@ jobs:
       - name: Restore previous data
         env: {GH_TOKEN: "${{ github.token }}"}
         run: |
-          mkdir -p data
+          mkdir -p data data/ml
           gh release download data-store -p works_v2.jsonl -p ingest_state.json -p country_snapshot.json -D data --clobber || echo "first run"
+          gh release download data-store -p discoveries.json -D data/ml --clobber || echo "no discoveries yet"
       - name: Fetch only new works
         env:
           OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
@@ -40,6 +41,10 @@ jobs:
           tail -n +$(( $(cat before.txt) + 1 )) data/works_v2.jsonl > data/new.jsonl
       - name: Update country analytics with the new works only
         run: python -m pipeline.country_stats --new data/new.jsonl --prev data/country_snapshot.json --out data/country_snapshot.json --corpus data/works_v2.jsonl
+      - name: Precompute gaps, emerging topics, and similar papers
+        run: |
+          pip install numpy
+          python -m ml.cli discover
       - name: Save back
         env: {GH_TOKEN: "${{ github.token }}"}
-        run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json --clobber
+        run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json data/ml/discoveries.json --clobber

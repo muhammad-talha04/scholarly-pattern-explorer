@@ -161,6 +161,7 @@ def test_refresh_snapshot_uses_table_without_rebuilding_vectors(tmp_path, monkey
     assert summary["n_emerging"] == 1 and summary["n_semantic_gaps"] == 0
     saved = json.loads((tmp_path / "ml" / "snapshots" / "discoveries-2026-10-15.json").read_text())
     assert saved["emerging"][0]["topic_name"] == "Growing Lasers"
+    assert "similar" not in saved
 
 
 def test_string_years_from_snapshot_json(tmp_path):
