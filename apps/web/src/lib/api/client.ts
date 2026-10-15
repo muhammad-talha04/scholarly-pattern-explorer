@@ -33,6 +33,18 @@ function text(v: unknown): string | null {
   return null;
 }
 
+function colorIndex(v: unknown): number | undefined {
+  const n = finite(v);
+  if (n == null) return undefined;
+  return Math.trunc(n);
+}
+
+function unitScore(v: unknown): number | undefined {
+  const n = finite(v);
+  if (n == null) return undefined;
+  return Math.min(1, Math.max(0, n));
+}
+
 function clusterName(id: string, label: unknown): string {
   const named = text(label);
   if (named) return named;
@@ -47,13 +59,16 @@ function pointToNode(row: Record<string, unknown>): GalaxyGraph["nodes"][number]
   const id = text(row.id) ?? text(row.topic_id);
   if (x == null || y == null || z == null || !id) return null;
   const cluster_id = text(row.cluster_id) ?? "0";
-  return {
+  const node: GalaxyGraph["nodes"][number] = {
     topic_id: id,
     topic_name: text(row.topic_name) ?? id,
     x, y, z,
     cluster_id,
     support: finite(row.support) ?? 1,
   };
+  const color_index = colorIndex(row.color_index);
+  if (color_index !== undefined) node.color_index = color_index;
+  return node;
 }
 
 function fromPaperList(rows: unknown[]): GalaxyGraph {
@@ -86,7 +101,12 @@ function fromGraph(raw: Record<string, unknown>): GalaxyGraph {
       const rec = c as Record<string, unknown>;
       const id = text(rec.id);
       if (!id) continue;
-      clusters.push({ id, name: text(rec.name) ?? id });
+      const cluster: GalaxyGraph["clusters"][number] = { id, name: text(rec.name) ?? id };
+      const color_index = colorIndex(rec.color_index);
+      const emerging_score = unitScore(rec.emerging_score);
+      if (color_index !== undefined) cluster.color_index = color_index;
+      if (emerging_score !== undefined) cluster.emerging_score = emerging_score;
+      clusters.push(cluster);
     }
   }
   const links: GalaxyGraph["links"] = [];
@@ -160,8 +180,8 @@ export const api = {
   ask: (id: string, question: string) =>
     request<AskResponse>(`/papers/${encodeURIComponent(id)}/ask`, () => mock.ask(id, question), { method: "POST", body: JSON.stringify({ question }) }),
   related: (id: string, limit = 6) => request<PaperSummary[]>(`/papers/${encodeURIComponent(id)}/related${qs({ limit })}`, () => mock.related(id, limit)),
-  patterns: (opts: { window?: number; trend?: "gap" } = {}) =>
-    request<Pattern[]>(`/patterns${qs(opts)}`, () => (opts.trend === "gap" ? mock.gaps() : mock.patterns(opts.window))),
+  patterns: (opts: { window?: number; trend?: "gap" | "emerging" } = {}) =>
+    request<Pattern[]>(`/patterns${qs(opts)}`, () => (opts.trend === "gap" ? mock.gaps() : opts.trend === "emerging" ? mock.emerging() : mock.patterns(opts.window))),
   countries: (counting: Counting = "fractional") =>
     request<CountryStats[]>(`/countries${qs({ counting })}`, () => mock.countries(counting)),
   country: (code: string, counting: Counting = "fractional") =>

@@ -38,7 +38,7 @@ function PaperBody({ id, onOpen }: { id: string; onOpen: (id: string) => void })
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {link && (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-champagne to-accent px-4 py-3 font-semibold text-ink shadow-glow transition hover:brightness-110">
+          <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-ink shadow-glow transition hover:brightness-110">
             Read original paper
           </a>
         )}

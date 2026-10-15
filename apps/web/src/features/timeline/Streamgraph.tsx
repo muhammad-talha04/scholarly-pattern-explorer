@@ -2,9 +2,7 @@
 import { useMemo, useState } from "react";
 import type { TopicCountryYear } from "@/lib/api/types";
 import { streamBands, topicSeries } from "@/lib/series";
-import { CLUSTER_COLORS, ink, mist } from "@/lib/palette";
-
-const COLORS = [...CLUSTER_COLORS, mist];
+import { chartColor, ink, mist } from "@/lib/theme";
 
 export function Streamgraph({ rows }: { rows: TopicCountryYear[] }) {
   const bands = useMemo(() => streamBands(topicSeries(rows, 7, false)), [rows]);
@@ -28,7 +26,7 @@ export function Streamgraph({ rows }: { rows: TopicCountryYear[] }) {
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-64 w-full" role="img" aria-label="Topic volume by year, stacked as a stream">
         {bands.map((b, i) => (
-          <path key={b.name} d={path(b)} fill={COLORS[i % COLORS.length]} opacity={0.82} stroke={ink} strokeWidth={0.6}>
+          <path key={b.name} d={path(b)} fill={chartColor(i)} opacity={0.88} stroke={ink} strokeWidth={0.6}>
             <title>{b.name}</title>
           </path>
         ))}
@@ -42,7 +40,7 @@ export function Streamgraph({ rows }: { rows: TopicCountryYear[] }) {
         ))}
       </svg>
       <ul className="mt-2 flex flex-wrap gap-2 text-xs text-mist">
-        {bands.map((b, i) => <li key={b.name} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{b.name}</li>)}
+        {bands.map((b, i) => <li key={b.name} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ background: chartColor(i) }} />{b.name}</li>)}
       </ul>
       <p className="mt-2 text-xs text-mist">{years[active]} fractional papers: {bands.map((b) => `${b.name} ${(b.points[active].y1 - b.points[active].y0).toFixed(0)}`).join(" · ")}</p>
       <details className="mt-2 text-xs text-mist">

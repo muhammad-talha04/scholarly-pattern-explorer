@@ -11,26 +11,53 @@ import { useApi } from "@/lib/useApi";
 import { useMotionPrefs } from "@/components/MotionProvider";
 import { EmptyState, ErrorNote, Spinner, StarMark } from "@/components/ui";
 import { Galaxy2D } from "./Galaxy2D";
-import { positionNodes, type Positioned } from "./layout";
+import { positionNodes } from "./layout";
 import { SearchBar } from "@/features/search/SearchBar";
-import { clusterColor } from "@/lib/palette";
+import { galaxyColor } from "@/lib/theme";
+import { centroid, freshPaperIds, type Star } from "./stars";
 
 const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () => <GalaxyLoading /> });
 
-type Placed = TopicNode & { pos?: [number, number, number] };
+function withCenters(nodes: Star[]): Star[] {
+  const groups = new Map<string, Star[]>();
+  for (const n of nodes) {
+    const list = groups.get(n.clusterId) ?? [];
+    list.push(n);
+    groups.set(n.clusterId, list);
+  }
+  const centers = new Map<string, [number, number, number]>();
+  for (const [id, list] of groups) centers.set(id, centroid(list));
+  return nodes.map((n) => ({ ...n, center: centers.get(n.clusterId) ?? n.pos }));
+}
 
-function project(graph: { nodes: TopicNode[]; links: TopicLink[] }, galaxy: GalaxyGraph | undefined, useCoords: boolean): { nodes: Placed[]; links: TopicLink[] } {
+function project(graph: { nodes: TopicNode[]; links: TopicLink[] }, galaxy: GalaxyGraph | undefined, useCoords: boolean): { nodes: Star[]; links: TopicLink[] } {
   const gNodes = Array.isArray(galaxy?.nodes) ? galaxy.nodes : [];
-  if (!useCoords || gNodes.length === 0) return { nodes: positionNodes(graph.nodes), links: graph.links };
+  const clusterById = new Map((Array.isArray(galaxy?.clusters) ? galaxy.clusters : []).map((c) => [c.id, c]));
+  if (!useCoords || gNodes.length === 0) {
+    const placed = positionNodes(graph.nodes);
+    return {
+      nodes: withCenters(placed.map((n) => ({
+        id: n.id, support: n.support, gap: n.gap, gapScore: n.gapScore, cluster: n.cluster,
+        clusterId: n.id, colorIndex: undefined, emerging: 0, pos: n.pos, center: n.pos,
+      }))),
+      links: graph.links,
+    };
+  }
   const gaps = new Map(graph.nodes.filter((n) => n.gap).map((n) => [n.id, n]));
-  const clusters = new Map((Array.isArray(galaxy?.clusters) ? galaxy.clusters : []).map((c) => [c.id, c.name]));
-  const nodes: Positioned[] = gNodes.map((n) => ({
-    id: n.topic_name,
-    support: n.support || gaps.get(n.topic_name)?.support || 0.05,
-    gap: gaps.has(n.topic_name),
-    gapScore: gaps.get(n.topic_name)?.gapScore,
-    cluster: clusters.get(n.cluster_id),
-    pos: [n.x, n.y, n.z],
+  const nodes = withCenters(gNodes.map((n) => {
+    const cluster = clusterById.get(n.cluster_id);
+    return {
+      id: n.topic_name,
+      support: n.support || gaps.get(n.topic_name)?.support || 0.05,
+      gap: gaps.has(n.topic_name),
+      gapScore: gaps.get(n.topic_name)?.gapScore,
+      cluster: cluster?.name,
+      clusterId: n.cluster_id,
+      colorIndex: n.color_index ?? cluster?.color_index,
+      emerging: cluster?.emerging_score ?? 0,
+      pos: [n.x, n.y, n.z] as [number, number, number],
+      center: [n.x, n.y, n.z] as [number, number, number],
+    };
   }));
   const linkList = Array.isArray(galaxy?.links) ? galaxy.links : [];
   const links = linkList.length ? linkList : graph.links;
@@ -42,19 +69,36 @@ export function GalaxyHero() {
   const { lowPower } = useMotionPrefs();
   const [showGaps, setShowGaps] = useState(true);
   const [focus, setFocus] = useState<string | null>(null);
+  const [clusterQuery, setClusterQuery] = useState<string | null>(null);
   const [previewEmpty, setPreviewEmpty] = useState(false);
-  useEffect(() => { setPreviewEmpty(new URLSearchParams(window.location.search).get("preview") === "empty"); }, []);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setPreviewEmpty(q.get("preview") === "empty");
+    setClusterQuery(q.get("cluster"));
+  }, []);
   const pats = useApi(() => api.patterns(), []);
   const gaps = useApi(() => api.patterns({ trend: "gap" }), []);
   const galaxy = useApi(() => api.galaxy(), []);
   const graph = useMemo(() => buildTopicGraph(pats.data ?? [], gaps.data ?? []), [pats.data, gaps.data]);
   const useCoords = galaxy.source === "live" || (galaxy.source === "mock" && (prefersFixtures() || pats.source !== "live"));
   const view = useMemo(() => project(graph, galaxy.data, !!useCoords), [graph, galaxy.data, useCoords]);
+  const fresh = useMemo(() => new Set(view.nodes.length ? freshPaperIds(view.nodes.map((n) => n.id)) : []), [view.nodes]);
+  const stars = useMemo(() => view.nodes.map((n) => ({ ...n, fresh: fresh.has(n.id) })), [view.nodes, fresh]);
+  const highlight = useMemo(() => {
+    if (!clusterQuery) return null;
+    const q = clusterQuery.toLowerCase();
+    const byName = stars.filter((n) => n.cluster?.toLowerCase() === q);
+    const picked = byName.length ? byName : stars.filter((n) => n.id.toLowerCase().includes(q) || n.cluster?.toLowerCase().includes(q));
+    return picked.length ? new Set(picked.map((n) => n.id)) : null;
+  }, [clusterQuery, stars]);
   const clusterLegend = useMemo(() => {
-    const names: string[] = [];
-    for (const n of view.nodes) if (n.cluster && !names.includes(n.cluster)) names.push(n.cluster);
-    return names;
-  }, [view.nodes]);
+    const rows: { name: string; color: string }[] = [];
+    for (const n of stars) {
+      if (!n.cluster || rows.some((r) => r.name === n.cluster)) continue;
+      rows.push({ name: n.cluster, color: galaxyColor(n.colorIndex, n.clusterId) });
+    }
+    return rows;
+  }, [stars]);
   const loading = (pats.loading && !pats.data) || (galaxy.loading && !galaxy.data);
   const pick = (t: string) => router.push(`/search?q=${encodeURIComponent(t)}`);
   return (
@@ -67,9 +111,9 @@ export function GalaxyHero() {
             <EmptyState title="No papers in this snapshot" body="The galaxy groups papers by theme once they are indexed. You can still search, or open Patterns once a run has landed." action={<Link href="/search" className="btn bg-accent/20">Search papers</Link>} />
           </div>
         ) : lowPower ? (
-          <Galaxy2D nodes={view.nodes} links={view.links} showGaps={showGaps} focus={focus} onFocus={setFocus} onPick={pick} />
+          <Galaxy2D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
         ) : (
-          <Galaxy3D nodes={view.nodes} links={view.links} showGaps={showGaps} focus={focus} onFocus={setFocus} onPick={pick} />
+          <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
         )}
       </div>
       <div aria-hidden className="hero-vignette pointer-events-none absolute inset-0 z-10" />
@@ -77,7 +121,7 @@ export function GalaxyHero() {
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pointer-events-none absolute inset-x-0 top-[4.5rem] z-30 mx-auto w-full max-w-xl px-3 sm:px-4">
         <div className="pointer-events-auto glass px-4 py-4 text-center sm:px-6">
           <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-white sm:text-5xl">
-            Explore research <span className="gold-mark">by meaning</span>
+            Explore research <span className="text-accent">by meaning</span>
           </h1>
           <p className="mx-auto mt-2 max-w-md text-xs text-mist sm:text-sm">Each dot is a paper. Colors are topic clusters. The galaxy groups papers by theme.</p>
           <div className="mt-3"><SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} /></div>
@@ -92,19 +136,21 @@ export function GalaxyHero() {
           </label>
           {clusterLegend.length > 0 && (
             <ul aria-label="Topic clusters" className="glass flex max-w-xl flex-wrap gap-x-3 gap-y-1 px-3 py-2 text-xs text-mist">
-              {clusterLegend.map((name) => (
-                <li key={name} className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: clusterColor(name) }} />
-                  {name}
+              {clusterLegend.map((row) => (
+                <li key={row.name}>
+                  <button type="button" className="inline-flex items-center gap-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => setClusterQuery(row.name)}>
+                    <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: row.color }} />
+                    {row.name}
+                  </button>
                 </li>
               ))}
             </ul>
           )}
         </div>
         <details className="glass max-h-40 overflow-auto px-3 py-2 text-sm text-mist">
-          <summary className="cursor-pointer text-white">Papers ({view.nodes.length})</summary>
+          <summary className="cursor-pointer text-white">Papers ({stars.length})</summary>
           <ul className="mt-2 max-h-28 space-y-1 overflow-auto">
-            {view.nodes.map((n) => (
+            {stars.map((n) => (
               <li key={n.id}>
                 <button className="w-full rounded-lg px-2 py-1 text-left hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => { setFocus(n.id); }}>
                   {n.id}{showGaps && n.gap ? " · gap" : ""}
@@ -120,7 +166,7 @@ export function GalaxyHero() {
 
 export function GalaxyLoading() {
   return (
-    <div role="status" className="flex h-full flex-col items-center justify-center gap-4 bg-[radial-gradient(ellipse_at_center,rgba(232,200,115,0.16),transparent_55%)] text-sm text-mist">
+    <div role="status" className="flex h-full flex-col items-center justify-center gap-4 text-sm text-mist">
       <StarMark />
       <div className="flex items-center gap-2"><Spinner /> Placing papers</div>
     </div>

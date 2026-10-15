@@ -23,7 +23,7 @@ export function SaveButton({ paperId }: { paperId: string }) {
           <button className="btn mt-3 w-full bg-accent/20" onClick={() => { saveToCollection(name, paperId); setNote(`Saved to ${name.trim() || "Reading list"}`); setOpen(false); }}>Save on this device</button>
         </div>
       )}
-      {note && <p className="mt-1 text-xs text-teal" role="status">{note}</p>}
+      {note && <p className="mt-1 text-xs text-up" role="status">{note}</p>}
     </div>
   );
 }

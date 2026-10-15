@@ -33,7 +33,7 @@ export function TimelinePage() {
             {list.map((r, i) => (
               <button key={r.id} onClick={() => setIdx(i)} aria-label={`${fmtDate(r.started_at)}: ${r.papers_added} papers`} title={`${fmtDate(r.started_at)}: ${r.papers_added} papers`} className="group flex h-full min-w-0 flex-1 flex-col justify-end focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                 <motion.div initial={{ height: 0 }} animate={{ height: `${Math.max(2, (r.papers_added / max) * 100)}%` }} transition={{ delay: Math.min(i, 20) * 0.015 }}
-                  className={`w-full rounded-t ${r.status !== "success" ? "bg-rose/80" : i === idx ? "bg-gradient-to-t from-accent to-gap" : i < idx ? "bg-accent/50" : "bg-white/15"} group-hover:brightness-125`} />
+                  className={`w-full rounded-t ${r.status !== "success" ? "bg-down/80" : i === idx ? "bg-gradient-to-t from-accent to-gap" : i < idx ? "bg-accent/50" : "bg-white/15"} group-hover:brightness-125`} />
               </button>
             ))}
           </div>
@@ -43,7 +43,7 @@ export function TimelinePage() {
         {cur && (
           <motion.div key={cur.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <Stat label={`Run #${cur.id}`} value={<span className="text-base">{fmtDate(cur.started_at)}</span>} />
-            <Stat label="Status" value={<span className={cur.status === "success" ? "text-teal" : "text-rose"}>{cur.status}</span>} />
+            <Stat label="Status" value={<span className={cur.status === "success" ? "text-up" : "text-down"}>{cur.status}</span>} />
             <Stat label="Papers added" value={cur.papers_added.toLocaleString()} />
             <Stat label="Total so far" value={cumulative.toLocaleString()} />
             <Stat label="Patterns changed" value={cur.patterns_changed} />
@@ -68,7 +68,7 @@ export function TimelinePage() {
 
 function LifePanel({ tone, title, life }: { tone: "born" | "died"; title: string; life: ReturnType<typeof selectBornDied> }) {
   const rows = tone === "born" ? life.born : life.died;
-  const color = tone === "born" ? "text-teal" : "text-rose";
+  const color = tone === "born" ? "text-up" : "text-down";
   const mark = tone === "born" ? "+" : "−";
   return (
     <div className="glass p-4">

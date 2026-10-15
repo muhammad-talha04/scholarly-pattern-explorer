@@ -2,52 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-  --bg: #14110E;
-  --text: #F7F3EC;
-  --muted: #D4CBBE;
-  --faint: #B7AA9A;
-  --line: rgba(243, 227, 181, 0.2);
-  --accent: #E8C873;
-  --champagne: #F3E3B5;
-  --ivory: #F8F6F2;
-  --teal: #5FB3A8;
-  --rose: #C4785A;
-  --dusk: #7383C0;
-  --gap: #E04B9A;
-}
 body {
   @apply bg-ink antialiased;
   background-color: var(--bg);
   color: var(--text);
   background-image:
-    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 248, 236, 0.5), transparent 1.4px),
-    radial-gradient(1px 1px at 28% 68%, rgba(255, 244, 220, 0.28), transparent 1.2px),
-    radial-gradient(1.2px 1.2px at 72% 18%, rgba(255, 236, 200, 0.34), transparent 1.4px),
-    radial-gradient(1px 1px at 84% 74%, rgba(255, 230, 190, 0.22), transparent 1.2px),
-    radial-gradient(1px 1px at 46% 42%, rgba(255, 236, 210, 0.16), transparent 1.2px),
-    radial-gradient(ellipse at 8% -8%, rgba(176, 112, 58, 0.18), transparent 48%),
-    radial-gradient(ellipse at 96% 6%, rgba(92, 54, 32, 0.28), transparent 46%),
-    radial-gradient(ellipse at 84% 108%, rgba(140, 78, 42, 0.16), transparent 48%),
-    radial-gradient(ellipse at 10% 96%, rgba(120, 74, 40, 0.14), transparent 44%),
-    radial-gradient(ellipse at 50% 40%, rgba(232, 200, 115, 0.05), transparent 38%);
+    radial-gradient(1.1px 1.1px at 12% 22%, var(--star), transparent 1.4px),
+    radial-gradient(1px 1px at 28% 68%, var(--star), transparent 1.2px),
+    radial-gradient(1.1px 1.1px at 72% 18%, var(--star), transparent 1.4px),
+    radial-gradient(1px 1px at 84% 74%, var(--star), transparent 1.2px),
+    radial-gradient(ellipse at 6% -6%, var(--wash), transparent 46%),
+    radial-gradient(ellipse at 96% 4%, var(--wash), transparent 42%),
+    radial-gradient(ellipse at 80% 110%, var(--wash), transparent 46%);
   background-attachment: fixed;
   min-height: 100vh;
 }
-::selection { background: rgba(232, 200, 115, 0.35); color: #14110E; }
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--bg); }
 @layer components {
   .glass {
     @apply rounded-2xl border backdrop-blur-xl;
     border-color: var(--line);
-    background: linear-gradient(180deg, rgba(36, 28, 22, 0.74), rgba(20, 17, 14, 0.58));
-    box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(243, 227, 181, 0.08);
+    background: linear-gradient(180deg, var(--glass-top), var(--glass-bot));
+    box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.85), inset 0 1px 0 color-mix(in srgb, var(--accent) 12%, transparent);
   }
-  .chip { @apply rounded-full border px-2.5 py-0.5 text-xs text-mist; border-color: var(--line); background: rgba(255, 248, 236, 0.05); }
+  .chip { @apply rounded-full border px-2.5 py-0.5 text-xs text-mist; border-color: var(--line); background: color-mix(in srgb, var(--text) 5%, transparent); }
   .btn {
     @apply rounded-xl border px-4 py-2 text-sm font-medium transition hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink;
     border-color: var(--line);
-    background: rgba(232, 200, 115, 0.08);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
   .input {
     @apply rounded-xl border bg-black/30 px-3 py-2 text-sm placeholder:text-mist/70 focus:outline-none focus:ring-2 focus:ring-accent;
@@ -56,36 +38,30 @@ body {
   }
   .search-hero {
     @apply pointer-events-auto rounded-2xl border;
-    border-color: rgba(232, 200, 115, 0.45);
-    background: rgba(20, 17, 14, 0.78);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    background: var(--search-bg);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     box-shadow:
       0 22px 48px -18px rgba(0, 0, 0, 0.85),
-      0 0 0 1px rgba(232, 200, 115, 0.16),
-      0 0 36px -6px rgba(232, 200, 115, 0.42);
+      0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent),
+      var(--glow);
   }
   .search-hero:focus-within {
     outline: 2px solid var(--accent);
     outline-offset: 3px;
     box-shadow:
       0 22px 48px -18px rgba(0, 0, 0, 0.85),
-      0 0 0 1px rgba(232, 200, 115, 0.45),
-      0 0 42px -4px rgba(232, 200, 115, 0.7);
+      0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+      var(--glow-strong);
   }
   .hero-vignette {
-    background: radial-gradient(ellipse 72% 52% at 50% 28%, rgba(20, 17, 14, 0.84) 0%, rgba(20, 17, 14, 0.46) 42%, rgba(20, 17, 14, 0.08) 68%, transparent 78%);
-  }
-  .gold-mark {
-    background-image: linear-gradient(105deg, #F3E3B5 0%, #E8C873 52%, #C6A15A 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    background: var(--vignette);
   }
 }
 .skip-link {
   position: absolute; left: 1rem; top: -4rem; z-index: 80;
-  @apply rounded-lg bg-champagne px-3 py-2 text-sm font-semibold text-ink;
+  @apply rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-ink;
 }
 .skip-link:focus { top: 0.75rem; }
 @media (prefers-reduced-motion: reduce) {

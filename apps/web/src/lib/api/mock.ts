@@ -92,6 +92,13 @@ export function patterns(window?: number): Pattern[] {
   }
   return window === undefined ? out : out.filter((p) => p.window_start === window);
 }
+export function emerging(): Pattern[] {
+  return ["Climate modelling", "Protein folding", "Quantum computing"].map((t, i) => ({
+    items: [t], support: 0.7 - i * 0.12, window_start: 2024, window_end: 2026,
+    growth_rate: 0.9 - i * 0.2, paper_count: 80 - i * 15,
+    top_countries: [["US", "GB"], ["DE", "CH"], ["CN", "JP"]][i],
+  }));
+}
 export function gaps(): Pattern[] {
   return ["Federated learning", "Edge computing", "Protein folding", "Energy systems"].map((t, i) => ({
     items: [t], support: 0.82 - i * 0.13, window_start: 2023, window_end: 2025,
@@ -136,7 +143,8 @@ export function galaxy(): GalaxyGraph {
     return {
       topic_id: slug(p.topics[0]), topic_name: p.title,
       x: r * Math.cos(a), y: (((i * 7919) % 13) / 13 - 0.5) * 1.6, z: r * Math.sin(a),
-      cluster_id: theme.id, support: Math.round((0.15 + (p.cited_by % 70) / 100) * 100) / 100,
+      cluster_id: theme.id, color_index: THEMES.findIndex((t) => t.id === theme.id),
+      support: Math.round((0.15 + (p.cited_by % 70) / 100) * 100) / 100,
     };
   });
   const links: GalaxyGraph["links"] = [];
@@ -144,7 +152,11 @@ export function galaxy(): GalaxyGraph {
     const mate = nodes.find((n, j) => j > i && n.cluster_id === nodes[i].cluster_id);
     if (mate) links.push({ source: nodes[i].topic_name, target: mate.topic_name, weight: 0.4 });
   }
-  return { nodes, clusters: THEMES.map(({ id, name }) => ({ id, name })), links };
+  const clusters = THEMES.map(({ id, name }, i) => ({
+    id, name, color_index: i,
+    ...(id === "science" ? { emerging_score: 0.72 } : {}),
+  }));
+  return { nodes, clusters, links };
 }
 export function topicCountryYears(q: TopicYearQuery = {}): TopicCountryYear[] {
   const years = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];

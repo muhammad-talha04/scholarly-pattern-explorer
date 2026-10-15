@@ -1,16 +1,19 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api/client";
 import { lifecycles } from "@/lib/graph";
 import { useApi } from "@/lib/useApi";
 import { ErrorNote, PageHeader, Spinner } from "@/components/ui";
+import { chartColor } from "@/lib/theme";
 import { deriveRules } from "./rules";
 
 type Tab = "itemsets" | "rules" | "lifecycles" | "gaps";
 export function PatternsPage() {
   const all = useApi(() => api.patterns(), []);
   const gaps = useApi(() => api.patterns({ trend: "gap" }), []);
+  const emerging = useApi(() => api.patterns({ trend: "emerging" }), []);
   const windows = useMemo(() => [...new Set((all.data ?? []).map((p) => p.window_start))].sort(), [all.data]);
   const [win, setWin] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("itemsets");
@@ -42,16 +45,28 @@ export function PatternsPage() {
         {tab === "lifecycles" && (
           <table className="text-sm"><thead className="text-xs text-slate-400"><tr><th className="p-2 text-left">Itemset</th>{life.windows.map((w) => <th key={w} className="p-2">{w}</th>)}<th className="p-2">Born</th><th className="p-2">Died</th></tr></thead>
             <tbody>{life.rows.map((r) => <tr key={r.key} className="border-t border-white/5"><td className="p-2 pr-6">{r.key}</td>
-              {r.supports.map((s, i) => <td key={i} className="p-1"><div title={s?.toFixed(3) ?? "absent"} className="mx-auto h-5 w-10 rounded" style={{ background: s == null ? "rgba(255,255,255,.04)" : `rgba(125,211,252,${0.15 + Math.min(1, s * 3)})` }} /></td>)}
-              <td className="p-2 text-teal">{r.born}</td><td className="p-2 text-rose">{r.died ?? "alive"}</td></tr>)}</tbody></table>
+              {r.supports.map((s, i) => <td key={i} className="p-1"><div title={s?.toFixed(3) ?? "absent"} className="mx-auto h-5 w-10 rounded" style={{ background: s == null ? "rgba(255,255,255,.04)" : chartColor(4), opacity: s == null ? 1 : 0.35 + Math.min(0.65, s * 2) }} /></td>)}
+              <td className="p-2 text-up">{r.born}</td><td className="p-2 text-down">{r.died ?? "alive"}</td></tr>)}</tbody></table>
         )}
         {tab === "gaps" && (gaps.loading ? <Spinner /> :
-          <div className="grid gap-3 md:grid-cols-2">{(gaps.data ?? []).map((g) => (
-            <div key={g.items[0]} className="rounded-xl border border-gap/30 bg-gap/10 p-4">
-              <div className="flex justify-between"><h3 className="font-medium text-gap">{g.items[0]}</h3><span className="chip">score {(g.gap_score ?? g.support).toFixed(2)}</span></div>
-              <p className="mt-1 text-sm text-slate-400">Growth {g.growth_rate != null ? `${(g.growth_rate * 100).toFixed(0)}%/yr` : "n/a"} · {g.paper_count ?? "?"} papers · {g.window_start}–{g.window_end}</p>
-              {g.top_countries && <p className="mt-1 text-xs text-slate-500">Top countries (fractional): {g.top_countries.join(", ")}</p>}
-            </div>))}</div>)}
+          <div className="space-y-6">
+            <div className="grid gap-3 md:grid-cols-2">{(gaps.data ?? []).map((g) => (
+              <div key={g.items[0]} className="rounded-xl border border-gap/30 bg-gap/10 p-4">
+                <div className="flex justify-between gap-2"><Link href={`/?cluster=${encodeURIComponent(g.items[0])}`} className="font-medium text-gap underline-offset-2 hover:underline">{g.items[0]}</Link><span className="chip">score {(g.gap_score ?? g.support).toFixed(2)}</span></div>
+                <p className="mt-1 text-sm text-slate-400">Growth {g.growth_rate != null ? `${(g.growth_rate * 100).toFixed(0)}%/yr` : "n/a"} · {g.paper_count ?? "?"} papers · {g.window_start}–{g.window_end}</p>
+                {g.top_countries && <p className="mt-1 text-xs text-slate-500">Top countries (fractional): {g.top_countries.join(", ")}</p>}
+              </div>))}</div>
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist">Emerging topics</h3>
+              {emerging.loading ? <Spinner /> : (
+                <ul className="grid gap-2 md:grid-cols-2">
+                  {(emerging.data ?? []).map((g) => (
+                    <li key={g.items[0]}><Link href={`/?cluster=${encodeURIComponent(g.items[0])}`} className="glass block px-3 py-2 text-sm text-accent hover:underline">{g.items[0]}</Link></li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>)}
       </motion.div>
     </div>
   );

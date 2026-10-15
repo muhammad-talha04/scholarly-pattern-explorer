@@ -44,4 +44,4 @@ A 404 on `/galaxy` or `/topic-country-years` uses fixtures for that call only. T
 - Low-power mode: `prefers-reduced-motion`, no WebGL, or the nav toggle. Galaxy and globe both have an SVG fallback.
 
 ## Design
-Tokens live in `tailwind.config.ts`, `src/app/globals.css`, and `src/lib/palette.ts`: warm charcoal `ink`, light gold `accent`, and the cluster set champagne, ivory, muted teal, terracotta (`rose`), and soft slate blue (`dusk`). `gap` is the research-gap mark. Display type is Fraunces, UI type is Space Grotesk, panels use the `glass` class. The landing search uses `search-hero`. The audit of the previous UI is `docs/ui/AUDIT.md`.
+Colors live in `src/lib/theme.ts` (CSS variables plus `clusterColors`). The page is near-black with a champagne accent. Galaxy clusters are champagne gold, platinum, antique gold, pewter, and pale gold. Charts and the globe use the Okabe–Ito set. Display type is Fraunces, UI type is Space Grotesk, panels use the `glass` class. The landing search uses `search-hero`. The audit of the previous UI is `docs/ui/AUDIT.md`.
