@@ -4,3 +4,4 @@ pydantic>=2
 pytest
 httpx
 numpy
+psycopg[binary]>=3.1
