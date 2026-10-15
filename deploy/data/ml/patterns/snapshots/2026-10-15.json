@@ -1,0 +1,50 @@
+{
+ "date": "2026-10-15",
+ "total_papers": 14159,
+ "n_windows": 5,
+ "n_patterns": 66,
+ "top_pairs_by_window": {
+  "2022": [
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.06383
+   }
+  ],
+  "2023": [
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05936
+   },
+   {
+    "itemset": "AI in cancer detection | Radiomics and Machine Learning in Medical Imaging",
+    "support": 0.05356
+   }
+  ],
+  "2024": [
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05926
+   },
+   {
+    "itemset": "AI in cancer detection | Radiomics and Machine Learning in Medical Imaging",
+    "support": 0.05283
+   }
+  ],
+  "2025": [
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05797
+   },
+   {
+    "itemset": "AI in cancer detection | Radiomics and Machine Learning in Medical Imaging",
+    "support": 0.05399
+   }
+  ],
+  "2026": [
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05815
+   }
+  ]
+ }
+}
