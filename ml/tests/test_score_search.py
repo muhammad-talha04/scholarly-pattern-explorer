@@ -45,6 +45,50 @@ def test_metrics_match_a_hand_worked_example():
     assert rep["ndcg@10"] == pytest.approx(0.7607, abs=1e-4)
 
 
+def test_fetch_sends_api_key_and_blocks_a_second_page_without_it(monkeypatch):
+    monkeypatch.setattr(sc.time, "sleep", lambda *_a, **_k: None)
+    calls = []
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {"results": [{
+                "id": "https://openalex.org/W1",
+                "display_name": "A paper",
+                "publication_year": 2020,
+            }]}
+
+    class Session:
+        def __init__(self):
+            self.headers = {}
+
+        def get(self, url, params=None, timeout=None):
+            calls.append(params)
+            return Resp()
+
+    import requests
+    monkeypatch.setattr(requests, "Session", Session)
+
+    monkeypatch.setenv("OPENALEX_API_KEY", "test-key")
+    monkeypatch.setenv("OPENALEX_MAILTO", "dev@example.com")
+    papers = sc.fetch_openalex(["W1"])
+    assert papers[0].work_id == "W1"
+    assert calls[0]["api_key"] == "test-key"
+    assert calls[0]["mailto"] == "dev@example.com"
+    assert calls[0]["per-page"] == "50"
+
+    monkeypatch.delenv("OPENALEX_API_KEY")
+    calls.clear()
+    sc.fetch_openalex(["W1"])
+    assert "api_key" not in calls[0]
+
+    calls.clear()
+    with pytest.raises(SystemExit, match="OPENALEX_API_KEY"):
+        sc.fetch_openalex([f"W{i}" for i in range(51)])
+    assert calls == []
+
+
 def test_score_runs_repo_search_on_a_fixture():
     papers = [
         Paper("Wrel", "quantum error correction surface codes",
