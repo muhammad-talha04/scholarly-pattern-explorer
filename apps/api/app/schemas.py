@@ -28,6 +28,14 @@ class PaperDetail(PaperSummary):
 class SearchResponse(BaseModel):
     query: str
     results: list[PaperSummary]
+    total: int = 0
+    limit: int = 20
+    offset: int = 0
+
+
+class CorpusStats(BaseModel):
+    """Indexed papers. This is the corpus size, not a search page."""
+    papers: int
 
 
 class AskRequest(BaseModel):

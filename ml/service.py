@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .embeddings import get_embedder
 from .llm import chat_complete
-from .papers import Paper
+from .papers import Paper, reader_url
 from .paths import ml_data_dir
 from .store import get_store
 from .text import best_sentences, extractive_summary
@@ -46,7 +46,7 @@ def _link(meta: dict) -> dict:
     p = Paper(**{k: meta.get(k) for k in ("work_id", "title", "abstract", "pub_year", "doi",
                                           "original_url")})
     return {"openalex_url": p.openalex_url, "doi_url": p.doi_url,
-            "original_url": p.best_original_url}
+            "original_url": reader_url(p.doi, p.original_url, p.openalex_url)}
 
 
 def _hit(wid: str, score: float, meta: dict) -> dict:

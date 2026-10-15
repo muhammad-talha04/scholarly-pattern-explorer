@@ -24,6 +24,16 @@ def test_normalize():
     assert r["countries"] == ["CA", "PK"] and r["original_url"].endswith(".pdf")
 
 
+def test_normalize_drops_placeholder_doi():
+    fake = {**W, "doi": "https://doi.org/10.1234/spe.0",
+            "open_access": {"oa_url": "https://doi.org/10.1234/spe.0"},
+            "primary_location": {"landing_page_url": "https://doi.org/10.1234/spe.9"}}
+    r = normalize(fake)
+    assert r["doi"] is None and r["original_url"] is None
+    kept = normalize({**W, "doi": "https://doi.org/10.1234/spe.0"})
+    assert kept["doi"] is None and kept["original_url"].endswith(".pdf")
+
+
 def test_merge_dedups(tmp_path):
     p = tmp_path / "w.jsonl"
     r = normalize(W)

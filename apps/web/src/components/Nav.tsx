@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useMotionPrefs } from "./MotionProvider";
-import { SourceBadge } from "./SourceBadge";
+import { DemoNote, SourceBadge } from "./SourceBadge";
 import { replayTour } from "./Tour";
 
 const LINKS = [
@@ -68,6 +68,7 @@ export function Nav() {
           </div>
         </div>
       )}
+      <DemoNote />
     </header>
   );
 }

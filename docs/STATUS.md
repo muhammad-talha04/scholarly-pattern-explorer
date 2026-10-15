@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 by harry (Embedding Lens plexus breath zoom); earlier the same day by harry (Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+Last updated: 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -72,9 +72,62 @@ Merged into main, in order: #1 platform skeleton, #3 OpenAlex ingestion, #2 ML s
   - Postgres DDL is numbered under `db/migrations/` and applied in order with `DATABASE_URL=... python -m db.apply` (also on `PgVectorStore` connect). `001_vector_storage.sql` is the pgvector extension, `paper_embeddings`, and `documents`. `002_topic_country_year.sql` is `topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`. `003_discovery_snapshots.sql` is `id`, `run_date`, `kind` (`gap`, `emerging`, and later kinds), optional `country_code`, `results` jsonb, `created_at`, with indexes on `run_date`, `(kind, country_code, run_date)`, and `created_at`. `004_runs_summaries_snapshots.sql` holds `runs`, `paper_summaries`, and `snapshots`. Every table has row level security and no policies, so anon has no access; the API uses `DATABASE_URL`. `pipeline/schema_v2.sql` points at these files. The DuckDB corpus stays in `schema.sql`.
   - Offline tests use the hash embedder and the file backend: ml 73 pass (1 skipped real-model test), api 26 pass, integration 42 pass, pipeline 12 pass.
 
+## Deploy
+
+The web app on Vercel is live. With `NEXT_PUBLIC_API_URL` unset it serves the built-in sample (66 papers). `render.yaml` at the repo root is a Render free-tier blueprint for `apps/api` (the API imports `ml/` and `pipeline/` from the repo root, so the service root is the repository). Build: `pip install -r apps/api/requirements.txt`. Start: `uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port $PORT`. Health check: `GET /api/v1/health`. No secret values are in the repo. Free-tier disk is ephemeral, so a file index disappears on restart; a persistent index needs `DATABASE_URL`.
+
+### API env vars (Render)
+
+Set these in the Render dashboard. `render.yaml` lists them as `sync: false`.
+
+| Variable | Required to boot? | What it does |
+|---|---|---|
+| `DATABASE_URL` | No | Postgres connection string (pgvector). Unset uses files under `ML_DATA_DIR`. Required for an index that survives a free-tier restart. |
+| `ML_VECTOR_BACKEND` | No | `local` forces files even when `DATABASE_URL` is set. `pgvector` forces Postgres and then `DATABASE_URL` is required. Unset follows `DATABASE_URL`. |
+| `ML_EMBEDDER` | No | `hash` boots without a model download. Unset loads `sentence-transformers` on the first encode. That package is not in `apps/api/requirements.txt`, so set `hash` on the free tier unless you install it. |
+| `ML_EMBED_MODEL` | No | Sentence-transformer id. Default `sentence-transformers/all-MiniLM-L6-v2`. |
+| `ML_DATA_DIR` | No | File-backend directory. Default `data/ml`. |
+| `ML_WORKS_PATH` | No | Corpus JSONL. Default `data/works_v2.jsonl` when that file exists. |
+| `OPENALEX_API_KEY` | No | Ingest and any OpenAlex fetch past the first page. The API process starts without it. |
+| `OPENALEX_MAILTO` | No | Polite-pool contact email for OpenAlex. |
+| `ML_LLM_URL` | No | OpenAI-compatible URL for summaries and ask. Unset uses the extractive fallback. |
+| `ML_LLM_MODEL` | No | Model name sent to that URL. Default `llama3.2`. |
+| `ML_LLM_API_KEY` | No | Optional bearer token for `ML_LLM_URL`. |
+| `SEARCH_MAX_LIMIT` | No | Most hits one search ranks. Default `100`. |
+| `GALAXY_NODE_LIMIT` | No | Cap on `GET /galaxy`. Unset returns every stored node. |
+| `COUNTRY_SNAPSHOT` | No | Country snapshot path. Default `data/country_snapshot.json`. |
+| `TOPIC_COUNTRY_YEAR_DB` | No | Topic × country × year SQLite path. Default `data/topic_country_year.sqlite`. |
+| `PYTHON_VERSION` | Set in the blueprint | `3.11.11`, matching CI. Not a secret. |
+
+### Vercel env vars
+
+| Variable | What it does |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Render origin, no `/api/v1` suffix. Empty or missing forces the sample. |
+| `NEXT_PUBLIC_API_MOCK` | `1` forces the sample even when the URL is set. Leave unset in production. |
+| `NEXT_PUBLIC_SEARCH_LIMIT` | Search page size. Default `20`. A `limit` query on `/search` overrides it. |
+| `NEXT_PUBLIC_GALAXY_LIMIT` | Optional `limit` sent to `GET /galaxy`. Unset asks for the whole graph. |
+
+### What caps the paper count
+
+487 is not a cap. It is not a constant in the client, in `GET /galaxy`, or in the API. The live mock bundle is the 66-paper sample.
+
+| Surface | Cap |
+|---|---|
+| Built-in sample | 66 papers (`FIXTURE_COUNT`). |
+| `GET /search` | Ranks at most `SEARCH_MAX_LIMIT` (default 100), then pages with `limit` (default 20, clamped to 1..that cap) and `offset`. `total` is the size of that ranked window, not the corpus. A country or year filter over-fetches 5× the cap inside `ml.service.search`, then slices to the cap. |
+| Web search page | Page size `NEXT_PUBLIC_SEARCH_LIMIT` or `?limit=`, plus `?offset=`. The pager shows “Showing a–b of total”. Changing the query or a filter clears `offset`. |
+| `GET /api/v1/stats` | `{papers}` is `len(store)`, the indexed corpus. The nav shows this when the API is configured. |
+| `GET /galaxy` | No paper limit unless `?limit=` or `GALAXY_NODE_LIMIT` is set. The client sends a limit only when `NEXT_PUBLIC_GALAXY_LIMIT` is set. `LINK_CAP = 200` in `ml/galaxy.py` is edges, not papers. |
+| Related and similar | `limit` clamped to 1..50. |
+| `GET /topic-country-years` | Default 1000, clamped to 1..10000. The countries and timeline pages request 5000. |
+| Collaborations | Default `limit` 200. |
+| Gaps, emerging, semantic gaps | 20, 20, and 10 inside `ml_bridge`. These are topic rows, not the corpus. |
+| OpenAlex ingest | 200 works per page. `--max-records` default 50000. The first anonymous page of the search-eval fetch is 50 ids. |
+
 ## Open items
 - [ ] #16 read gaps and emerging topics from the precomputed discoveries snapshot: reviewed, tests pass with main merged in (ml+pipeline 91, api 27, integration 42). The merge resolution changes `.github/workflows/v2-ingest.yml` (discover step + upload of the refreshed `discoveries.json` after `ml.cli update`), and the push was refused because the bot token lacks the `workflow` permission. Needs a token with Workflows read/write, or the owner pushes the merge. Until #16 lands, gap/emerging routes still compute live.
 - [ ] `/galaxy` nodes are papers (#15). The hero used to say "Nodes are topics"; the galaxy-copy row above changes that wording. The client still normalises both payload shapes.
 - [ ] First successful 1st/15th run of `python -m ml.cli index` against the real `works_v2.jsonl`. The workflow step is in place. `python -m ml.cli update` also runs discoveries and rebuilds the galaxy.
 - [ ] Live pgvector / Supabase `DATABASE_URL` untested against a real database; tests use the file backend and the offline hash embedder.
-- [ ] Deploy the API and web app (free tiers) and set `NEXT_PUBLIC_API_URL`.
+- [ ] Deploy the API from `render.yaml` (free tier) and set Vercel `NEXT_PUBLIC_API_URL` to that origin. The web app is already on Vercel and, with the URL unset, serves the 66-paper sample. Env vars are listed under Deploy above. Do not commit secret values.

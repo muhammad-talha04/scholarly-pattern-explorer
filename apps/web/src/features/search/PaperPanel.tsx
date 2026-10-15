@@ -1,6 +1,7 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
 import { api } from "@/lib/api/client";
+import { readerLink } from "@/lib/paperLink";
 import { toggleCompare, useCompare } from "@/lib/library";
 import { useApi } from "@/lib/useApi";
 import { ErrorNote, Spinner } from "@/components/ui";
@@ -28,7 +29,7 @@ function PaperBody({ id, onOpen }: { id: string; onOpen: (id: string) => void })
   const pinned = useCompare().includes(id);
   if (p.loading) return <div className="pt-8"><Spinner /></div>;
   if (p.error || !p.data) return <ErrorNote msg={p.error ?? "not found"} onRetry={p.reload} />;
-  const d = p.data, link = d.original_url ?? d.openalex_url;
+  const d = p.data, link = readerLink(d, p.source === "live" ? "live" : "mock");
   return (
     <div className="clear-both space-y-6">
       <div>
@@ -38,8 +39,8 @@ function PaperBody({ id, onOpen }: { id: string; onOpen: (id: string) => void })
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {link && (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-ink shadow-glow transition hover:brightness-110">
-            Read original paper
+          <a href={link.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-ink shadow-glow transition hover:brightness-110">
+            {link.label}
           </a>
         )}
         <button className={`btn ${pinned ? "bg-gap/20" : ""}`} aria-pressed={pinned} onClick={() => toggleCompare(id)}>{pinned ? "Pinned for compare" : "Pin to compare"}</button>

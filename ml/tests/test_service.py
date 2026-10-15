@@ -13,6 +13,12 @@ def test_inverted_index_and_links():
                              "abstract_inverted_index": {"hi": [0]}})
     assert p.work_id == "W9" and p.abstract == "hi" and p.topics == ["A"]
     assert p.openalex_url == "https://openalex.org/W9" and p.doi_url == "https://doi.org/10.1/x"
+    from ml.papers import is_placeholder_doi, reader_url
+    assert is_placeholder_doi("https://doi.org/10.1234/spe.0")
+    assert reader_url("https://doi.org/10.1/a", "https://example.org/w1.pdf", p.openalex_url) == "https://doi.org/10.1/a"
+    assert reader_url(None, "https://example.org/w1.pdf", p.openalex_url) == "https://example.org/w1.pdf"
+    assert reader_url("10.1234/spe.0", "https://doi.org/10.1234/spe.0", p.openalex_url) == p.openalex_url
+    assert reader_url(None, None, None) is None
 
 
 def test_real_embedder_uses_minilm_mocked(monkeypatch):

@@ -1,4 +1,5 @@
 /** Deterministic fixtures shaped exactly like apps/api/app/schemas.py. */
+import { openAlexSearchUrl } from "../paperLink";
 import type { AskResponse, Collaboration, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchParams, SearchResponse, TopicCountryYear, TopicYearQuery } from "./types";
 
 export const TOPICS = [
@@ -33,9 +34,12 @@ const PAPERS: PaperDetail[] = Array.from({ length: 66 }, (_, i) => {
   const t2 = TOPICS[(i * 5 + 3) % TOPICS.length];
   const c = [COUNTRY_META[i % COUNTRY_META.length][0], COUNTRY_META[(i * 3 + 1) % COUNTRY_META.length][0]];
   const id = `W${4100000000 + i * 7919}`;
+  const title = `${t1} meets ${t2.toLowerCase()}: ${["a survey", "new benchmarks", "scaling laws", "a causal view", "lessons from deployment", "an open dataset"][i % 6]}`;
+  // Fixture ids are not OpenAlex works. Both links are a real title search, never a 10.1234 DOI.
+  const find = openAlexSearchUrl(title);
   return {
     id,
-    title: `${t1} meets ${t2.toLowerCase()}: ${["a survey", "new benchmarks", "scaling laws", "a causal view", "lessons from deployment", "an open dataset"][i % 6]}`,
+    title,
     authors: [["A. Khan", "L. Chen", "M. Rossi"], ["S. Patel", "J. Müller"], ["E. Okafor", "Y. Tanaka", "R. Silva", "K. Lee"]][i % 3],
     year: 2018 + (i % 9),
     cited_by: Math.floor(r() * 900),
@@ -45,26 +49,30 @@ const PAPERS: PaperDetail[] = Array.from({ length: 66 }, (_, i) => {
     summary: `This paper connects ${t1.toLowerCase()} with ${t2.toLowerCase()}. The authors propose a method, evaluate it against strong baselines, and report a ${Math.floor(r() * 20 + 3)}% improvement. Limitations include dataset bias and compute cost.`,
     topics: [t1, t2],
     countries: c,
-    original_url: `https://doi.org/10.1234/spe.${i}`,
-    openalex_url: `https://openalex.org/${id}`,
+    original_url: find,
+    openalex_url: find,
   };
 });
+
+/** Sample corpus size. The live site shows this until NEXT_PUBLIC_API_URL is set. */
+export const FIXTURE_COUNT = PAPERS.length;
 
 const toSummary = ({ id, title, authors, year, cited_by, one_line_summary, score }: PaperDetail): PaperSummary =>
   ({ id, title, authors, year, cited_by, one_line_summary, score });
 
 export function search(p: SearchParams): SearchResponse {
   const words = p.q.toLowerCase().split(/\s+/).filter(Boolean);
-  const results = PAPERS
+  const ranked = PAPERS
     .filter((x) => (!p.country || x.countries.includes(p.country)) && (!p.year_from || (x.year ?? 0) >= p.year_from))
     .map((x) => {
       const hay = `${x.title} ${x.abstract} ${x.topics.join(" ")}`.toLowerCase();
       const hits = words.filter((w) => hay.includes(w)).length;
       return { ...toSummary(x), score: Math.round((0.35 + 0.6 * (words.length ? hits / words.length : 0.5)) * 1000) / 1000 };
     })
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    .slice(0, p.limit ?? 20);
-  return { query: p.q, results };
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const limit = Math.max(1, p.limit ?? 20);
+  const offset = Math.max(0, p.offset ?? 0);
+  return { query: p.q, results: ranked.slice(offset, offset + limit), total: ranked.length, limit, offset };
 }
 export function paper(id: string): PaperDetail { return PAPERS.find((p) => p.id === id) ?? { ...PAPERS[0], id }; }
 export function ask(id: string, q: string): AskResponse {
@@ -145,7 +153,7 @@ const THEMES: { id: string; name: string; topics: string[] }[] = [
 ];
 function themeFor(topic: string) { return THEMES.find((t) => t.topics.includes(topic)) ?? THEMES[0]; }
 /** One dot per fixture paper. The cluster name is the topic group that colors it. */
-export function galaxy(): GalaxyGraph {
+export function galaxy(limit?: number): GalaxyGraph {
   const golden = Math.PI * (3 - Math.sqrt(5));
   const nodes = PAPERS.map((p, i) => {
     const theme = themeFor(p.topics[0]);
@@ -166,7 +174,10 @@ export function galaxy(): GalaxyGraph {
     id, name, color_index: i,
     ...(id === "science" ? { emerging_score: 0.72 } : {}),
   }));
-  return { nodes, clusters, links };
+  if (limit == null) return { nodes, clusters, links };
+  const kept = nodes.slice(0, Math.max(0, limit));
+  const names = new Set(kept.map((n) => n.topic_name));
+  return { nodes: kept, clusters, links: links.filter((e) => names.has(e.source) && names.has(e.target)) };
 }
 export function topicCountryYears(q: TopicYearQuery = {}): TopicCountryYear[] {
   const years = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];

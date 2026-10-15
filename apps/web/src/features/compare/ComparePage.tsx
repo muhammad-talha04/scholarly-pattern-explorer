@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { api } from "@/lib/api/client";
+import { api, type Source } from "@/lib/api/client";
 import type { PaperDetail } from "@/lib/api/types";
+import { readerLink } from "@/lib/paperLink";
 import { useApi } from "@/lib/useApi";
 import { EmptyState, ErrorNote, LoadingBlock, PageHeader } from "@/components/ui";
 
@@ -38,7 +39,7 @@ export function ComparePage() {
           <article key={p.id} className="glass p-4">
             <h2 className="font-display text-2xl leading-snug text-white">{p.title}</h2>
             <a className="mt-2 inline-block text-sm text-accent underline-offset-2 hover:underline" href={`/search?paper=${encodeURIComponent(p.id)}&q=${encodeURIComponent(p.topics[0] ?? p.title)}`}>Open in search</a>
-            {p.original_url && <a className="ml-3 text-sm text-accent underline-offset-2 hover:underline" href={p.original_url} target="_blank" rel="noopener noreferrer">Original</a>}
+            <OriginalLink paper={p} source={p === left.data ? left.source : right.source} />
           </article>
         ))}
       </div>
@@ -57,6 +58,16 @@ export function ComparePage() {
         </table>
       </div>
     </div>
+  );
+}
+
+function OriginalLink({ paper, source }: { paper: PaperDetail; source?: Source }) {
+  const link = readerLink(paper, source === "live" ? "live" : "mock");
+  if (!link) return null;
+  return (
+    <a className="ml-3 text-sm text-accent underline-offset-2 hover:underline" href={link.href} target="_blank" rel="noopener noreferrer">
+      {link.label === "Find on OpenAlex" ? "Find on OpenAlex" : "Original"}
+    </a>
   );
 }
 
