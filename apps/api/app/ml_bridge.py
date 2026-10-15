@@ -50,8 +50,29 @@ def get_gaps(limit: int = 20) -> list[dict]:
     return find_gaps(tyc, top, limit=limit)
 
 
+def _snapshot_semantic_gaps() -> list[dict] | None:
+    """semantic_gaps from the newest discoveries-<date>.json, or None when there is none."""
+    import json
+    files = sorted((data_dir() / "snapshots").glob("discoveries-*.json"))
+    if not files:
+        return None
+    try:
+        rows = json.loads(files[-1].read_text()).get("semantic_gaps")
+    except (OSError, ValueError):
+        return None
+    return rows if isinstance(rows, list) else None
+
+
 def get_semantic_gaps(limit: int = 10) -> list[dict]:
-    """Topic pairs and thin regions in the current embedding index. Empty if nothing is indexed."""
+    """Topic pairs and thin regions in the embedding index.
+
+    Reads the precomputed discoveries snapshot when one exists: computing it live
+    loads every vector, which runs a 512 MB free instance out of memory on a
+    large index. Falls back to the live computation. Empty if nothing is indexed.
+    """
+    cached = _snapshot_semantic_gaps()
+    if cached is not None:
+        return cached[:limit]
     try:
         store = get_service().store
     except Exception:
