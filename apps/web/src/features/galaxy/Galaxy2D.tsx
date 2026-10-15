@@ -1,8 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { TopicLink } from "@/lib/graph";
-import { NODE_BRIGHTNESS, accent, dust as dustColor, gap as gapColor, galaxyColor, hub as hubColor, scaleHex } from "@/lib/theme";
-import { centroid, heroConstellation, neighborIds, type Star } from "./stars";
+import { NODE_BRIGHTNESS, accent, dust as dustColor, gap as gapColor, hub as hubColor, scaleHex } from "@/lib/theme";
+import { heroNetwork, neighborIds, networkLinks, nodeAmber, type Star } from "./stars";
 
 /** Flat drawing for reduced motion, low power, or no WebGL. Same amber palette, no drift. */
 export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, onHighlight, onPick }: {
@@ -10,17 +10,20 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
   focus?: string | null; highlight?: Set<string> | null;
   onFocus?: (id: string) => void; onHighlight?: (cluster?: string) => void; onPick?: (id: string) => void;
 }) {
-  const drawn = useMemo(() => heroConstellation(nodes), [nodes]);
+  const net = useMemo(() => heroNetwork(nodes), [nodes]);
+  const drawn = net.nodes;
   const maxS = Math.max(...drawn.map((n) => n.support), 0.01);
   const [hover, setHover] = useState<string | null>(null);
   const activeId = hover ?? focus ?? null;
   const active = drawn.find((n) => n.id === activeId);
-  const near = useMemo(() => (hover ? neighborIds(hover, links) : new Set<string>()), [hover, links]);
-  const project = (pos: [number, number, number]) => [400 + pos[0] * 34, 280 + pos[2] * 34] as [number, number];
-  const hub = useMemo(() => {
-    const c = centroid(drawn);
-    return [400 + c[0] * 34, 280 + c[2] * 34] as [number, number];
-  }, [drawn]);
+  const near = useMemo(() => {
+    if (!hover) return new Set<string>();
+    const ids = neighborIds(hover, networkLinks(net.edges));
+    for (const id of neighborIds(hover, links)) ids.add(id);
+    return ids;
+  }, [hover, net.edges, links]);
+  const project = (pos: [number, number, number]) => [400 + pos[0] * 30, 280 + pos[2] * 30] as [number, number];
+  const hub = project(net.hub);
   const dust = useMemo(() => {
     const specks = [];
     let seed = 11;
@@ -37,7 +40,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
       <svg viewBox="0 0 800 560" className="h-full w-full" role="img" aria-label="Paper galaxy. Each node is a paper, colored by topic cluster.">
         <defs>
           {drawn.map((n, i) => {
-            const hex = showGaps && n.gap ? gapColor : galaxyColor(n.colorIndex, n.clusterId || n.id);
+            const hex = showGaps && n.gap ? gapColor : nodeAmber(n.colorIndex, n.clusterId || n.id, n.id);
             return (
               <radialGradient id={`node-halo-${i}`} key={n.id}>
                 <stop offset="0%" stopColor={hex} stopOpacity="0.2" />
@@ -48,17 +51,19 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
           })}
         </defs>
         {dust.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.rad} fill={dustColor} opacity={0.9} />)}
-        {drawn.map((n) => {
-          const [x, y] = project(n.pos);
-          return <line key={`spoke-${n.id}`} x1={x} y1={y} x2={hub[0]} y2={hub[1]} stroke={accent} strokeOpacity={0.5} strokeWidth={1.1} />;
+        {net.edges.map((edge, i) => {
+          const [x1, y1] = project(edge.a);
+          const [x2, y2] = project(edge.b);
+          const opacity = edge.kind === "hub" ? 0.28 : edge.kind === "spoke" ? 0.2 : 0.15;
+          return <line key={`link-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={accent} strokeOpacity={opacity} strokeWidth={0.7} />;
         })}
-        <circle cx={hub[0]} cy={hub[1]} r={14} fill={hubColor} opacity={0.95} />
+        <circle cx={hub[0]} cy={hub[1]} r={15} fill={hubColor} opacity={0.95} />
         {drawn.map((n, i) => {
-          const r = 7.5 + 4.5 * Math.sqrt(n.support / maxS);
+          const r = n.role === "secondary" ? 11.5 : 7.2 + 3.2 * Math.sqrt(n.support / maxS);
           const gap = showGaps && n.gap;
           const hot = n.id === hover || n.id === focus;
           const lit = hot || near.has(n.id) || highlight?.has(n.id);
-          const hex = gap ? gapColor : galaxyColor(n.colorIndex, n.clusterId || n.id);
+          const hex = gap ? gapColor : nodeAmber(n.colorIndex, n.clusterId || n.id, n.id);
           const fill = scaleHex(hex, hot ? 1 : lit ? 0.96 : NODE_BRIGHTNESS);
           const [x, y] = project(n.pos);
           return (

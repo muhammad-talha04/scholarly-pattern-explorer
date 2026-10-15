@@ -9,8 +9,8 @@ import {
 import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
-import { NODE_BRIGHTNESS, clusterColors, dust as dustColor, gap as gapColor, galaxyColor, hub as hubColor, ink, linkAmber } from "@/lib/theme";
-import { centroid, heroConstellation, neighborIds, type Star } from "./stars";
+import { NODE_BRIGHTNESS, clusterColors, dust as dustColor, gap as gapColor, hub as hubColor, ink, linkAmber } from "@/lib/theme";
+import { heroNetwork, neighborIds, networkLinks, nodeAmber, type Star } from "./stars";
 
 /** Resting camera, above the disc so the spiral reads as a cluster rather than an edge-on line. At fov 46 and this distance a unit is ~38px on a 900px-tall pane, so a 0.16–0.30 sphere is about 6–12px. */
 const CAMERA_POS = new Vector3(0.35, 26, 11);
@@ -152,11 +152,33 @@ void main() {
 }
 `;
 
+const LINK_VERT = `
+attribute float aT;
+attribute float aPulse;
+attribute float aAlpha;
+varying float vT;
+varying float vPulse;
+varying float vAlpha;
+void main() {
+  vT = aT;
+  vPulse = aPulse;
+  vAlpha = aAlpha;
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+}
+`;
+
 const LINK_FRAG = `
 precision highp float;
+varying float vT;
+varying float vPulse;
+varying float vAlpha;
 uniform vec3 uColor;
+uniform float uTime;
+uniform float uMotion;
 void main() {
-  gl_FragColor = vec4(uColor, 0.5);
+  float phase = fract(uTime * 0.16);
+  float spark = uMotion * vPulse * exp(-pow((vT - phase) * 7.5, 2.0));
+  gl_FragColor = vec4(uColor, min(0.8, vAlpha + spark * 0.5));
   #include <colorspace_fragment>
 }
 `;
@@ -218,11 +240,12 @@ function CameraRig({ look, reduce, controls }: { look: [number, number, number];
 
 const HUB_RADIUS = 0.4;
 
-function nodeRadius(support: number, maxS: number) {
-  return 0.16 + 0.14 * Math.sqrt(Math.max(support, 0) / maxS);
+function nodeRadius(support: number, maxS: number, secondary: boolean) {
+  if (secondary) return 0.3;
+  return 0.15 + 0.1 * Math.sqrt(Math.max(support, 0) / maxS);
 }
 
-function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, onFocus, onHighlight, onPick }: Props & { reduce: boolean }) {
+function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, onHighlight, onPick }: Props & { reduce: boolean }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const spin = useRef<Group>(null);
   const nodesRef = useRef<InstancedMesh>(null);
@@ -230,11 +253,12 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
   const glowAttr = useRef<InstancedBufferAttribute | null>(null);
   const haloGlowAttr = useRef<InstancedBufferAttribute | null>(null);
   const [hover, setHover] = useState<number | null>(null);
-  const nodes = useMemo(() => heroConstellation(catalogue), [catalogue]);
+  const net = useMemo(() => heroNetwork(catalogue), [catalogue]);
+  const nodes = net.nodes;
   const maxS = Math.max(...nodes.map((n) => n.support), 0.01);
   const sphere = useMemo(() => new SphereGeometry(1, 28, 20), []);
   const haloPlane = useMemo(() => new PlaneGeometry(2, 2), []);
-  const hub = useMemo(() => centroid(nodes), [nodes]);
+  const hub = net.hub;
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
     uMotion: { value: reduce ? 0 : 1 },
@@ -256,18 +280,33 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
     uRadius: { value: HUB_RADIUS * 2.5 },
     uColor: { value: new Color(hubColor) },
   }), [uniforms]);
-  const linkUniforms = useMemo(() => ({ uColor: { value: new Color(linkAmber) } }), []);
+  const linkUniforms = useMemo(() => ({
+    uColor: { value: new Color(linkAmber) },
+    uTime: uniforms.uTime,
+    uMotion: uniforms.uMotion,
+  }), [uniforms]);
   const dustUniforms = useMemo(() => ({ uColor: { value: new Color(dustColor) } }), []);
 
   const spokes = useMemo(() => {
     const pos: number[] = [];
-    for (const n of nodes) {
-      pos.push(n.pos[0], n.pos[1], n.pos[2], hub[0], hub[1], hub[2]);
+    const t: number[] = [];
+    const pulse: number[] = [];
+    const alpha: number[] = [];
+    const opacity = { near: 0.16, spoke: 0.2, hub: 0.26 };
+    for (const edge of net.edges) {
+      pos.push(edge.a[0], edge.a[1], edge.a[2], edge.b[0], edge.b[1], edge.b[2]);
+      t.push(0, 1);
+      const spark = edge.kind === "hub" ? 1 : 0;
+      pulse.push(spark, spark);
+      alpha.push(opacity[edge.kind], opacity[edge.kind]);
     }
     const geo = new BufferGeometry();
     geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    geo.setAttribute("aT", new Float32BufferAttribute(t, 1));
+    geo.setAttribute("aPulse", new Float32BufferAttribute(pulse, 1));
+    geo.setAttribute("aAlpha", new Float32BufferAttribute(alpha, 1));
     return geo;
-  }, [nodes, hub]);
+  }, [net.edges]);
 
   const dustGeo = useMemo(() => {
     const count = 720;
@@ -279,7 +318,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
       return (seed - 1) / 2147483646;
     };
     for (let i = 0; i < count; i++) {
-      const r = 0.5 + Math.pow(rand(), 0.7) * 8.1;
+      const r = 0.6 + Math.pow(rand(), 0.7) * 8.6;
       const a = rand() * Math.PI * 2;
       const y = (rand() - 0.5) * 3.4;
       pos[i * 3] = Math.cos(a) * r;
@@ -307,7 +346,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
     const glow = new Float32Array(n);
     const m = new Matrix4();
     nodes.forEach((node, i) => {
-      const s = nodeRadius(node.support, maxS);
+      const s = nodeRadius(node.support, maxS, node.role === "secondary");
       m.makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
       dummy.makeScale(s, s, s);
       m.multiply(dummy);
@@ -316,7 +355,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
       const haloM = new Matrix4().makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
       haloM.multiply(new Matrix4().makeScale(haloScale, haloScale, haloScale));
       halo.setMatrixAt(i, haloM);
-      const hex = showGaps && node.gap ? gapColor : galaxyColor(node.colorIndex, node.clusterId);
+      const hex = showGaps && node.gap ? gapColor : nodeAmber(node.colorIndex, node.clusterId, node.id);
       color.set(hex);
       colors[i * 3] = color.r; colors[i * 3 + 1] = color.g; colors[i * 3 + 2] = color.b;
       phases[i] = phaseOf(node.id);
@@ -349,7 +388,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
     const attrs = [glowAttr.current, haloGlowAttr.current];
     if (attrs.some((attr) => !attr)) return;
     const hoverId = hover == null ? null : nodes[hover]?.id;
-    const near = hoverId ? neighborIds(hoverId, links) : new Set<string>();
+    const near = hoverId ? neighborIds(hoverId, networkLinks(net.edges)) : new Set<string>();
     for (const attr of attrs) {
       const arr = attr!.array as Float32Array;
       for (let i = 0; i < nodes.length; i++) {
@@ -362,7 +401,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
       }
       attr!.needsUpdate = true;
     }
-  }, [hover, focus, highlight, nodes, links]);
+  }, [hover, focus, highlight, nodes, net.edges]);
 
   useFrame((_, dt) => {
     if (document.hidden) return;
@@ -388,7 +427,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
           <shaderMaterial args={[{ uniforms: dustUniforms, vertexShader: DUST_VERT, fragmentShader: DUST_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </points>
         <lineSegments geometry={spokes} frustumCulled={false} raycast={() => null}>
-          <shaderMaterial args={[{ uniforms: linkUniforms, vertexShader: "void main(){ gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0); }", fragmentShader: LINK_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
+          <shaderMaterial args={[{ uniforms: linkUniforms, vertexShader: LINK_VERT, fragmentShader: LINK_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </lineSegments>
         <instancedMesh
           ref={nodesRef}

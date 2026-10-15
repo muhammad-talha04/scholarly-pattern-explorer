@@ -1,4 +1,5 @@
 import type { TopicLink } from "@/lib/graph";
+import { clusterColors, galaxyColor } from "@/lib/palette";
 
 /** One paper placed in the galaxy, with the cluster fields the shaders read. */
 export interface Star {
@@ -52,34 +53,55 @@ export function centroid(nodes: { pos: [number, number, number] }[]): [number, n
 }
 
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
-/** Hero drawing cap. Graphs of 14 or fewer are shown whole. */
-const CONSTELLATION_CAP = 12;
+/** Above this, the hero keeps a round-robin sample so the disc stays readable. */
+const NETWORK_CAP = 48;
 
 type Placed = { id: string; support: number; clusterId?: string; gap?: boolean; pos?: [number, number, number] };
 
-/**
- * The landing drawing is a dozen distinct papers, not the full catalogue.
- * Highest-support papers are taken round-robin by cluster, then seated on a
- * golden spiral so the spheres stay separated around the hub.
- */
-export function heroConstellation<T extends Placed>(nodes: T[]): (T & { pos: [number, number, number] })[] {
-  const picked = nodes.length > 14 ? pickConstellation(nodes) : nodes.slice();
-  return placeConstellation(picked);
+export type NetRole = "node" | "secondary";
+export interface NetEdge {
+  source: string;
+  target: string;
+  a: [number, number, number];
+  b: [number, number, number];
+  kind: "near" | "spoke" | "hub";
 }
 
-function pickConstellation<T extends Placed>(nodes: T[]): T[] {
+/** Amber shade for one paper. Stays on the cluster ramp, with a small per-paper shift. */
+export function nodeAmber(colorIndex: number | null | undefined, clusterId: string, id: string) {
+  const base = galaxyColor(colorIndex, clusterId);
+  const at = clusterColors.indexOf(base as (typeof clusterColors)[number]);
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h + id.charCodeAt(i)) % 997;
+  return clusterColors[((at < 0 ? 0 : at) + (h % 3)) % clusterColors.length];
+}
+
+type Drawn<T> = T & { pos: [number, number, number]; center: [number, number, number]; role: NetRole };
+
+/**
+ * Hero drawing. Up to 48 papers, seated as a few sub-clusters around a main hub.
+ * Each sub-cluster has a secondary hub. Links are k-nearest, spokes to that hub,
+ * and a short ring of hub-to-hub edges.
+ */
+export function heroNetwork<T extends Placed>(nodes: T[]): { nodes: Drawn<T>[]; edges: NetEdge[]; hub: [number, number, number] } {
+  const hub: [number, number, number] = [0, 0, 0];
+  const picked = nodes.length > 50 ? pickNetwork(nodes) : nodes.slice();
+  const placed = placeNetwork(picked);
+  return { nodes: placed, edges: buildEdges(placed, hub), hub };
+}
+
+function pickNetwork<T extends Placed>(nodes: T[]): T[] {
   const groups = new Map<string, T[]>();
   for (const n of nodes) {
-    const key = n.clusterId || "";
-    const list = groups.get(key) ?? [];
+    const list = groups.get(n.clusterId || "") ?? [];
     list.push(n);
-    groups.set(key, list);
+    groups.set(n.clusterId || "", list);
   }
   for (const list of groups.values()) list.sort((a, b) => b.support - a.support || a.id.localeCompare(b.id));
   const picked: T[] = [];
   const seen = new Set<string>();
   const take = (n: T) => {
-    if (picked.length >= CONSTELLATION_CAP || seen.has(n.id)) return;
+    if (picked.length >= NETWORK_CAP || seen.has(n.id)) return;
     seen.add(n.id);
     picked.push(n);
   };
@@ -87,14 +109,14 @@ function pickConstellation<T extends Placed>(nodes: T[]): T[] {
   if (gap) take(gap);
   const keys = [...groups.keys()];
   let round = 0;
-  while (picked.length < CONSTELLATION_CAP) {
+  while (picked.length < NETWORK_CAP) {
     let added = false;
     for (const key of keys) {
       const list = groups.get(key)!;
       if (round < list.length) {
         take(list[round]);
         added = true;
-        if (picked.length >= CONSTELLATION_CAP) break;
+        if (picked.length >= NETWORK_CAP) break;
       }
     }
     if (!added) break;
@@ -103,14 +125,100 @@ function pickConstellation<T extends Placed>(nodes: T[]): T[] {
   return picked;
 }
 
-function placeConstellation<T extends Placed>(nodes: T[]): (T & { pos: [number, number, number] })[] {
-  const n = nodes.length;
-  return nodes.map((node, i) => {
-    const t = n <= 1 ? 0 : i / (n - 1);
-    const r = n <= 1 ? 3.4 : 2.7 + t * 3.15;
-    const a = i * GOLDEN;
-    const y = (((i * 7919) % 13) / 13 - 0.5) * 0.85;
-    const pos: [number, number, number] = [r * Math.cos(a), y, r * Math.sin(a)];
-    return { ...node, pos, center: pos };
+function placeNetwork<T extends Placed>(nodes: T[]): Drawn<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const n of nodes) {
+    const list = groups.get(n.clusterId || "") ?? [];
+    list.push(n);
+    groups.set(n.clusterId || "", list);
+  }
+  for (const list of groups.values()) list.sort((a, b) => b.support - a.support || a.id.localeCompare(b.id));
+  const keys = [...groups.keys()].sort();
+  const g = keys.length;
+  const out: Drawn<T>[] = [];
+  keys.forEach((key, gi) => {
+    const list = groups.get(key)!;
+    const ang = g === 1 ? 0.5 : (gi / g) * Math.PI * 2 - Math.PI / 2;
+    const ring = g === 1 ? 3.1 : 4.55;
+    const hx = ring * Math.cos(ang);
+    const hz = ring * Math.sin(ang);
+    const hy = ((gi % 5) - 2) * 0.06;
+    const center: [number, number, number] = [hx, hy, hz];
+    const satellites = Math.max(1, list.length - 1);
+    list.forEach((node, i) => {
+      let pos: [number, number, number];
+      if (i === 0) pos = [hx, hy, hz];
+      else {
+        const t = Math.sqrt((i - 1) / satellites);
+        const lr = 0.9 + t * 1.05;
+        const la = i * GOLDEN;
+        pos = [hx + lr * Math.cos(la), hy + (((i * 3) % 5) - 2) * 0.035, hz + lr * Math.sin(la)];
+      }
+      out.push({ ...node, pos, center, role: i === 0 ? "secondary" : "node" });
+    });
   });
+  separate(out, 0.78, 14);
+  for (const n of out) {
+    const d = Math.hypot(n.pos[0], n.pos[2]) || 0.001;
+    if (d < 1.45) {
+      const s = 1.45 / d;
+      n.pos = [n.pos[0] * s, n.pos[1], n.pos[2] * s];
+    }
+  }
+  return out;
+}
+
+function separate<T extends { pos: [number, number, number] }>(nodes: T[], min: number, iters: number) {
+  for (let k = 0; k < iters; k++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[j].pos[0] - nodes[i].pos[0];
+        const dz = nodes[j].pos[2] - nodes[i].pos[2];
+        const d = Math.hypot(dx, dz) || 0.0001;
+        if (d >= min) continue;
+        const push = (min - d) / 2;
+        const ux = dx / d;
+        const uz = dz / d;
+        nodes[i].pos = [nodes[i].pos[0] - ux * push, nodes[i].pos[1], nodes[i].pos[2] - uz * push];
+        nodes[j].pos = [nodes[j].pos[0] + ux * push, nodes[j].pos[1], nodes[j].pos[2] + uz * push];
+      }
+    }
+  }
+}
+
+function buildEdges<T extends Placed>(nodes: Drawn<T>[], hub: [number, number, number]): NetEdge[] {
+  const edges: NetEdge[] = [];
+  const seen = new Set<string>();
+  const add = (source: string, target: string, a: [number, number, number], b: [number, number, number], kind: NetEdge["kind"]) => {
+    const key = [source, target].sort().join("|");
+    if (seen.has(key) || source === target) return;
+    seen.add(key);
+    edges.push({ source, target, a, b, kind });
+  };
+  const secondaries = nodes.filter((n) => n.role === "secondary");
+  secondaries.forEach((s, i) => {
+    add(s.id, "hub", s.pos, hub, "hub");
+    const next = secondaries[(i + 1) % secondaries.length];
+    if (next) add(s.id, next.id, s.pos, next.pos, "hub");
+  });
+  for (const n of nodes) {
+    if (n.role === "secondary") continue;
+    const local = secondaries.find((s) => (s.clusterId || "") === (n.clusterId || "")) ?? secondaries[0];
+    if (local) add(n.id, local.id, n.pos, local.pos, "spoke");
+  }
+  for (const n of nodes) {
+    const nearest = nodes
+      .filter((o) => o.id !== n.id)
+      .map((o) => ({ o, d: Math.hypot(o.pos[0] - n.pos[0], o.pos[2] - n.pos[2]) }))
+      .sort((p, q) => p.d - q.d)
+      .slice(0, 2);
+    for (const { o } of nearest) add(n.id, o.id, n.pos, o.pos, "near");
+  }
+  return edges;
+}
+
+export function networkLinks(edges: NetEdge[]): TopicLink[] {
+  return edges
+    .filter((e) => e.source !== "hub" && e.target !== "hub")
+    .map((e) => ({ source: e.source, target: e.target, weight: e.kind === "hub" ? 0.8 : 0.45 }));
 }
