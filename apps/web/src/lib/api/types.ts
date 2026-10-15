@@ -2,9 +2,10 @@
  * Mirrors apps/api/app/schemas.py (single source of truth). Keep in sync, or
  * regenerate from /api/v1/openapi.json once the API is deployed.
  *
- * GalaxyGraph and TopicCountryYear are the shapes teammates are adding.
- * `/topic-country-years` matches talha's PR #6. `/galaxy` is not on main yet;
- * the client falls back to fixtures until that route answers 200.
+ * GalaxyGraph is what the scene renders. GET /galaxy may return that object,
+ * or the #8 paper list (id, x, y, z, cluster_id, cluster_label, year).
+ * `normalizeGalaxy` in client.ts turns either one into GalaxyGraph.
+ * `/topic-country-years` matches the #6 table and is live on main.
  */
 export interface PaperSummary {
   id: string;

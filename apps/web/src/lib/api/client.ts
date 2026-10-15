@@ -21,6 +21,104 @@ function report(s: Source) { if (s !== lastSource) { lastSource = s; listeners.f
 
 export class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } }
 
+const EMPTY_GALAXY: GalaxyGraph = { nodes: [], clusters: [], links: [] };
+
+function finite(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function text(v: unknown): string | null {
+  if (typeof v === "string" && v.trim()) return v.trim();
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return null;
+}
+
+function clusterName(id: string, label: unknown): string {
+  const named = text(label);
+  if (named) return named;
+  const n = Number(id);
+  if (Number.isFinite(n) && n < 0) return "unclustered";
+  return `cluster ${id}`;
+}
+
+/** #8 paper point → a graph node. The paper id is the node id so keys stay unique. */
+function pointToNode(row: Record<string, unknown>): GalaxyGraph["nodes"][number] | null {
+  const x = finite(row.x), y = finite(row.y), z = finite(row.z);
+  const id = text(row.id) ?? text(row.topic_id);
+  if (x == null || y == null || z == null || !id) return null;
+  const cluster_id = text(row.cluster_id) ?? "0";
+  return {
+    topic_id: id,
+    topic_name: text(row.topic_name) ?? id,
+    x, y, z,
+    cluster_id,
+    support: finite(row.support) ?? 1,
+  };
+}
+
+function fromPaperList(rows: unknown[]): GalaxyGraph {
+  const nodes: GalaxyGraph["nodes"] = [];
+  const clusters = new Map<string, string>();
+  for (const row of rows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const rec = row as Record<string, unknown>;
+    const node = pointToNode(rec);
+    if (!node) continue;
+    nodes.push(node);
+    if (!clusters.has(node.cluster_id)) clusters.set(node.cluster_id, clusterName(node.cluster_id, rec.cluster_label));
+  }
+  return { nodes, clusters: [...clusters.entries()].map(([id, name]) => ({ id, name })), links: [] };
+}
+
+function fromGraph(raw: Record<string, unknown>): GalaxyGraph {
+  const nodes: GalaxyGraph["nodes"] = [];
+  const rows = raw.nodes as unknown[];
+  for (const row of rows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const node = pointToNode(row as Record<string, unknown>);
+    if (!node) continue;
+    nodes.push(node);
+  }
+  const clusters: GalaxyGraph["clusters"] = [];
+  if (Array.isArray(raw.clusters)) {
+    for (const c of raw.clusters) {
+      if (!c || typeof c !== "object" || Array.isArray(c)) continue;
+      const rec = c as Record<string, unknown>;
+      const id = text(rec.id);
+      if (!id) continue;
+      clusters.push({ id, name: text(rec.name) ?? id });
+    }
+  }
+  const links: GalaxyGraph["links"] = [];
+  if (Array.isArray(raw.links)) {
+    for (const link of raw.links) {
+      if (!link || typeof link !== "object" || Array.isArray(link)) continue;
+      const rec = link as Record<string, unknown>;
+      const source = text(rec.source), target = text(rec.target);
+      if (!source || !target) continue;
+      links.push({ source, target, weight: finite(rec.weight) ?? 1 });
+    }
+  }
+  return { nodes, clusters, links };
+}
+
+/**
+ * Accepts the topic graph `{nodes, clusters, links}` and the #8 paper list
+ * `{id, x, y, z, cluster_id, cluster_label, year}`. Anything else becomes an
+ * empty graph so the landing page can show its empty state instead of throwing.
+ */
+export function normalizeGalaxy(raw: unknown): GalaxyGraph {
+  try {
+    if (Array.isArray(raw)) return fromPaperList(raw);
+    if (raw && typeof raw === "object" && Array.isArray((raw as { nodes?: unknown }).nodes)) {
+      return fromGraph(raw as Record<string, unknown>);
+    }
+  } catch {
+    return { ...EMPTY_GALAXY, nodes: [], clusters: [], links: [] };
+  }
+  return { nodes: [], clusters: [], links: [] };
+}
+
 function qs(params: Record<string, string | number | undefined | null>) {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") p.set(k, String(v));
@@ -71,8 +169,11 @@ export const api = {
   collaborations: (counting: Counting = "fractional") =>
     request<Collaboration[]>(`/countries/collaborations${qs({ counting })}`, () => mock.collaborations(counting), undefined, fetch, { notFoundIsMock: true }),
   runs: () => request<Run[]>("/runs", () => mock.runs()),
-  /** 3D topic coordinates and clusters. Mock until GET /galaxy exists. */
-  galaxy: () => request<GalaxyGraph>("/galaxy", () => mock.galaxy(), undefined, fetch, { notFoundIsMock: true }),
+  /** Paper or topic coordinates. Accepts the #8 list and `{nodes, clusters, links}`. */
+  galaxy: async () => {
+    const result = await request<unknown>("/galaxy", () => mock.galaxy(), undefined, fetch, { notFoundIsMock: true });
+    return { data: normalizeGalaxy(result.data), source: result.source };
+  },
   /** Topic × country × year rows. Mock until GET /topic-country-years exists (PR #6). */
   topicCountryYears: (q: TopicYearQuery = {}) =>
     request<TopicCountryYear[]>(`/topic-country-years${qs({ topic_id: q.topic_id, country: q.country, year: q.year, limit: q.limit })}`, () => mock.topicCountryYears(q), undefined, fetch, { notFoundIsMock: true }),

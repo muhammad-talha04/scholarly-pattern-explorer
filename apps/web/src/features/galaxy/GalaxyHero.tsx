@@ -19,10 +19,11 @@ const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () =
 type Placed = TopicNode & { pos?: [number, number, number] };
 
 function project(graph: { nodes: TopicNode[]; links: TopicLink[] }, galaxy: GalaxyGraph | undefined, useCoords: boolean): { nodes: Placed[]; links: TopicLink[] } {
-  if (!useCoords || !galaxy?.nodes.length) return { nodes: positionNodes(graph.nodes), links: graph.links };
+  const gNodes = Array.isArray(galaxy?.nodes) ? galaxy.nodes : [];
+  if (!useCoords || gNodes.length === 0) return { nodes: positionNodes(graph.nodes), links: graph.links };
   const gaps = new Map(graph.nodes.filter((n) => n.gap).map((n) => [n.id, n]));
-  const clusters = new Map(galaxy.clusters.map((c) => [c.id, c.name]));
-  const nodes: Positioned[] = galaxy.nodes.map((n) => ({
+  const clusters = new Map((Array.isArray(galaxy?.clusters) ? galaxy.clusters : []).map((c) => [c.id, c.name]));
+  const nodes: Positioned[] = gNodes.map((n) => ({
     id: n.topic_name,
     support: n.support || gaps.get(n.topic_name)?.support || 0.05,
     gap: gaps.has(n.topic_name),
@@ -30,7 +31,8 @@ function project(graph: { nodes: TopicNode[]; links: TopicLink[] }, galaxy: Gala
     cluster: clusters.get(n.cluster_id),
     pos: [n.x, n.y, n.z],
   }));
-  const links = galaxy.links?.length ? galaxy.links : graph.links;
+  const linkList = Array.isArray(galaxy?.links) ? galaxy.links : [];
+  const links = linkList.length ? linkList : graph.links;
   return { nodes, links };
 }
 

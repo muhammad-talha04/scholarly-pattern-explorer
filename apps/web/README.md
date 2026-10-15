@@ -30,7 +30,7 @@ A first-run tour starts until it is dismissed (`spe-tour-done`). Replay it from 
 ## Data that is still a fixture
 | Client call | Route | Switches to live when |
 |---|---|---|
-| `api.galaxy()` | `GET /galaxy` | the route returns 200. Body: `{ nodes: [{ topic_id, topic_name, x, y, z, cluster_id, support }], clusters: [{ id, name }], links }` |
+| `api.galaxy()` | `GET /galaxy` | the route returns 200. Accepts `{ nodes, clusters, links }` and the #8 paper list `{ id, x, y, z, cluster_id, cluster_label, year }`. A paper list becomes nodes and clusters with empty links. Any other body becomes an empty graph, and the landing page shows its empty state. |
 | `api.topicCountryYears()` | `GET /topic-country-years` | the route returns 200. Rows: `topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`. Optional filters: `topic_id`, `country`, `year`, `limit`. This is talha's PR #6. |
 | `api.countries()` / `api.collaborations()` | already on main | a non-empty snapshot. An empty list is an empty state. `per_country` changes collaboration weights; country totals follow the fractional snapshot unless `counting=full`. |
 
