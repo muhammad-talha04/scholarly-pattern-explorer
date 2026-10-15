@@ -17,7 +17,7 @@ npm run lint && npm run typecheck && npm test && npm run build
 ## Pages
 | Route | What it shows |
 |---|---|
-| `/` | Paper galaxy. Each dot is a paper. Colors and groups are topic clusters, so papers sit together by theme. Bloom and a camera move in 3D; an SVG drawing in 2D. `?preview=empty` shows the empty state. |
+| `/` | Paper galaxy. Each dot is a paper. Colors and groups are topic clusters, so papers sit together by theme. A slow spin and a node pulse in 3D; an SVG drawing in 2D. `?preview=empty` shows the empty state. |
 | `/search` | Meaning search, filters, paper panel (summary, ask, related-paper map, save, pin). |
 | `/compare?a=&b=` | Two papers side by side. Pin them from search; the pair is kept in `sessionStorage`. |
 | `/countries` | Globe with Natural Earth outlines, collaboration arcs, fractional / per country / full counting, and a year slider. |
@@ -44,4 +44,4 @@ A 404 on `/galaxy` or `/topic-country-years` uses fixtures for that call only. T
 - Low-power mode: `prefers-reduced-motion`, no WebGL, or the nav toggle. Galaxy and globe both have an SVG fallback.
 
 ## Design
-Colors live in `src/lib/palette.ts` (CSS variables plus `clusterColors`). The ground is deep navy `#0B0F1A` with an amber accent `#F5A54A`. Galaxy nodes are warm amber spheres with a soft halo, spokes to a hub, and pale-blue dust behind them. Charts and the globe use the Okabe–Ito set. UI type is Space Grotesk, panels use the `glass` class, and the landing search uses `search-hero`. The audit of the previous UI is `docs/ui/AUDIT.md`.
+Colors live in `src/lib/palette.ts` (CSS variables plus `clusterColors`). The ground is deep navy `#0B0F1A` with an amber accent `#F5A54A`. Galaxy nodes are a small spaced set of warm amber spheres with a tight soft halo, spokes to a hub, and a dense field of pale-blue dust around them. Charts and the globe use the Okabe–Ito set. UI type is Space Grotesk, panels use the `glass` class, and the landing search uses `search-hero`. The audit of the previous UI is `docs/ui/AUDIT.md`.

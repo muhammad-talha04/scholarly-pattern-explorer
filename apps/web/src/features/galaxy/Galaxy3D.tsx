@@ -3,14 +3,18 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  BufferGeometry, Color, Float32BufferAttribute, InstancedBufferAttribute, InstancedMesh, Matrix4, NoToneMapping,
-  SphereGeometry, Vector3,
+  BufferGeometry, Color, DoubleSide, Float32BufferAttribute, InstancedBufferAttribute, InstancedMesh, Matrix4, NoToneMapping,
+  PlaneGeometry, SphereGeometry, Vector3,
 } from "three";
 import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
 import { NODE_BRIGHTNESS, clusterColors, dust as dustColor, gap as gapColor, galaxyColor, hub as hubColor, ink, linkAmber } from "@/lib/theme";
-import { neighborIds, type Star } from "./stars";
+import { centroid, heroConstellation, neighborIds, type Star } from "./stars";
+
+/** Resting camera. At fov 46 and z 28 a unit is ~38px on a 900px-tall pane, so a 0.16–0.30 sphere is about 6–12px. */
+const CAMERA_POS = new Vector3(0.4, 1.35, 28);
+const CAMERA_FOV = 46;
 
 const NODE_VERT = `
 attribute float aPhase;
@@ -19,7 +23,6 @@ attribute float aGlow;
 attribute float aTwinkle;
 attribute float aEmerging;
 varying vec3 vColor;
-varying vec3 vNormalV;
 varying float vGlow;
 varying float vTwinkle;
 varying float vEmerging;
@@ -28,9 +31,8 @@ uniform float uTime;
 uniform float uMotion;
 void main() {
   float pulse = 1.0 + uMotion * sin(uTime * 1.5 + aPhase) * 0.045;
-  vec4 world = instanceMatrix * vec4(position * pulse, 1.0);
+  vec4 world = modelMatrix * instanceMatrix * vec4(position * pulse, 1.0);
   gl_Position = projectionMatrix * viewMatrix * world;
-  vNormalV = normalize(mat3(viewMatrix) * mat3(instanceMatrix) * normal);
   vColor = aColor;
   vGlow = aGlow;
   vTwinkle = aTwinkle;
@@ -42,7 +44,6 @@ void main() {
 const NODE_FRAG = `
 precision highp float;
 varying vec3 vColor;
-varying vec3 vNormalV;
 varying float vGlow;
 varying float vTwinkle;
 varying float vEmerging;
@@ -59,8 +60,7 @@ void main() {
   vec3 srgb = pow(max(vColor, vec3(0.0)), vec3(0.454545));
   vec3 warm = pow(max(uWarm, vec3(0.0)), vec3(0.454545));
   vec3 mixed = mix(srgb, warm, clamp(vEmerging, 0.0, 1.0) * 0.35);
-  float rim = pow(1.0 - abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0))), 2.4);
-  vec3 outS = min(vec3(1.0), mixed * bright + rim * 0.06);
+  vec3 outS = min(vec3(1.0), mixed * bright);
   gl_FragColor = vec4(pow(outS, vec3(2.2)), 1.0);
   #include <colorspace_fragment>
 }
@@ -68,55 +68,88 @@ void main() {
 
 const HALO_VERT = `
 attribute float aPhase;
-varying vec3 vNormalV;
+attribute vec3 aColor;
+attribute float aGlow;
+varying vec2 vUv;
+varying vec3 vColor;
+varying float vGlow;
 uniform float uTime;
 uniform float uMotion;
 void main() {
   float pulse = 1.0 + uMotion * sin(uTime * 1.5 + aPhase) * 0.045;
-  vec4 world = instanceMatrix * vec4(position * pulse, 1.0);
-  gl_Position = projectionMatrix * viewMatrix * world;
-  vNormalV = normalize(mat3(viewMatrix) * mat3(instanceMatrix) * normal);
+  float s = length(instanceMatrix[0].xyz) * pulse;
+  vec4 center = viewMatrix * modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+  gl_Position = projectionMatrix * (center + vec4(position.xy * s, 0.0, 0.0));
+  vUv = uv;
+  vColor = aColor;
+  vGlow = aGlow;
 }
 `;
 
 const HALO_FRAG = `
 precision highp float;
-varying vec3 vNormalV;
-uniform vec3 uColor;
+varying vec2 vUv;
+varying vec3 vColor;
+varying float vGlow;
 void main() {
-  float facing = abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0)));
-  float rim = pow(1.0 - facing, 1.5);
-  float alpha = rim * 0.62 + (1.0 - facing) * 0.08;
-  if (alpha < 0.03) discard;
-  gl_FragColor = vec4(uColor, alpha);
+  float d = length(vUv * 2.0 - 1.0);
+  if (d > 1.0) discard;
+  float edge = smoothstep(1.0, 0.0, d);
+  float alpha = edge * edge * (0.26 + vGlow * 0.14);
+  if (alpha < 0.01) discard;
+  gl_FragColor = vec4(vColor, alpha);
   #include <colorspace_fragment>
 }
 `;
 
 const HUB_VERT = `
-varying vec3 vNormalV;
 uniform float uTime;
 uniform float uMotion;
 void main() {
   float pulse = 1.0 + uMotion * sin(uTime * 1.2) * 0.04;
   vec4 world = modelMatrix * vec4(position * pulse, 1.0);
   gl_Position = projectionMatrix * viewMatrix * world;
-  vNormalV = normalize(normalMatrix * normal);
 }
 `;
 
 const HUB_FRAG = `
 precision highp float;
-varying vec3 vNormalV;
 uniform vec3 uColor;
 uniform float uTime;
 uniform float uMotion;
 void main() {
   float pulse = uMotion * (0.5 + 0.5 * sin(uTime * 1.2)) * 0.08;
   vec3 srgb = pow(max(uColor, vec3(0.0)), vec3(0.454545));
-  float rim = pow(1.0 - abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0))), 2.2);
-  vec3 outS = min(vec3(1.0), srgb * (0.96 + pulse) + rim * 0.08);
+  vec3 outS = min(vec3(1.0), srgb * (0.96 + pulse));
   gl_FragColor = vec4(pow(outS, vec3(2.2)), 1.0);
+  #include <colorspace_fragment>
+}
+`;
+
+const HUB_HALO_VERT = `
+varying vec2 vUv;
+uniform float uTime;
+uniform float uMotion;
+uniform float uRadius;
+void main() {
+  float pulse = 1.0 + uMotion * sin(uTime * 1.2) * 0.04;
+  vec4 center = viewMatrix * modelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+  gl_Position = projectionMatrix * (center + vec4(position.xy * uRadius * pulse, 0.0, 0.0));
+  vUv = uv;
+}
+`;
+
+const HUB_HALO_FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform vec3 uColor;
+void main() {
+  float d = length(vUv * 2.0 - 1.0);
+  if (d > 1.0) discard;
+  float edge = smoothstep(1.0, 0.0, d);
+  float alpha = edge * edge * 0.22;
+  if (alpha < 0.01) discard;
+  gl_FragColor = vec4(uColor, alpha);
   #include <colorspace_fragment>
 }
 `;
@@ -125,17 +158,17 @@ const LINK_FRAG = `
 precision highp float;
 uniform vec3 uColor;
 void main() {
-  gl_FragColor = vec4(uColor, 0.38);
+  gl_FragColor = vec4(uColor, 0.5);
   #include <colorspace_fragment>
 }
 `;
 
 const DUST_VERT = `
-uniform float uMotion;
+attribute float aSize;
 void main() {
   vec4 mv = viewMatrix * modelMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = uMotion > 0.5 ? 2.2 : 2.0;
+  gl_PointSize = aSize;
 }
 `;
 
@@ -144,8 +177,9 @@ precision highp float;
 uniform vec3 uColor;
 void main() {
   vec2 p = gl_PointCoord * 2.0 - 1.0;
-  if (dot(p, p) > 1.0) discard;
-  gl_FragColor = vec4(uColor, 0.42);
+  float d = dot(p, p);
+  if (d > 1.0) discard;
+  gl_FragColor = vec4(uColor, 0.78 * (1.0 - d));
   #include <colorspace_fragment>
 }
 `;
@@ -158,13 +192,13 @@ function phaseOf(id: string) {
 
 function CameraRig({ look, reduce, controls }: { look: [number, number, number]; reduce: boolean; controls: React.RefObject<OrbitControlsImpl | null> }) {
   const { camera } = useThree();
-  const intro = useRef(reduce ? 1 : 0);
-  const from = useRef(new Vector3(0, 4.6, 14));
+  const intro = useRef(reduce ? 1 : 0.65);
+  const from = useRef(new Vector3(0.4, 2.4, 34));
   const to = useRef(new Vector3());
   const lookV = useRef(new Vector3());
   useEffect(() => {
     lookV.current.set(look[0], look[1], look[2]);
-    to.current.set(look[0] * 0.2 + 0.2, look[1] + 1.8, look[2] + 8.4);
+    to.current.set(look[0] * 0.12 + CAMERA_POS.x, look[1] + CAMERA_POS.y, look[2] + CAMERA_POS.z);
     if (reduce) {
       camera.position.copy(to.current);
       if (controls.current) { controls.current.target.copy(lookV.current); controls.current.update(); }
@@ -172,7 +206,7 @@ function CameraRig({ look, reduce, controls }: { look: [number, number, number];
   }, [look, reduce, camera, controls]);
   useFrame((_, dt) => {
     if (reduce || document.hidden) return;
-    intro.current = Math.min(1, intro.current + dt * 0.45);
+    intro.current = Math.min(1, intro.current + dt * 1.15);
     const k = 1 - Math.exp(-dt * 2.4);
     const dest = from.current.clone().lerp(to.current, intro.current);
     camera.position.lerp(dest, k);
@@ -184,21 +218,25 @@ function CameraRig({ look, reduce, controls }: { look: [number, number, number];
   return null;
 }
 
-function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHighlight, onPick }: Props & { reduce: boolean }) {
+const HUB_RADIUS = 0.4;
+
+function nodeRadius(support: number, maxS: number) {
+  return 0.16 + 0.14 * Math.sqrt(Math.max(support, 0) / maxS);
+}
+
+function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, onFocus, onHighlight, onPick }: Props & { reduce: boolean }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const spin = useRef<Group>(null);
   const nodesRef = useRef<InstancedMesh>(null);
   const haloRef = useRef<InstancedMesh>(null);
   const glowAttr = useRef<InstancedBufferAttribute | null>(null);
+  const haloGlowAttr = useRef<InstancedBufferAttribute | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const nodes = useMemo(() => heroConstellation(catalogue), [catalogue]);
   const maxS = Math.max(...nodes.map((n) => n.support), 0.01);
   const sphere = useMemo(() => new SphereGeometry(1, 28, 20), []);
-  const haloSphere = useMemo(() => new SphereGeometry(1, 20, 16), []);
-  const hub = useMemo(() => {
-    if (!nodes.length) return [0, 0, 0] as [number, number, number];
-    const c = nodes.reduce((a, n) => [a[0] + n.pos[0], a[1] + n.pos[1], a[2] + n.pos[2]] as [number, number, number], [0, 0, 0]);
-    return [c[0] / nodes.length, c[1] / nodes.length, c[2] / nodes.length] as [number, number, number];
-  }, [nodes]);
+  const haloPlane = useMemo(() => new PlaneGeometry(2, 2), []);
+  const hub = useMemo(() => centroid(nodes), [nodes]);
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
     uMotion: { value: reduce ? 0 : 1 },
@@ -208,18 +246,20 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
   const haloUniforms = useMemo(() => ({
     uTime: uniforms.uTime,
     uMotion: uniforms.uMotion,
-    uColor: { value: new Color(linkAmber) },
   }), [uniforms]);
   const hubUniforms = useMemo(() => ({
     uTime: uniforms.uTime,
     uMotion: uniforms.uMotion,
     uColor: { value: new Color(hubColor) },
   }), [uniforms]);
-  const linkUniforms = useMemo(() => ({ uColor: { value: new Color(linkAmber) } }), []);
-  const dustUniforms = useMemo(() => ({
+  const hubHaloUniforms = useMemo(() => ({
+    uTime: uniforms.uTime,
     uMotion: uniforms.uMotion,
-    uColor: { value: new Color(dustColor) },
+    uRadius: { value: HUB_RADIUS * 2.5 },
+    uColor: { value: new Color(hubColor) },
   }), [uniforms]);
+  const linkUniforms = useMemo(() => ({ uColor: { value: new Color(linkAmber) } }), []);
+  const dustUniforms = useMemo(() => ({ uColor: { value: new Color(dustColor) } }), []);
 
   const spokes = useMemo(() => {
     const pos: number[] = [];
@@ -232,23 +272,26 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
   }, [nodes, hub]);
 
   const dustGeo = useMemo(() => {
-    const count = 1400;
+    const count = 640;
     const pos = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
     let seed = 17;
     const rand = () => {
       seed = (seed * 16807) % 2147483647;
       return (seed - 1) / 2147483646;
     };
     for (let i = 0; i < count; i++) {
-      const r = 3.2 + rand() * 16;
+      const r = 0.5 + Math.pow(rand(), 0.7) * 8.1;
       const a = rand() * Math.PI * 2;
-      const y = (rand() - 0.5) * 9;
+      const y = (rand() - 0.5) * 3.4;
       pos[i * 3] = Math.cos(a) * r;
       pos[i * 3 + 1] = y;
       pos[i * 3 + 2] = Math.sin(a) * r;
+      sizes[i] = 1.8 + rand() * 1.7;
     }
     const geo = new BufferGeometry();
     geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    geo.setAttribute("aSize", new Float32BufferAttribute(sizes, 1));
     return geo;
   }, []);
 
@@ -266,13 +309,14 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
     const glow = new Float32Array(n);
     const m = new Matrix4();
     nodes.forEach((node, i) => {
-      const s = 0.18 + 0.42 * Math.sqrt(node.support / maxS);
+      const s = nodeRadius(node.support, maxS);
       m.makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
       dummy.makeScale(s, s, s);
       m.multiply(dummy);
       mesh.setMatrixAt(i, m);
+      const haloScale = s * 2.5;
       const haloM = new Matrix4().makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
-      haloM.multiply(new Matrix4().makeScale(s * 2.15, s * 2.15, s * 2.15));
+      haloM.multiply(new Matrix4().makeScale(haloScale, haloScale, haloScale));
       halo.setMatrixAt(i, haloM);
       const hex = showGaps && node.gap ? gapColor : galaxyColor(node.colorIndex, node.clusterId);
       color.set(hex);
@@ -284,6 +328,8 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
     });
     mesh.instanceMatrix.needsUpdate = true;
     halo.instanceMatrix.needsUpdate = true;
+    mesh.count = n;
+    halo.count = n;
     const put = (target: InstancedMesh, name: string, data: Float32Array, size: number) => {
       const attr = new InstancedBufferAttribute(data, size);
       target.geometry.setAttribute(name, attr);
@@ -295,25 +341,29 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
     put(mesh, "aEmerging", emerging, 1);
     glowAttr.current = put(mesh, "aGlow", glow, 1);
     put(halo, "aPhase", phases.slice(), 1);
+    put(halo, "aColor", colors.slice(), 3);
+    haloGlowAttr.current = put(halo, "aGlow", glow.slice(), 1);
     mesh.frustumCulled = false;
     halo.frustumCulled = false;
   }, [nodes, showGaps, maxS]);
 
   useEffect(() => {
-    const attr = glowAttr.current;
-    if (!attr) return;
-    const arr = attr.array as Float32Array;
+    const attrs = [glowAttr.current, haloGlowAttr.current];
+    if (attrs.some((attr) => !attr)) return;
     const hoverId = hover == null ? null : nodes[hover]?.id;
     const near = hoverId ? neighborIds(hoverId, links) : new Set<string>();
-    for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      let g = 0;
-      if (highlight?.has(n.id)) g = 0.62;
-      if (near.has(n.id)) g = 0.55;
-      if (n.id === hoverId || n.id === focus) g = 1;
-      arr[i] = g;
+    for (const attr of attrs) {
+      const arr = attr!.array as Float32Array;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        let g = 0;
+        if (highlight?.has(n.id)) g = 0.62;
+        if (near.has(n.id)) g = 0.55;
+        if (n.id === hoverId || n.id === focus) g = 1;
+        arr[i] = g;
+      }
+      attr!.needsUpdate = true;
     }
-    attr.needsUpdate = true;
   }, [hover, focus, highlight, nodes, links]);
 
   useFrame((_, dt) => {
@@ -336,15 +386,12 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
   return (
     <>
       <group ref={spin}>
-        <points geometry={dustGeo} frustumCulled={false}>
+        <points geometry={dustGeo} frustumCulled={false} raycast={() => null}>
           <shaderMaterial args={[{ uniforms: dustUniforms, vertexShader: DUST_VERT, fragmentShader: DUST_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </points>
-        <lineSegments geometry={spokes} frustumCulled={false}>
+        <lineSegments geometry={spokes} frustumCulled={false} raycast={() => null}>
           <shaderMaterial args={[{ uniforms: linkUniforms, vertexShader: "void main(){ gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0); }", fragmentShader: LINK_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </lineSegments>
-        <instancedMesh ref={haloRef} args={[haloSphere, undefined, Math.max(nodes.length, 1)]} renderOrder={1} frustumCulled={false}>
-          <shaderMaterial args={[{ uniforms: haloUniforms, vertexShader: HALO_VERT, fragmentShader: HALO_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
-        </instancedMesh>
         <instancedMesh
           ref={nodesRef}
           args={[sphere, undefined, Math.max(nodes.length, 1)]}
@@ -362,9 +409,16 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
         >
           <shaderMaterial args={[{ uniforms, vertexShader: NODE_VERT, fragmentShader: NODE_FRAG, toneMapped: false }]} />
         </instancedMesh>
+        <instancedMesh ref={haloRef} args={[haloPlane, undefined, Math.max(nodes.length, 1)]} renderOrder={3} frustumCulled={false} raycast={() => null}>
+          <shaderMaterial args={[{ uniforms: haloUniforms, vertexShader: HALO_VERT, fragmentShader: HALO_FRAG, transparent: true, depthWrite: false, depthTest: true, side: DoubleSide, toneMapped: false }]} />
+        </instancedMesh>
         <mesh position={hub} renderOrder={2}>
-          <sphereGeometry args={[0.62, 32, 24]} />
+          <sphereGeometry args={[HUB_RADIUS, 32, 24]} />
           <shaderMaterial args={[{ uniforms: hubUniforms, vertexShader: HUB_VERT, fragmentShader: HUB_FRAG, toneMapped: false }]} />
+        </mesh>
+        <mesh position={hub} renderOrder={3} raycast={() => null}>
+          <planeGeometry args={[2, 2]} />
+          <shaderMaterial args={[{ uniforms: hubHaloUniforms, vertexShader: HUB_HALO_VERT, fragmentShader: HUB_HALO_FRAG, transparent: true, depthWrite: false, depthTest: true, side: DoubleSide, toneMapped: false }]} />
         </mesh>
         {hover != null && nodes[hover] && (
           <Html position={nodes[hover].pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
@@ -378,7 +432,7 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
         )}
       </group>
       <CameraRig look={look} reduce={reduce} controls={controls} />
-      <OrbitControls ref={controls} enablePan={false} enableZoom minDistance={4} maxDistance={22} />
+      <OrbitControls ref={controls} enablePan={false} enableZoom minDistance={18} maxDistance={48} />
     </>
   );
 }
@@ -400,7 +454,7 @@ export default function Galaxy3D(p: Props) {
   return (
     <Canvas
       frameloop={hidden ? "never" : "always"}
-      camera={{ position: [0, 3.2, 11], fov: 52 }}
+      camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: CAMERA_FOV }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, toneMapping: NoToneMapping }}
     >
