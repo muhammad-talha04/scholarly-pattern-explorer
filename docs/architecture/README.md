@@ -37,7 +37,7 @@ All routes are under `/api/v1`. Types are defined once in
 | `GET /countries/{code}` | one country's topics, patterns, collaborators |
 | `GET /topic-country-years?limit=` | topic × country × year `paper_count` and `fractional_count`. `limit` defaults to 1000 and is clamped to 1–10000 |
 | `GET /runs` | progress timeline of every scheduled run |
-| `GET /galaxy` | 2D/3D paper layout: id, x, y, z, cluster id, cluster label, year |
+| `GET /galaxy` | Stored galaxy graph: `nodes`, `clusters`, `links`. Each node is one paper (`id`, `topic_id`, `topic_name`, `x`, `y`, `z`, `cluster_id`, `cluster_label`, `year`, `support`). `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout. Embeddings and this payload share the store in `STORAGE.md` |
 
 ## Adding a feature
 1. Add schemas to `schemas.py` and a router in `app/routers/`.

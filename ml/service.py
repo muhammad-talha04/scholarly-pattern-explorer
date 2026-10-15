@@ -82,11 +82,30 @@ class MLService:
             self.store.upsert([p.work_id for p in chunk], vecs, [p.to_dict() for p in chunk])
         return len(papers)
 
-    def galaxy(self, refit: bool = False) -> list[dict]:
-        """2D/3D layout plus cluster id and label for every indexed paper."""
-        from .galaxy import GalaxyMap
+    def read_galaxy(self) -> dict:
+        """Stored galaxy graph. Does not read embeddings or recompute the layout."""
+        from .galaxy import empty_graph
+        stored = self.store.get_document("galaxy")
+        return stored if stored else empty_graph()
+
+    def rebuild_galaxy(self, refit: bool = False) -> dict:
+        """Recompute the layout from the embedding index and store the graph.
+
+        The scheduled index/update job calls this. ``GET /galaxy`` calls
+        ``read_galaxy`` and does not touch the embedding rows.
+        """
+        from .galaxy import GalaxyMap, empty_graph, graph_from_layout
+        layout = GalaxyMap(self.galaxy_dir)
+        if not refit:
+            saved = self.store.get_document("galaxy_state")
+            if saved:
+                layout.state = saved
         ids, vecs, metas = self.store.rows()
-        return GalaxyMap(self.galaxy_dir).sync(ids, vecs, metas, refit=refit)
+        points = layout.sync(ids, vecs, metas, refit=refit)
+        graph = graph_from_layout(points, vecs, metas) if points else empty_graph()
+        self.store.put_document("galaxy_state", layout.state)
+        self.store.put_document("galaxy", graph)
+        return graph
 
     @staticmethod
     def links(meta: dict) -> dict:

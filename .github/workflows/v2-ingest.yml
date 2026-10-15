@@ -43,3 +43,18 @@ jobs:
       - name: Save back
         env: {GH_TOKEN: "${{ github.token }}"}
         run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json --clobber
+      - name: Precompute embeddings and the galaxy graph
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ML_DATA_DIR: data/ml
+        run: |
+          pip install -r ml/requirements.txt
+          python -m ml.cli index
+          python -m ml.cli update || echo "pattern update failed"
+      - name: Save the galaxy payload
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          f=data/ml/vectors/documents/galaxy.json
+          if [ -f "$f" ]; then
+            gh release upload data-store "$f" --clobber
+          fi

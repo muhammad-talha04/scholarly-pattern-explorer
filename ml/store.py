@@ -1,17 +1,76 @@
 """Vector storage: pgvector (Supabase) or a local FAISS / numpy fallback.
 
 All vectors are L2-normalised, so cosine similarity == inner product.
+
+The same store holds JSON documents (the precomputed galaxy, pattern snapshots,
+country and topic counts). Postgres is used when ``DATABASE_URL`` is set, unless
+``ML_VECTOR_BACKEND=local``. Otherwise documents are JSON files next to the
+vectors, so tests run with no database.
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 
 from .paths import ml_data_dir
+
+# Shared JSON slots. Any kind matching the name pattern can be stored the same way.
+DOCUMENT_KINDS = (
+    "galaxy",              # GET /api/v1/galaxy body
+    "galaxy_state",        # frozen PCA basis and assignments
+    "patterns",            # pattern snapshot
+    "countries",           # country counts
+    "topics",              # topic counts
+    "topic_country_year",  # topic × country × year counts
+)
+
+_KIND = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "db" / "migrations"
+
+
+def check_kind(kind: str) -> str:
+    if not isinstance(kind, str) or not _KIND.fullmatch(kind):
+        raise ValueError("document kind must match ^[a-z][a-z0-9_]{0,63}$")
+    return kind
+
+
+def split_sql(sql: str) -> list[str]:
+    """Split a migration on semicolons, keeping dollar-quoted blocks intact."""
+    parts: list[str] = []
+    buf: list[str] = []
+    dollar = False
+    for line in sql.splitlines():
+        if not dollar and line.strip().startswith("--"):
+            continue
+        if line.count("$$") % 2 == 1:
+            dollar = not dollar
+        buf.append(line)
+        if not dollar and line.strip().endswith(";"):
+            stmt = "\n".join(buf).strip()
+            if stmt:
+                parts.append(stmt)
+            buf = []
+    tail = "\n".join(buf).strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
+def migration_files() -> list[Path]:
+    """Numbered SQL files under db/migrations, in apply order."""
+    return sorted(p for p in _MIGRATIONS_DIR.glob("[0-9]*.sql") if p.is_file())
+
+
+def migration_sql() -> list[str]:
+    statements: list[str] = []
+    for path in migration_files():
+        statements.extend(split_sql(path.read_text(encoding="utf-8")))
+    return statements
 
 
 class VectorStore(Protocol):
@@ -20,6 +79,8 @@ class VectorStore(Protocol):
     def get(self, work_id: str) -> dict | None: ...
     def vector(self, work_id: str): ...
     def rows(self): ...
+    def put_document(self, kind: str, payload: dict) -> None: ...
+    def get_document(self, kind: str) -> dict | None: ...
     def __len__(self) -> int: ...
 
 
@@ -32,11 +93,16 @@ class LocalStore:
         self.ids: list[str] = []
         self.meta: dict[str, dict] = {}
         self.vecs = np.zeros((0, dim), dtype=np.float32)
+        self._docs: dict[str, dict] = {}
         if self.path and (self.path / "vectors.npy").exists():
             self.vecs = np.load(self.path / "vectors.npy")
             self.dim = int(self.vecs.shape[1])
             data = json.loads((self.path / "meta.json").read_text(encoding="utf-8"))
             self.ids, self.meta = data["ids"], data["meta"]
+        if self.path and (self.path / "documents").is_dir():
+            for f in sorted((self.path / "documents").glob("*.json")):
+                if _KIND.fullmatch(f.stem):
+                    self._docs[f.stem] = json.loads(f.read_text(encoding="utf-8"))
 
     def __len__(self):
         return len(self.ids)
@@ -99,17 +165,24 @@ class LocalStore:
         except ValueError:
             return None
 
+    def put_document(self, kind: str, payload: dict) -> None:
+        kind = check_kind(kind)
+        if not isinstance(payload, dict):
+            raise TypeError("document payload must be a dict")
+        blob = json.loads(json.dumps(payload))
+        self._docs[kind] = blob
+        if not self.path:
+            return
+        dest = self.path / "documents"
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / f"{kind}.json").write_text(json.dumps(blob), encoding="utf-8")
 
-PG_SCHEMA = """
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE TABLE IF NOT EXISTS paper_embeddings (
-    work_id   TEXT PRIMARY KEY,
-    embedding vector(384),
-    meta      JSONB
-);
-CREATE INDEX IF NOT EXISTS paper_embeddings_hnsw
-    ON paper_embeddings USING hnsw (embedding vector_cosine_ops);
-"""
+    def get_document(self, kind: str) -> dict | None:
+        kind = check_kind(kind)
+        payload = self._docs.get(kind)
+        if payload is None:
+            return None
+        return json.loads(json.dumps(payload))
 
 
 def _vec_literal(v) -> str:
@@ -117,7 +190,11 @@ def _vec_literal(v) -> str:
 
 
 class PgVectorStore:
-    """Supabase Postgres + pgvector. Needs psycopg (v3) and DATABASE_URL."""
+    """Supabase Postgres + pgvector. Needs psycopg (v3) and DATABASE_URL.
+
+    Connecting applies every file in ``db/migrations`` in order. The same files
+    are what ``python -m db.apply`` runs.
+    """
 
     def __init__(self, dsn: str | None = None, conn=None):
         if conn is None:
@@ -125,7 +202,8 @@ class PgVectorStore:
             conn = psycopg.connect(dsn or os.environ["DATABASE_URL"], autocommit=True)
         self.conn = conn
         with self.conn.cursor() as cur:
-            cur.execute(PG_SCHEMA)
+            for stmt in migration_sql():
+                cur.execute(stmt)
 
     def __len__(self):
         with self.conn.cursor() as cur:
@@ -177,9 +255,35 @@ class PgVectorStore:
             metas.append(meta if isinstance(meta, dict) else json.loads(meta))
         return ids, np.stack(vecs), metas
 
+    def put_document(self, kind: str, payload: dict) -> None:
+        kind = check_kind(kind)
+        if not isinstance(payload, dict):
+            raise TypeError("document payload must be a dict")
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO documents (kind, payload, updated_at) VALUES (%s, %s::jsonb, now()) "
+                "ON CONFLICT (kind) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()",
+                (kind, json.dumps(payload)))
+
+    def get_document(self, kind: str) -> dict | None:
+        kind = check_kind(kind)
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT payload FROM documents WHERE kind = %s", (kind,))
+            row = cur.fetchone()
+        if not row:
+            return None
+        return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+
 
 def get_store():
-    """ML_VECTOR_BACKEND=pgvector uses DATABASE_URL; otherwise local files in ML_DATA_DIR."""
-    if os.getenv("ML_VECTOR_BACKEND", "local").lower() == "pgvector":
+    """Postgres + pgvector when DATABASE_URL is set, unless ML_VECTOR_BACKEND=local.
+
+    ``ML_VECTOR_BACKEND=pgvector`` forces Postgres and needs ``DATABASE_URL``.
+    With neither set, embeddings and documents are files under ``ML_DATA_DIR``.
+    """
+    backend = os.getenv("ML_VECTOR_BACKEND", "").strip().lower()
+    if backend == "local":
+        return LocalStore(ml_data_dir() / "vectors")
+    if backend == "pgvector" or os.getenv("DATABASE_URL"):
         return PgVectorStore()
     return LocalStore(ml_data_dir() / "vectors")

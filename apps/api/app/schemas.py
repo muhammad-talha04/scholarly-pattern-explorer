@@ -104,12 +104,46 @@ class Collaboration(BaseModel):
     papers: float  # fractional or full, per the request's counting method
 
 
-class GalaxyPoint(BaseModel):
-    """One paper in the galaxy. (x, y) is the 2D layout; (x, y, z) is the 3D layout."""
-    id: str
+class GalaxyCentroid(BaseModel):
     x: float
     y: float
     z: float
-    cluster_id: int
+
+
+class GalaxyCluster(BaseModel):
+    """One topic cluster. ``name`` is the front-end label; ``label`` is the same string."""
+    id: str
+    name: str
+    label: str
+    centroid: GalaxyCentroid
+    size: int
+
+
+class GalaxyNode(BaseModel):
+    """One paper. ``topic_name`` is the display id the front end uses for links."""
+    id: str
+    topic_id: str
+    topic_name: str
+    x: float
+    y: float
+    z: float
+    cluster_id: str
     cluster_label: str = ""
     year: int | None = None
+    support: float
+
+
+class GalaxyLink(BaseModel):
+    source: str
+    target: str
+    weight: float
+
+
+class GalaxyGraph(BaseModel):
+    """Matches the web client's GalaxyGraph: nodes, clusters, and nearest-neighbour links.
+
+    ``(x, y)`` is the 2D layout; ``(x, y, z)`` is the 3D layout of the same basis.
+    """
+    nodes: list[GalaxyNode] = []
+    clusters: list[GalaxyCluster] = []
+    links: list[GalaxyLink] = []
