@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
 from .. import ml_bridge as ml
+from pipeline import country_api  # repo root is on sys.path via ml_bridge
 from ..schemas import (AskRequest, AskResponse, Collaboration, CountingMethod, CountryStats, PaperDetail,
                        PaperSummary, Pattern, Run, SearchResponse)
 
@@ -92,17 +93,25 @@ def patterns(window: int | None = None, trend: str | None = None) -> list[Patter
 
 @router.get("/countries", response_model=list[CountryStats])
 def countries(counting: CountingMethod = "fractional") -> list[CountryStats]:
-    return []
+    return [CountryStats(**r) for r in country_api.countries(counting)]
 
 
 @router.get("/countries/collaborations", response_model=list[Collaboration])
-def collaborations(counting: CountingMethod = "fractional") -> list[Collaboration]:
-    return []
+def collaborations(counting: CountingMethod = "fractional", limit: int = 200) -> list[Collaboration]:
+    # The pipeline snapshot currently has one pair list (papers co-authored by both
+    # countries). Use a counting-specific list if the snapshot ever provides one.
+    rows = country_api.snapshot().get(f"collaborations_{counting}")
+    if rows is None:
+        rows = country_api.collaborations(limit)
+    return [Collaboration(**r) for r in rows[:limit]]
 
 
 @router.get("/countries/{code}", response_model=CountryStats)
-def country(code: str) -> CountryStats:
-    raise HTTPException(404, "country not found")
+def country(code: str, counting: CountingMethod = "fractional") -> CountryStats:
+    r = country_api.country(code, counting)
+    if r is None:
+        raise HTTPException(404, "country not found")
+    return CountryStats(**r)
 
 
 @router.get("/runs", response_model=list[Run])
