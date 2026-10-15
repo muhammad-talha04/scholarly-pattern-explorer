@@ -112,7 +112,9 @@ python eval/score_search.py --works data/works_v2.jsonl
 python eval/score_search.py --fetch     # pull the judged works from OpenAlex
 ```
 
-`--fetch` is the only network path. The pytest
+`--fetch` is the only network path. It requests the judged work ids 50 at a
+time. The first page is anonymous. Pages after that need the free
+`OPENALEX_API_KEY` (repo secret, already set). The pytest
 (`ml/tests/test_score_search.py`) uses a tiny in-memory fixture and does not
 call OpenAlex.
 

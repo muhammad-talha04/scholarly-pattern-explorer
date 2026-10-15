@@ -184,7 +184,9 @@ def galaxy() -> GalaxyGraph:
 
 @router.get("/topic-country-years", response_model=list[TopicCountryYear])
 def topic_country_years(topic_id: str | None = None, country: str | None = None,
-                        year: int | None = None, limit: int = 1000) -> list[TopicCountryYear]:
+                        year: int | None = None,
+                        limit: int = country_api.TOPIC_COUNTRY_YEAR_DEFAULT_LIMIT) -> list[TopicCountryYear]:
+    """limit defaults to 1000. Values below 1 become 1; values above 10000 are capped."""
     return country_api.topic_country_years(topic_id, country, year, limit)
 
 
