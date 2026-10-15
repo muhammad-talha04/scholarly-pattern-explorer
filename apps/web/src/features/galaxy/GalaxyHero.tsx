@@ -13,7 +13,9 @@ import { EmptyState, ErrorNote, Spinner, StarMark } from "@/components/ui";
 import { Galaxy2D } from "./Galaxy2D";
 import { positionNodes } from "./layout";
 import { SearchBar } from "@/features/search/SearchBar";
-import { galaxyColor } from "@/lib/theme";
+import { galaxyColor } from "@/lib/palette";
+
+const SUGGESTIONS = ["Protein folding", "Climate modelling", "Large language models"];
 import { centroid, freshPaperIds, type Star } from "./stars";
 
 const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () => <GalaxyLoading /> });
@@ -101,33 +103,42 @@ export function GalaxyHero() {
   }, [stars]);
   const loading = (pats.loading && !pats.data) || (galaxy.loading && !galaxy.data);
   const pick = (t: string) => router.push(`/search?q=${encodeURIComponent(t)}`);
+  const sky = pats.error && !pats.data ? (
+    <div className="flex h-full items-center justify-center px-6 pt-24"><ErrorNote msg={pats.error} onRetry={pats.reload} /></div>
+  ) : loading && !previewEmpty ? <GalaxyLoading /> : (previewEmpty || view.nodes.length === 0) ? (
+    <div className="flex h-full items-center justify-center px-6 pt-28" data-testid="galaxy-empty">
+      <EmptyState title="No papers in this snapshot" body="The galaxy groups papers by theme once they are indexed. You can still search, or open Patterns once a run has landed." action={<Link href="/search" className="btn bg-accent/20">Search papers</Link>} />
+    </div>
+  ) : lowPower ? (
+    <Galaxy2D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
+  ) : (
+    <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
+  );
   return (
     <section className="relative -mx-3 -mt-20 h-[100dvh] min-h-[640px] overflow-hidden sm:-mx-4">
-      <div className="absolute inset-0 z-0">
-        {pats.error && !pats.data ? (
-          <div className="flex h-full items-center justify-center px-6 pt-24"><ErrorNote msg={pats.error} onRetry={pats.reload} /></div>
-        ) : loading && !previewEmpty ? <GalaxyLoading /> : (previewEmpty || view.nodes.length === 0) ? (
-          <div className="flex h-full items-center justify-center px-6 pt-28" data-testid="galaxy-empty">
-            <EmptyState title="No papers in this snapshot" body="The galaxy groups papers by theme once they are indexed. You can still search, or open Patterns once a run has landed." action={<Link href="/search" className="btn bg-accent/20">Search papers</Link>} />
-          </div>
-        ) : lowPower ? (
-          <Galaxy2D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
-        ) : (
-          <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
-        )}
-      </div>
-      <div aria-hidden className="hero-vignette pointer-events-none absolute inset-0 z-10" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-gradient-to-b from-ink via-ink/80 to-transparent" />
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pointer-events-none absolute inset-x-0 top-[4.5rem] z-30 mx-auto w-full max-w-xl px-3 sm:px-4">
-        <div className="pointer-events-auto glass px-4 py-4 text-center sm:px-6">
-          <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-white sm:text-5xl">
+      <div className="absolute inset-0 z-0 lg:left-[44%]">{sky}</div>
+      <div aria-hidden className="hero-scrim pointer-events-none absolute inset-0 z-10" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-gradient-to-b from-ink to-transparent" />
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pointer-events-none relative z-30 flex h-full flex-col justify-start px-4 pb-8 pt-28 sm:px-8 lg:w-[54%] lg:justify-center lg:pb-16 lg:pt-24">
+        <div className="pointer-events-auto max-w-xl text-left">
+          <p className="font-mono text-[11px] font-medium tracking-[0.18em] text-accent">OPENALEX · EMBEDDINGS · COSINE SIMILARITY</p>
+          <h1 className="mt-3 font-sans text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
             Explore research <span className="text-accent">by meaning</span>
           </h1>
-          <p className="mx-auto mt-2 max-w-md text-xs text-mist sm:text-sm">Each dot is a paper. Colors are topic clusters. The galaxy groups papers by theme.</p>
-          <div className="mt-3"><SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} /></div>
+          <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Each node is a paper. Amber marks a topic cluster. Papers sit together when their embeddings are close.</p>
+          <div className="mt-6">
+            <SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} />
+            <ul aria-label="Suggestions" className="mt-3 flex flex-wrap gap-2">
+              {SUGGESTIONS.map((label) => (
+                <li key={label}>
+                  <button type="button" className="chip transition hover:border-accent/70 hover:text-accent" onClick={() => pick(label)}>{label}</button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </motion.div>
-      <div className="absolute inset-x-0 bottom-3 z-20 flex flex-wrap items-end justify-between gap-2 px-3 sm:px-5">
+      <div className="absolute inset-x-0 bottom-3 z-20 flex flex-wrap items-end justify-between gap-2 px-3 sm:px-5 lg:left-[46%] lg:right-3">
         <div className="flex min-w-0 flex-col gap-2">
           <label className="glass inline-flex w-fit cursor-pointer items-center gap-2 px-3 py-2 text-sm text-mist">
             <input type="checkbox" checked={showGaps} onChange={(e) => setShowGaps(e.target.checked)} className="accent-gap" />

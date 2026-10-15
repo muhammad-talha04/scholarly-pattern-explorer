@@ -1,18 +1,18 @@
 "use client";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html, OrbitControls, Stars } from "@react-three/drei";
+import { Html, OrbitControls } from "@react-three/drei";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  CircleGeometry, Color, InstancedBufferAttribute, InstancedMesh, Matrix4, NoToneMapping,
+  BufferGeometry, Color, Float32BufferAttribute, InstancedBufferAttribute, InstancedMesh, Matrix4, NoToneMapping,
   SphereGeometry, Vector3,
 } from "three";
+import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
-import { NODE_BRIGHTNESS, clusterColors, gap as gapColor, galaxyColor, ink, linkGrey } from "@/lib/theme";
+import { NODE_BRIGHTNESS, clusterColors, dust as dustColor, gap as gapColor, galaxyColor, hub as hubColor, ink, linkAmber } from "@/lib/theme";
 import { neighborIds, type Star } from "./stars";
 
 const NODE_VERT = `
-attribute vec3 aCenter;
 attribute float aPhase;
 attribute vec3 aColor;
 attribute float aGlow;
@@ -23,23 +23,19 @@ varying vec3 vNormalV;
 varying float vGlow;
 varying float vTwinkle;
 varying float vEmerging;
+varying float vPhase;
 uniform float uTime;
 uniform float uMotion;
 void main() {
-  vec3 rest = (instanceMatrix * vec4(position, 1.0)).xyz;
-  vec3 arm = rest - aCenter;
-  float ang = uMotion * uTime * 0.15;
-  float c = cos(ang);
-  float s = sin(ang);
-  vec3 spun = vec3(arm.x * c - arm.z * s, arm.y, arm.x * s + arm.z * c);
-  spun.y += uMotion * sin(uTime * 0.35 + aPhase) * 0.045;
-  vec4 viewPos = viewMatrix * vec4(aCenter + spun, 1.0);
-  gl_Position = projectionMatrix * viewPos;
+  float pulse = 1.0 + uMotion * sin(uTime * 1.5 + aPhase) * 0.045;
+  vec4 world = instanceMatrix * vec4(position * pulse, 1.0);
+  gl_Position = projectionMatrix * viewMatrix * world;
   vNormalV = normalize(mat3(viewMatrix) * mat3(instanceMatrix) * normal);
   vColor = aColor;
   vGlow = aGlow;
   vTwinkle = aTwinkle;
   vEmerging = aEmerging;
+  vPhase = aPhase;
 }
 `;
 
@@ -50,68 +46,78 @@ varying vec3 vNormalV;
 varying float vGlow;
 varying float vTwinkle;
 varying float vEmerging;
+varying float vPhase;
 uniform float uTime;
 uniform float uMotion;
 uniform float uBrightness;
 uniform vec3 uWarm;
 void main() {
   float base = mix(uBrightness, 1.0, clamp(vGlow, 0.0, 1.0));
+  float pulse = uMotion * (0.5 + 0.5 * sin(uTime * 1.5 + vPhase)) * 0.06;
   float tw = uMotion * vTwinkle * exp(-uTime * 1.55) * (0.55 + 0.45 * sin(uTime * 16.0));
-  float bright = min(1.0, base + tw * 0.16 + vEmerging * 0.08);
+  float bright = min(1.0, base + pulse + tw * 0.16 + vEmerging * 0.08);
   vec3 srgb = pow(max(vColor, vec3(0.0)), vec3(0.454545));
   vec3 warm = pow(max(uWarm, vec3(0.0)), vec3(0.454545));
-  vec3 mixed = mix(srgb, warm, clamp(vEmerging, 0.0, 1.0) * 0.4);
-  float rim = pow(1.0 - abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0))), 3.0);
-  vec3 outS = min(vec3(1.0), mixed * bright + rim * 0.045);
+  vec3 mixed = mix(srgb, warm, clamp(vEmerging, 0.0, 1.0) * 0.35);
+  float rim = pow(1.0 - abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0))), 2.4);
+  vec3 outS = min(vec3(1.0), mixed * bright + rim * 0.06);
   gl_FragColor = vec4(pow(outS, vec3(2.2)), 1.0);
   #include <colorspace_fragment>
 }
 `;
 
-const SHADOW_VERT = `
-attribute vec3 aCenter;
+const HALO_VERT = `
 attribute float aPhase;
-varying vec2 vUv;
+varying vec3 vNormalV;
 uniform float uTime;
 uniform float uMotion;
 void main() {
-  vUv = uv;
-  vec3 rest = (instanceMatrix * vec4(position, 1.0)).xyz;
-  vec3 arm = rest - aCenter;
-  float ang = uMotion * uTime * 0.15;
-  float c = cos(ang);
-  float s = sin(ang);
-  vec3 spun = vec3(arm.x * c - arm.z * s, arm.y, arm.x * s + arm.z * c);
-  spun.y += uMotion * sin(uTime * 0.35 + aPhase) * 0.045;
-  vec3 pos = aCenter + spun + vec3(0.04, -0.1, 0.02);
-  gl_Position = projectionMatrix * viewMatrix * vec4(pos, 1.0);
+  float pulse = 1.0 + uMotion * sin(uTime * 1.5 + aPhase) * 0.045;
+  vec4 world = instanceMatrix * vec4(position * pulse, 1.0);
+  gl_Position = projectionMatrix * viewMatrix * world;
+  vNormalV = normalize(mat3(viewMatrix) * mat3(instanceMatrix) * normal);
 }
 `;
 
-const SHADOW_FRAG = `
+const HALO_FRAG = `
 precision highp float;
-varying vec2 vUv;
+varying vec3 vNormalV;
+uniform vec3 uColor;
 void main() {
-  float d = length((vUv - 0.5) * 2.0);
-  float alpha = (1.0 - smoothstep(0.78, 0.98, d)) * 0.35;
-  if (alpha < 0.02) discard;
-  gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+  float facing = abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0)));
+  float rim = pow(1.0 - facing, 1.5);
+  float alpha = rim * 0.62 + (1.0 - facing) * 0.08;
+  if (alpha < 0.03) discard;
+  gl_FragColor = vec4(uColor, alpha);
+  #include <colorspace_fragment>
 }
 `;
 
-const LINK_VERT = `
-attribute vec3 aCenter;
-attribute float aPhase;
+const HUB_VERT = `
+varying vec3 vNormalV;
 uniform float uTime;
 uniform float uMotion;
 void main() {
-  vec3 arm = position - aCenter;
-  float ang = uMotion * uTime * 0.15;
-  float c = cos(ang);
-  float s = sin(ang);
-  vec3 spun = vec3(arm.x * c - arm.z * s, arm.y, arm.x * s + arm.z * c);
-  spun.y += uMotion * sin(uTime * 0.35 + aPhase) * 0.045;
-  gl_Position = projectionMatrix * viewMatrix * vec4(aCenter + spun, 1.0);
+  float pulse = 1.0 + uMotion * sin(uTime * 1.2) * 0.04;
+  vec4 world = modelMatrix * vec4(position * pulse, 1.0);
+  gl_Position = projectionMatrix * viewMatrix * world;
+  vNormalV = normalize(normalMatrix * normal);
+}
+`;
+
+const HUB_FRAG = `
+precision highp float;
+varying vec3 vNormalV;
+uniform vec3 uColor;
+uniform float uTime;
+uniform float uMotion;
+void main() {
+  float pulse = uMotion * (0.5 + 0.5 * sin(uTime * 1.2)) * 0.08;
+  vec3 srgb = pow(max(uColor, vec3(0.0)), vec3(0.454545));
+  float rim = pow(1.0 - abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0))), 2.2);
+  vec3 outS = min(vec3(1.0), srgb * (0.96 + pulse) + rim * 0.08);
+  gl_FragColor = vec4(pow(outS, vec3(2.2)), 1.0);
+  #include <colorspace_fragment>
 }
 `;
 
@@ -119,7 +125,27 @@ const LINK_FRAG = `
 precision highp float;
 uniform vec3 uColor;
 void main() {
-  gl_FragColor = vec4(uColor, 0.2);
+  gl_FragColor = vec4(uColor, 0.38);
+  #include <colorspace_fragment>
+}
+`;
+
+const DUST_VERT = `
+uniform float uMotion;
+void main() {
+  vec4 mv = viewMatrix * modelMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = uMotion > 0.5 ? 2.2 : 2.0;
+}
+`;
+
+const DUST_FRAG = `
+precision highp float;
+uniform vec3 uColor;
+void main() {
+  vec2 p = gl_PointCoord * 2.0 - 1.0;
+  if (dot(p, p) > 1.0) discard;
+  gl_FragColor = vec4(uColor, 0.42);
   #include <colorspace_fragment>
 }
 `;
@@ -133,12 +159,12 @@ function phaseOf(id: string) {
 function CameraRig({ look, reduce, controls }: { look: [number, number, number]; reduce: boolean; controls: React.RefObject<OrbitControlsImpl | null> }) {
   const { camera } = useThree();
   const intro = useRef(reduce ? 1 : 0);
-  const from = useRef(new Vector3(0, 5.8, 16));
+  const from = useRef(new Vector3(0, 4.6, 14));
   const to = useRef(new Vector3());
   const lookV = useRef(new Vector3());
   useEffect(() => {
     lookV.current.set(look[0], look[1], look[2]);
-    to.current.set(look[0] * 0.25 + 0.4, look[1] + 2.4, look[2] + 7.2);
+    to.current.set(look[0] * 0.2 + 0.2, look[1] + 1.8, look[2] + 8.4);
     if (reduce) {
       camera.position.copy(to.current);
       if (controls.current) { controls.current.target.copy(lookV.current); controls.current.update(); }
@@ -160,51 +186,79 @@ function CameraRig({ look, reduce, controls }: { look: [number, number, number];
 
 function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHighlight, onPick }: Props & { reduce: boolean }) {
   const controls = useRef<OrbitControlsImpl>(null);
+  const spin = useRef<Group>(null);
   const nodesRef = useRef<InstancedMesh>(null);
-  const shadowRef = useRef<InstancedMesh>(null);
+  const haloRef = useRef<InstancedMesh>(null);
   const glowAttr = useRef<InstancedBufferAttribute | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const maxS = Math.max(...nodes.map((n) => n.support), 0.01);
   const sphere = useMemo(() => new SphereGeometry(1, 28, 20), []);
-  const disc = useMemo(() => { const g = new CircleGeometry(0.55, 24); g.rotateX(-Math.PI / 2); return g; }, []);
+  const haloSphere = useMemo(() => new SphereGeometry(1, 20, 16), []);
+  const hub = useMemo(() => {
+    if (!nodes.length) return [0, 0, 0] as [number, number, number];
+    const c = nodes.reduce((a, n) => [a[0] + n.pos[0], a[1] + n.pos[1], a[2] + n.pos[2]] as [number, number, number], [0, 0, 0]);
+    return [c[0] / nodes.length, c[1] / nodes.length, c[2] / nodes.length] as [number, number, number];
+  }, [nodes]);
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
     uMotion: { value: reduce ? 0 : 1 },
     uBrightness: { value: NODE_BRIGHTNESS },
     uWarm: { value: new Color(clusterColors[2]) },
   }), [reduce]);
-  const linkUniforms = useMemo(() => ({
+  const haloUniforms = useMemo(() => ({
     uTime: uniforms.uTime,
     uMotion: uniforms.uMotion,
-    uColor: { value: new Color(linkGrey) },
+    uColor: { value: new Color(linkAmber) },
   }), [uniforms]);
-  const shadowUniforms = useMemo(() => ({ uTime: uniforms.uTime, uMotion: uniforms.uMotion }), [uniforms]);
+  const hubUniforms = useMemo(() => ({
+    uTime: uniforms.uTime,
+    uMotion: uniforms.uMotion,
+    uColor: { value: new Color(hubColor) },
+  }), [uniforms]);
+  const linkUniforms = useMemo(() => ({ uColor: { value: new Color(linkAmber) } }), []);
+  const dustUniforms = useMemo(() => ({
+    uMotion: uniforms.uMotion,
+    uColor: { value: new Color(dustColor) },
+  }), [uniforms]);
 
-  const linkGeo = useMemo(() => {
-    const by = new Map(nodes.map((n) => [n.id, n]));
+  const spokes = useMemo(() => {
     const pos: number[] = [];
-    const center: number[] = [];
-    const phase: number[] = [];
-    for (const link of links) {
-      const a = by.get(link.source), b = by.get(link.target);
-      if (!a?.pos || !b?.pos) continue;
-      for (const n of [a, b]) {
-        pos.push(n.pos[0], n.pos[1], n.pos[2]);
-        center.push(n.center[0], n.center[1], n.center[2]);
-        phase.push(phaseOf(n.clusterId));
-      }
+    for (const n of nodes) {
+      pos.push(n.pos[0], n.pos[1], n.pos[2], hub[0], hub[1], hub[2]);
     }
-    return { pos: new Float32Array(pos), center: new Float32Array(center), phase: new Float32Array(phase), count: pos.length / 3 };
-  }, [nodes, links]);
+    const geo = new BufferGeometry();
+    geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    return geo;
+  }, [nodes, hub]);
+
+  const dustGeo = useMemo(() => {
+    const count = 1400;
+    const pos = new Float32Array(count * 3);
+    let seed = 17;
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+    for (let i = 0; i < count; i++) {
+      const r = 3.2 + rand() * 16;
+      const a = rand() * Math.PI * 2;
+      const y = (rand() - 0.5) * 9;
+      pos[i * 3] = Math.cos(a) * r;
+      pos[i * 3 + 1] = y;
+      pos[i * 3 + 2] = Math.sin(a) * r;
+    }
+    const geo = new BufferGeometry();
+    geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    return geo;
+  }, []);
 
   useLayoutEffect(() => {
     const mesh = nodesRef.current;
-    const shadow = shadowRef.current;
-    if (!mesh || !shadow) return;
+    const halo = haloRef.current;
+    if (!mesh || !halo) return;
     const dummy = new Matrix4();
     const color = new Color();
     const n = nodes.length;
-    const centers = new Float32Array(n * 3);
     const phases = new Float32Array(n);
     const colors = new Float32Array(n * 3);
     const twinkle = new Float32Array(n);
@@ -212,40 +266,37 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
     const glow = new Float32Array(n);
     const m = new Matrix4();
     nodes.forEach((node, i) => {
-      const s = 0.09 + 0.32 * Math.sqrt(node.support / maxS);
+      const s = 0.18 + 0.42 * Math.sqrt(node.support / maxS);
       m.makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
       dummy.makeScale(s, s, s);
       m.multiply(dummy);
       mesh.setMatrixAt(i, m);
-      const shadowM = new Matrix4().makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
-      shadowM.multiply(new Matrix4().makeScale(s, s, s));
-      shadow.setMatrixAt(i, shadowM);
+      const haloM = new Matrix4().makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
+      haloM.multiply(new Matrix4().makeScale(s * 2.15, s * 2.15, s * 2.15));
+      halo.setMatrixAt(i, haloM);
       const hex = showGaps && node.gap ? gapColor : galaxyColor(node.colorIndex, node.clusterId);
       color.set(hex);
       colors[i * 3] = color.r; colors[i * 3 + 1] = color.g; colors[i * 3 + 2] = color.b;
-      centers[i * 3] = node.center[0]; centers[i * 3 + 1] = node.center[1]; centers[i * 3 + 2] = node.center[2];
-      phases[i] = phaseOf(node.clusterId);
+      phases[i] = phaseOf(node.id);
       twinkle[i] = node.fresh ? 1 : 0;
       emerging[i] = node.gap ? 0 : node.emerging;
       glow[i] = 0;
     });
     mesh.instanceMatrix.needsUpdate = true;
-    shadow.instanceMatrix.needsUpdate = true;
+    halo.instanceMatrix.needsUpdate = true;
     const put = (target: InstancedMesh, name: string, data: Float32Array, size: number) => {
       const attr = new InstancedBufferAttribute(data, size);
       target.geometry.setAttribute(name, attr);
       return attr;
     };
-    put(mesh, "aCenter", centers, 3);
     put(mesh, "aPhase", phases, 1);
     put(mesh, "aColor", colors, 3);
     put(mesh, "aTwinkle", twinkle, 1);
     put(mesh, "aEmerging", emerging, 1);
     glowAttr.current = put(mesh, "aGlow", glow, 1);
-    put(shadow, "aCenter", centers, 3);
-    put(shadow, "aPhase", phases, 1);
+    put(halo, "aPhase", phases.slice(), 1);
     mesh.frustumCulled = false;
-    shadow.frustumCulled = false;
+    halo.frustumCulled = false;
   }, [nodes, showGaps, maxS]);
 
   useEffect(() => {
@@ -258,7 +309,7 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
       const n = nodes[i];
       let g = 0;
       if (highlight?.has(n.id)) g = 0.62;
-      if (near.has(n.id)) g = 0.48;
+      if (near.has(n.id)) g = 0.55;
       if (n.id === hoverId || n.id === focus) g = 1;
       arr[i] = g;
     }
@@ -269,6 +320,7 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
     if (document.hidden) return;
     uniforms.uTime.value += Math.min(dt, 0.05);
     uniforms.uMotion.value = reduce ? 0 : 1;
+    if (spin.current) spin.current.rotation.y = reduce ? 0 : uniforms.uTime.value * 0.16;
   });
 
   const look = useMemo(() => {
@@ -278,58 +330,55 @@ function Field({ nodes, links, showGaps, focus, highlight, reduce, onFocus, onHi
       return [c[0] / picked.length, c[1] / picked.length, c[2] / picked.length] as [number, number, number];
     }
     const focused = nodes.find((n) => n.id === focus);
-    return focused ? focused.pos : [0, 0, 0] as [number, number, number];
-  }, [highlight, focus, nodes]);
+    return focused ? focused.pos : hub;
+  }, [highlight, focus, nodes, hub]);
 
   return (
     <>
-      <instancedMesh
-        ref={shadowRef}
-        args={[disc, undefined, nodes.length]}
-        renderOrder={0}
-        frustumCulled={false}
-      >
-        <shaderMaterial args={[{ uniforms: shadowUniforms, vertexShader: SHADOW_VERT, fragmentShader: SHADOW_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
-      </instancedMesh>
-      <instancedMesh
-        ref={nodesRef}
-        args={[sphere, undefined, nodes.length]}
-        frustumCulled={false}
-        renderOrder={1}
-        onPointerOver={(e) => { e.stopPropagation(); if (e.instanceId != null) setHover(e.instanceId); }}
-        onPointerOut={() => setHover(null)}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (e.instanceId == null) return;
-          const n = nodes[e.instanceId];
-          onFocus?.(n.id);
-          if (n.gap) onHighlight?.(n.cluster);
-        }}
-      >
-        <shaderMaterial args={[{ uniforms, vertexShader: NODE_VERT, fragmentShader: NODE_FRAG, toneMapped: false }]} />
-      </instancedMesh>
-      {linkGeo.count > 0 && (
-        <lineSegments frustumCulled={false}>
-          <bufferGeometry>
-            <bufferAttribute attach="attributes-position" args={[linkGeo.pos, 3]} />
-            <bufferAttribute attach="attributes-aCenter" args={[linkGeo.center, 3]} />
-            <bufferAttribute attach="attributes-aPhase" args={[linkGeo.phase, 1]} />
-          </bufferGeometry>
-          <shaderMaterial args={[{ uniforms: linkUniforms, vertexShader: LINK_VERT, fragmentShader: LINK_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
+      <group ref={spin}>
+        <points geometry={dustGeo} frustumCulled={false}>
+          <shaderMaterial args={[{ uniforms: dustUniforms, vertexShader: DUST_VERT, fragmentShader: DUST_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
+        </points>
+        <lineSegments geometry={spokes} frustumCulled={false}>
+          <shaderMaterial args={[{ uniforms: linkUniforms, vertexShader: "void main(){ gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0); }", fragmentShader: LINK_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </lineSegments>
-      )}
+        <instancedMesh ref={haloRef} args={[haloSphere, undefined, Math.max(nodes.length, 1)]} renderOrder={1} frustumCulled={false}>
+          <shaderMaterial args={[{ uniforms: haloUniforms, vertexShader: HALO_VERT, fragmentShader: HALO_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
+        </instancedMesh>
+        <instancedMesh
+          ref={nodesRef}
+          args={[sphere, undefined, Math.max(nodes.length, 1)]}
+          frustumCulled={false}
+          renderOrder={2}
+          onPointerOver={(e) => { e.stopPropagation(); if (e.instanceId != null) setHover(e.instanceId); }}
+          onPointerOut={() => setHover(null)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (e.instanceId == null) return;
+            const n = nodes[e.instanceId];
+            onFocus?.(n.id);
+            if (n.gap) onHighlight?.(n.cluster);
+          }}
+        >
+          <shaderMaterial args={[{ uniforms, vertexShader: NODE_VERT, fragmentShader: NODE_FRAG, toneMapped: false }]} />
+        </instancedMesh>
+        <mesh position={hub} renderOrder={2}>
+          <sphereGeometry args={[0.62, 32, 24]} />
+          <shaderMaterial args={[{ uniforms: hubUniforms, vertexShader: HUB_VERT, fragmentShader: HUB_FRAG, toneMapped: false }]} />
+        </mesh>
+        {hover != null && nodes[hover] && (
+          <Html position={nodes[hover].pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
+            <div className="glass w-48 p-2.5 text-left text-xs" onPointerDown={(e) => e.stopPropagation()}>
+              <div className="font-medium text-white">{nodes[hover].id}</div>
+              <p className="mt-0.5 text-mist">Paper{nodes[hover].cluster ? ` · topic cluster ${nodes[hover].cluster}` : ""}</p>
+              {showGaps && nodes[hover].gap && <p className="text-gap">Research gap</p>}
+              <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(nodes[hover].id)}>Search this paper</button>
+            </div>
+          </Html>
+        )}
+      </group>
       <CameraRig look={look} reduce={reduce} controls={controls} />
       <OrbitControls ref={controls} enablePan={false} enableZoom minDistance={4} maxDistance={22} />
-      {hover != null && nodes[hover] && (
-        <Html position={nodes[hover].pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
-          <div className="glass w-48 p-2.5 text-left text-xs" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="font-medium text-white">{nodes[hover].id}</div>
-            <p className="mt-0.5 text-mist">Paper{nodes[hover].cluster ? ` · topic cluster ${nodes[hover].cluster}` : ""}</p>
-            {showGaps && nodes[hover].gap && <p className="text-gap">Research gap</p>}
-            <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(nodes[hover].id)}>Search this paper</button>
-          </div>
-        </Html>
-      )}
     </>
   );
 }
@@ -351,12 +400,11 @@ export default function Galaxy3D(p: Props) {
   return (
     <Canvas
       frameloop={hidden ? "never" : "always"}
-      camera={{ position: [0, 4.2, 12], fov: 52 }}
+      camera={{ position: [0, 3.2, 11], fov: 52 }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, toneMapping: NoToneMapping }}
     >
       <color attach="background" args={[ink]} />
-      <Stars radius={70} depth={40} count={1600} factor={2} fade speed={reduce ? 0 : 0.25} />
       <Field {...p} reduce={reduce} />
     </Canvas>
   );
