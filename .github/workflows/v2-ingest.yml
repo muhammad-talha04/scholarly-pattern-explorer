@@ -39,7 +39,7 @@ jobs:
           [ "$code" -eq 1 ] && exit 1
           tail -n +$(( $(cat before.txt) + 1 )) data/works_v2.jsonl > data/new.jsonl
       - name: Update country analytics with the new works only
-        run: python -m pipeline.country_stats --new data/new.jsonl --prev data/country_snapshot.json --out data/country_snapshot.json
+        run: python -m pipeline.country_stats --new data/new.jsonl --prev data/country_snapshot.json --out data/country_snapshot.json --corpus data/works_v2.jsonl
       - name: Save back
         env: {GH_TOKEN: "${{ github.token }}"}
         run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json --clobber

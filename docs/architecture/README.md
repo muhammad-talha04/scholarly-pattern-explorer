@@ -33,8 +33,9 @@ All routes are under `/api/v1`. Types are defined once in
 | `POST /papers/{id}/ask` | question about one paper, answered from its text |
 | `GET /papers/{id}/related` | related-papers graph |
 | `GET /patterns?window=` | mined topic patterns for a window |
-| `GET /countries` | per-country counts and growth |
+| `GET /countries` | per-country whole and fractional counts, growth, and per-year breakdown |
 | `GET /countries/{code}` | one country's topics, patterns, collaborators |
+| `GET /topic-country-years` | topic × country × year `paper_count` and `fractional_count` |
 | `GET /runs` | progress timeline of every scheduled run |
 | `GET /galaxy` | 2D/3D paper layout: id, x, y, z, cluster id, cluster label, year |
 
