@@ -37,6 +37,7 @@ All routes are under `/api/v1`. Types are defined once in
 | `GET /countries/{code}` | one country's topics, patterns, collaborators |
 | `GET /topic-country-years` | topic × country × year `paper_count` and `fractional_count` |
 | `GET /runs` | progress timeline of every scheduled run |
+| `GET /galaxy` | 2D/3D paper layout: id, x, y, z, cluster id, cluster label, year |
 
 ## Adding a feature
 1. Add schemas to `schemas.py` and a router in `app/routers/`.

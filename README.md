@@ -273,19 +273,52 @@ A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
 
 | Feature | How |
 |---|---|
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU) |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU). Override with `ML_EMBED_MODEL` or `python -m ml.cli index --model <id>` |
 | Vector storage | `ML_VECTOR_BACKEND=pgvector` (Supabase, `DATABASE_URL`, HNSW cosine index) or local numpy files with optional FAISS (default) |
 | Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
 | Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite` |
 | Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences |
+| Galaxy | `GET /api/v1/galaxy` → `{id, x, y, z, cluster_id, cluster_label, year}` per paper. `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout |
 | Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /api/v1/patterns`, `GET /api/v1/runs` |
 
-**Free LLM, optional.** Summaries and chat work offline with extractive methods
-(term-frequency sentence ranking and BM25-style evidence retrieval). To get
-generated answers, point `ML_LLM_URL` at any OpenAI-compatible endpoint you can
-use for free, such as a local Ollama (`http://localhost:11434/v1`, `ML_LLM_MODEL=llama3.2`)
-or a free-tier host (`ML_LLM_API_KEY`). If that call fails, the service falls back
-to the extractive methods.
+**Embedding model.** The default stays `all-MiniLM-L6-v2`. `python -m ml.benchmark`
+compares it with other small free 384-d models (`BAAI/bge-small-en-v1.5`,
+`intfloat/e5-small-v2`) on a CSV labelled `query_id,query,work_id,relevance`,
+scored with recall@10 and nDCG@10. A model replaces the default only if it
+leads by at least 0.05 on both. SPECTER2 is not in the comparison: it is 768-d
+and needs the adapters library, so it does not fit the pgvector column.
+e5 and bge queries get the prefixes those models require. The checked-in
+`eval/benchmark_queries.csv` is a tiny format sample; a hand-labelled set can
+replace it without a code change. Numbers from the real models are in
+`eval/README.md`.
+
+**Galaxy layout.** Papers are clustered in embedding space (UMAP + HDBSCAN when
+both libraries are installed and there are at least 25 papers, otherwise
+k-means) and labelled with c-TF-IDF keywords. The plotted coordinates are a
+3-component PCA, not the UMAP coordinates. The basis is saved on the first
+build. Later runs project only new or re-embedded papers into that basis and
+assign them to the nearest existing centroid, so papers that were already
+placed do not move. Labels are recomputed from the current members, so the
+wording can change. `python -m ml.cli galaxy --refit` recomputes the basis and
+the clusters and can move every point. With fewer than about 25 papers, or
+without `umap-learn` and `hdbscan` installed, clustering is k-means.
+
+**Local LLM, optional.** Summaries and chat work with no model at all
+(term-frequency sentence ranking and BM25-style evidence, cached per paper).
+To use a free local model, run an OpenAI-compatible server and leave the API
+key unset:
+
+```bash
+# Ollama, in one terminal: ollama serve
+ML_LLM_URL=http://127.0.0.1:11434/v1 ML_LLM_MODEL=llama3.2
+
+# llama.cpp: llama-server -m model.gguf --port 8080
+ML_LLM_URL=http://127.0.0.1:8080/v1 ML_LLM_MODEL=local
+```
+
+If `ML_LLM_URL` is unset or the server does not answer, the service falls back
+to the extractive methods. `ml/tests/test_llm_local.py` checks both summary and
+chat against a local endpoint.
 
 **Incremental mining.** Each sliding window stores a compressed basket multiset
 (`{topic set: count}`) next to its patterns. A run skips papers it has already seen.
@@ -298,7 +331,8 @@ progress timeline.
 
 ```bash
 pip install -r ml/requirements.txt
-python -m ml.cli index      # embeds data/works_v2.jsonl (falls back to data/works.jsonl)
+python -m ml.cli index      # embeds data/works_v2.jsonl (falls back to data/works.jsonl) and writes the galaxy
+python -m ml.benchmark      # recall@10 and nDCG@10 for MiniLM, bge-small, e5-small
 (cd apps/api && uvicorn app.main:app --reload)      # API routes are in apps/api/app/routers/core.py
 ML_EMBEDDER=hash python -m pytest ml -q             # offline tests, no model download
 ```
