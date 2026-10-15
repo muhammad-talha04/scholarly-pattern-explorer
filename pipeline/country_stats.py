@@ -8,7 +8,9 @@ with N distinct countries gives each 1/N); full counting is also kept.
 
 Each run also refreshes the topic × country × year aggregate
 (`topic_country_year`: topic_id, topic_name, country_code, year, paper_count,
-fractional_count) inside the snapshot and rewrites the SQLite table next to it.
+fractional_count) inside the snapshot and replaces that table in the shared
+store: Postgres when ``DATABASE_URL`` selects it (see ``ml.paths.use_postgres``),
+and the SQLite file otherwise. ``--table`` always writes SQLite.
 """
 from __future__ import annotations
 import argparse, json, os, sqlite3, sys
@@ -272,7 +274,7 @@ def main(argv=None):
     ap.add_argument("--new", required=True, help="JSONL of works added this run")
     ap.add_argument("--prev", help="previous snapshot JSON")
     ap.add_argument("--out", default="data/country_snapshot.json")
-    ap.add_argument("--table", help="SQLite file for topic_country_year (default: beside --out)")
+    ap.add_argument("--table", help="write topic_country_year to this SQLite file (skips Postgres)")
     ap.add_argument("--corpus", help="full works JSONL; read once if --prev has no topic-country-year counters")
     a = ap.parse_args(argv)
     new_path = resolve(a.new)
@@ -294,7 +296,15 @@ def main(argv=None):
     out, table = output_paths(a.out, a.table)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(snap))
-    write_topic_country_year(snap["topic_country_year"], table)
+    # Snapshot tally is the incremental state. The table is a full replace of
+    # the combined rows, so a later run does not add them on top again.
+    # An explicit --table stays on SQLite even when DATABASE_URL is set, so
+    # local tests never open Postgres.
+    from pipeline.aggregate_store import replace_topic_country_year, use_postgres
+    if a.table or not use_postgres():
+        write_topic_country_year(snap["topic_country_year"], table)
+    else:
+        replace_topic_country_year(snap["topic_country_year"])
     print(f"{len(snap['countries'])} countries, {len(snap['topic_year_counts'])} topics, "
           f"{len(snap['topic_country_year'])} topic-country-year rows")
 

@@ -81,14 +81,37 @@ def clamp_topic_country_year_limit(limit: int) -> int:
     return max(1, min(int(limit), TOPIC_COUNTRY_YEAR_MAX_LIMIT))
 
 
+def _aggregate_rows() -> list[dict]:
+    """Typed topic × country × year rows.
+
+    Postgres when that backend is selected. Otherwise the SQLite file when it
+    exists. The snapshot list is the fallback (tests, and a run that has not
+    written the file yet). Country totals on ``/countries`` stay on the snapshot
+    tally: summing this table would double-count a paper that has several topics.
+    """
+    from ml.paths import topic_country_year_db
+    from pipeline import aggregate_store
+
+    if aggregate_store.use_postgres():
+        try:
+            return aggregate_store.read_topic_country_year()
+        except Exception:
+            return snapshot().get("topic_country_year") or []
+    stored = aggregate_store.read_sqlite(topic_country_year_db())
+    if stored is None:
+        return snapshot().get("topic_country_year") or []
+    return stored
+
+
 def topic_country_years(topic_id: str | None = None, country: str | None = None,
                         year: int | None = None,
                         limit: int = TOPIC_COUNTRY_YEAR_DEFAULT_LIMIT) -> list[dict]:
     """Rows of topic_id, topic_name, country_code, year, paper_count, fractional_count.
 
-    `limit` defaults to 1000 and is clamped to 1..10000.
+    `limit` defaults to 1000 and is clamped to 1..10000. Rows come from the
+    shared topic-country-year table (Postgres or SQLite); see ``_aggregate_rows``.
     """
-    rows = snapshot().get("topic_country_year") or []
+    rows = _aggregate_rows()
     if topic_id:
         rows = [r for r in rows if r.get("topic_id") == topic_id]
     if country:

@@ -17,7 +17,7 @@ from typing import Protocol
 
 import numpy as np
 
-from .paths import ml_data_dir
+from .paths import ml_data_dir, use_postgres
 
 # Shared JSON slots. Any kind matching the name pattern can be stored the same way.
 DOCUMENT_KINDS = (
@@ -276,14 +276,12 @@ class PgVectorStore:
 
 
 def get_store():
-    """Postgres + pgvector when DATABASE_URL is set, unless ML_VECTOR_BACKEND=local.
+    """Postgres + pgvector when ``use_postgres()`` is true, otherwise files.
 
-    ``ML_VECTOR_BACKEND=pgvector`` forces Postgres and needs ``DATABASE_URL``.
-    With neither set, embeddings and documents are files under ``ML_DATA_DIR``.
+    ``use_postgres`` (in ``ml.paths``) follows ``DATABASE_URL`` unless
+    ``ML_VECTOR_BACKEND`` forces ``local`` or ``pgvector``. With neither set,
+    embeddings and documents are files under ``ML_DATA_DIR``.
     """
-    backend = os.getenv("ML_VECTOR_BACKEND", "").strip().lower()
-    if backend == "local":
-        return LocalStore(ml_data_dir() / "vectors")
-    if backend == "pgvector" or os.getenv("DATABASE_URL"):
+    if use_postgres():
         return PgVectorStore()
     return LocalStore(ml_data_dir() / "vectors")

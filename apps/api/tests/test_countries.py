@@ -122,6 +122,47 @@ def test_topic_country_year_limit_clamped(monkeypatch):
     assert client.get("/api/v1/topic-country-years", params={"limit": "many"}).status_code == 422
 
 
+def test_topic_country_years_reads_postgres_store(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.invalid/db")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "pgvector")
+    stored = [{
+        "topic_id": "T9", "topic_name": "Graphs", "country_code": "CA",
+        "year": 2024, "paper_count": 2, "fractional_count": 1.0,
+    }]
+    monkeypatch.setattr("pipeline.aggregate_store.read_topic_country_year", lambda conn=None: stored)
+    monkeypatch.setattr(country_api, "snapshot", lambda: {"topic_country_year": []})
+    assert country_api.topic_country_years() == stored
+    client = TestClient(app)
+    assert client.get("/api/v1/topic-country-years").json() == stored
+
+
+def test_topic_country_years_prefers_sqlite_over_snapshot(monkeypatch, tmp_path):
+    from pipeline.country_stats import write_topic_country_year
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "local")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    db = tmp_path / "topic_country_year.sqlite"
+    row = {"topic_id": "T", "topic_name": "N", "country_code": "PK",
+           "year": 2024, "paper_count": 3, "fractional_count": 3.0}
+    write_topic_country_year([row], db)
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", str(db))
+    monkeypatch.setattr(country_api, "snapshot", lambda: {"topic_country_year": [{**row, "paper_count": 99}]})
+    assert country_api.topic_country_years() == [row]
+
+
+def test_postgres_read_failure_falls_back_to_snapshot(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.invalid/db")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "pgvector")
+    row = {"topic_id": "T", "topic_name": "N", "country_code": "PK",
+           "year": 2024, "paper_count": 1, "fractional_count": 1.0}
+
+    def boom(conn=None):
+        raise OSError("database unavailable")
+
+    monkeypatch.setattr("pipeline.aggregate_store.read_topic_country_year", boom)
+    monkeypatch.setattr(country_api, "snapshot", lambda: {"topic_country_year": [row]})
+    assert country_api.topic_country_years() == [row]
+
+
 def test_topic_country_years_endpoint(monkeypatch, tmp_path):
     client = _use(tmp_path, monkeypatch, [BASE])
     rows = client.get("/api/v1/topic-country-years").json()

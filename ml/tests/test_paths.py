@@ -31,6 +31,16 @@ def test_topic_country_year_db_is_root_anchored(monkeypatch, tmp_path):
     assert paths.topic_country_year_db() == tmp_path / "t.sqlite"
 
 
+def test_use_postgres_matches_get_store(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("ML_VECTOR_BACKEND", raising=False)
+    assert paths.use_postgres() is False
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.invalid/db")
+    assert paths.use_postgres() is True
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "local")
+    assert paths.use_postgres() is False
+
+
 def test_absolute_env_paths_are_kept(monkeypatch, tmp_path):
     monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
     monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "s.json"))
