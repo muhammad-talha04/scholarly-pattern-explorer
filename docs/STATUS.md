@@ -83,6 +83,8 @@ The web app on Vercel is live. With `NEXT_PUBLIC_API_URL` unset it serves the bu
 - Loaded 3000 real OpenAlex works (`primary_topic.subfield.id:subfields/1702`, articles since 2025-10-15) with `python -m pipeline.ingest --max-records 3000`, embedded with `ML_EMBEDDER=hash` (must match the API), plus the `galaxy` and `galaxy_state` documents from `python -m ml.cli index`.
 - `apps/api/requirements.txt` now includes `psycopg[binary]`; without it a `DATABASE_URL` makes the API fail on the first store call.
 - Render needs `DATABASE_URL` = the Supabase Session pooler string (port 5432, IPv4) for user `spe_api.obhzpotvdexzkaeheiun`. The value is never committed.
+- 2026-10-15 expansion: re-ran `python -m pipeline.ingest --first-lookback-days 730 --max-records 12000` (same AI subfield filter, articles since 2024-10-15), merged with the first batch for 14159 unique works, re-indexed with `ML_EMBEDDER=hash`, and upserted every row into `paper_embeddings` (no duplicates; keyed on `work_id`). `galaxy` (14159 nodes) and `galaxy_state` were rebuilt over the full set. Supabase database size went from 28 MB to 91 MB (free tier limit 500 MB).
+- Caps: `GALAXY_NODE_LIMIT` is unset by default, so `/galaxy` returns every stored node; set it on Render only if the 14k-node payload (about 4.7 MB) is too heavy for the client. `SEARCH_MAX_LIMIT` defaults to 100 hits per search and does not limit the corpus size.
 - Pattern and discovery snapshots are still files under `ML_DATA_DIR`, so on the free tier they are rebuilt or missing after a restart.
 
 ### API env vars (Render)
