@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 05:10 PKT by tom (ML row) and ami (integration tests row); earlier by michal, olli.
+Last updated: 2026-10-15 05:15 PKT by tom (ML row) and ami (integration tests row); earlier by michal, olli.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -40,8 +40,8 @@ Nothing is merged into main yet.
 - [ ] #1 (olli): ready for review, waiting for Prince to merge
 - [ ] #3 (grok): draft; fractional-counting change and STATUS entry not pushed yet, waiting on Prince's OK in 1:1
 - [ ] #2 (tom): draft. Merge after #1 and #3, because the branch already contains both (merged, not rebased).
-  - Done: `ml/` reads `data/works_v2.jsonl` and falls back to the old JSONL. Every contract route in `core.py` is now wired: search, papers, ask, related, patterns and runs go to `ml/`; `/countries`, `/countries/{code}` and `/countries/collaborations` (each with `counting=fractional|full`) go to `pipeline/country_api.py`. `CountryStats.papers` is now a float. Branch has the latest #1, #3 and michal's gap finder merged in. Tests pass: api 12, ml + pipeline 31, `test_fpgrowth`, `test_linkpred`. Ami's #4 integration tests run against this branch: 23 pass, all 7 countries/float xfails now XPASS (fixed), 2 xfails remain (pipeline side).
-  - Next: ami can drop the 7 fixed xfails in #4. Index the real `works_v2.jsonl` into pgvector, and make the ingest workflow run `python -m ml.cli index/update`. Grok's side: fractional collaboration counts (the route already takes `counting`; it serves `collaborations_<counting>` from the snapshot if present, else the existing list) and `topic_top_countries` as `[code, fractional_count]` pairs.
+  - Done: `ml/` reads `data/works_v2.jsonl` and falls back to the old JSONL. Every contract route is wired: search, papers, ask, related, patterns and runs go to `ml/`; `/countries`, `/countries/{code}` and `/countries/collaborations` go to `pipeline/country_api.py` and accept all three `counting` values (fractional, per_country, full). `CountryStats.papers` is a float. The latest #1, #3 and michal's gap finder are merged in. Tests pass: api 18, ml + pipeline 32, `test_fpgrowth`, `test_linkpred`. Ami's #4 run against this branch: 23 pass and all 9 strict xfails now XPASS, so all 9 known failures are fixed.
+  - Next: ami removes the 9 stale xfail markers in #4. Index the real `works_v2.jsonl` into pgvector, and make the ingest workflow run `python -m ml.cli index/update`.
   - Blockers: the real all-MiniLM-L6-v2 model and pgvector are untested. The tests use a lightweight offline embedder and a fake database connection. A live run needs a Supabase `DATABASE_URL`.
 - [ ] Front end (harry): not started on the shared base (`v2-rebuild` will not be merged); waiting on "start the front end" in 1:1
 - [ ] Ami - integration tests: draft PR #4 "Cross-PR integration tests" (`integration-tests`). Latest `ml-service`, `data-pipeline` (#3) and `platform-skeleton` (#1) are merged in.
