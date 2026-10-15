@@ -267,3 +267,38 @@ is CC0. Nothing in this repository redistributes their data — `data/` is
 gitignored and every database is rebuilt locally by the commands above.
 
 The code is MIT licensed; see [LICENSE](LICENSE).
+## ML service (`ml/`)
+
+A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
+
+| Feature | How |
+|---|---|
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU) |
+| Vector storage | `ML_VECTOR_BACKEND=pgvector` (Supabase, `DATABASE_URL`, HNSW cosine index) or local numpy files with optional FAISS (default) |
+| Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
+| Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite` |
+| Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences |
+| Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /api/v1/patterns`, `GET /api/v1/runs` |
+
+**Free LLM, optional.** Summaries and chat work offline with extractive methods
+(term-frequency sentence ranking and BM25-style evidence retrieval). To get
+generated answers, point `ML_LLM_URL` at any OpenAI-compatible endpoint you can
+use for free, such as a local Ollama (`http://localhost:11434/v1`, `ML_LLM_MODEL=llama3.2`)
+or a free-tier host (`ML_LLM_API_KEY`). If that call fails, the service falls back
+to the extractive methods.
+
+**Incremental mining.** Each sliding window stores a compressed basket multiset
+(`{topic set: count}`) next to its patterns. A run skips papers it has already seen.
+Papers without topics can be assigned to existing topics by embedding similarity
+to the topic centroids. Only the windows that receive new papers are re-mined, using
+the repo's own `fpgrowth.py` on the weighted multiset. The result is exactly what a
+full recompute would give (a test checks this), but the raw corpus is never
+rescanned. Every run writes `data/ml/patterns/snapshots/YYYY-MM-DD.json` for the
+progress timeline.
+
+```bash
+pip install -r ml/requirements.txt
+python -m ml.cli index      # embeds data/works_v2.jsonl (falls back to data/works.jsonl)
+(cd apps/api && uvicorn app.main:app --reload)      # API routes are in apps/api/app/routers/core.py
+ML_EMBEDDER=hash python -m pytest ml -q             # offline tests, no model download
+```

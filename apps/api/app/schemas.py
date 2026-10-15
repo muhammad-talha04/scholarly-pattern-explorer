@@ -44,12 +44,17 @@ class Pattern(BaseModel):
     support: float
     window_start: int
     window_end: int
+    # Optional, filled only for trend=gap (research-gap finder, ml/gaps.py).
+    gap_score: float | None = None
+    growth_rate: float | None = None
+    paper_count: int | None = None
+    top_countries: list[str] | None = None
 
 
 class CountryStats(BaseModel):
     code: str
     name: str
-    papers: int
+    papers: float  # fractional counts by default
     growth_pct: float | None = None
     top_topics: list[str] = []
     counting: CountingMethod = "fractional"
