@@ -64,10 +64,35 @@ def test_paper_detail_summary_and_ask(client):
     assert client.post("/api/v1/papers/NOPE/ask", json={"question": "x"}).status_code == 404
 
 
+def test_galaxy_layout(client):
+    rows = client.get("/api/v1/galaxy").json()
+    assert {r["id"] for r in rows} == {"W1", "W2", "W3"}
+    for row in rows:
+        assert set(row) == {"id", "x", "y", "z", "cluster_id", "cluster_label", "year"}
+        assert isinstance(row["cluster_id"], int) and row["cluster_label"]
+        assert isinstance(row["x"], float) and isinstance(row["y"], float) and isinstance(row["z"], float)
+    assert {r["id"]: r["year"] for r in rows} == {"W1": 2021, "W2": 2023, "W3": 2020}
+    assert client.get("/api/v1/galaxy").json() == rows
+
+
 def test_related(client):
     r = client.get("/api/v1/papers/W1/related").json()
     assert r[0]["id"] == "W2" and all(x["id"] != "W1" for x in r)
     assert client.get("/api/v1/papers/NOPE/related").status_code == 404
+
+
+def test_similar(client):
+    r = client.get("/api/v1/papers/W1/similar", params={"limit": 1})
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) == 1 and body[0]["id"] == "W2"
+    assert body[0]["score"] > 0
+    full = client.get("/api/v1/papers/W1/similar").json()
+    assert full[0]["id"] == "W2"
+    assert all(x["id"] != "W1" for x in full)
+    scores = [x["score"] for x in full]
+    assert scores == sorted(scores, reverse=True)
+    assert client.get("/api/v1/papers/NOPE/similar").status_code == 404
 
 
 def test_patterns_runs_and_gap_hook(client, monkeypatch):
@@ -92,3 +117,49 @@ def test_patterns_gap(client, monkeypatch):
     assert [p["items"] for p in body] == [["QML"]]
     assert body[0]["paper_count"] == 90 and body[0]["top_countries"] == ["CA"]
     assert body[0]["growth_rate"] > 0.5
+    assert "QML" in body[0]["explanation"]
+
+
+def test_patterns_gap_includes_embedding_gaps(client, monkeypatch):
+    monkeypatch.setattr(ml_bridge, "get_gaps", lambda limit=20: [{
+        "topic": "QML", "gap_score": 0.2, "growth_rate": 0.3, "paper_count": 40,
+        "top_countries": ["CA"], "window_start": 2022, "window_end": 2025}])
+    monkeypatch.setattr(ml_bridge, "get_semantic_gaps", lambda limit=10: [{
+        "kind": "cooccurrence", "items": ["Alpha", "Beta"], "topic": "Alpha + Beta",
+        "gap_score": 0.91, "paper_count": 1, "growth_rate": None,
+        "window_start": 2022, "window_end": 2025,
+        "explanation": "Alpha and Beta cover closely related subjects. 1 papers study them together.",
+        "example_papers": [{"id": "W9", "title": "A bridge paper", "year": 2024}]}])
+    body = client.get("/api/v1/patterns", params={"trend": "gap"}).json()
+    assert [p["items"] for p in body] == [["Alpha", "Beta"], ["QML"]]
+    assert body[0]["support"] == body[0]["gap_score"] == 0.91
+    assert body[0]["example_papers"][0]["id"] == "W9"
+    assert "Alpha" in body[0]["explanation"]
+
+
+def test_patterns_emerging_country_filter(client, tmp_path, monkeypatch):
+    import sqlite3
+    db = tmp_path / "topic_country_year.sqlite"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE topic_country_year (topic_id TEXT, topic_name TEXT, country_code TEXT, "
+                "year INTEGER, paper_count INTEGER, fractional_count REAL)")
+    con.execute("CREATE VIEW topic_country_year_v AS SELECT topic_id, topic_name, country_code, "
+                "year, paper_count, fractional_count FROM topic_country_year")
+    rows = []
+    for year, n in ((2022, 10), (2023, 20), (2024, 40), (2025, 80)):
+        rows.append(("grow", "Growing Lasers", "PK", year, n, float(n)))
+    for year in (2022, 2023, 2024, 2025):
+        rows.append(("flat", "Flat Graphs", "US", year, 40, 40.0))
+    con.executemany("INSERT INTO topic_country_year VALUES (?, ?, ?, ?, ?, ?)", rows)
+    con.commit()
+    con.close()
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", str(db))
+    monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "missing.json"))
+    pk = client.get("/api/v1/patterns", params={"trend": "emerging", "country": "pk"})
+    assert pk.status_code == 200
+    body = pk.json()
+    assert [p["items"] for p in body] == [["Growing Lasers"]]
+    assert body[0]["growth_rate"] > 0.5 and body[0]["support"] == body[0]["growth_rate"]
+    assert body[0]["paper_count"] == 150
+    assert "in PK" in body[0]["explanation"]
+    assert client.get("/api/v1/patterns", params={"trend": "emerging", "country": "US"}).json() == []

@@ -112,3 +112,18 @@ def find_gaps(topic_year_counts: dict, topic_top_countries: dict | None = None, 
                     "window_start": span[0], "window_end": span[-1]})
     out.sort(key=lambda x: (-x["gap_score"], -x["growth_rate"]))
     return out[:limit]
+
+
+def explain_growth_gap(gap: dict) -> str:
+    """Plain-language line for a fast-growing, still-small topic."""
+    topic = gap.get("topic") or "This topic"
+    rate = gap.get("growth_rate")
+    pace = f"{rate:.0%} a year" if isinstance(rate, (int, float)) else "year over year"
+    text = (
+        f"{topic} grew about {pace} from {gap.get('window_start')} to {gap.get('window_end')}. "
+        f"{gap.get('paper_count')} papers were published in that window, so the literature is still small."
+    )
+    countries = [c for c in (gap.get("top_countries") or []) if c]
+    if countries:
+        text += " The countries with the most papers are " + ", ".join(countries[:3]) + "."
+    return text

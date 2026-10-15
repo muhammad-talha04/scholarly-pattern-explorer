@@ -1,9 +1,15 @@
-"""Optional free LLM backend, with a zero-cost default of "no LLM".
+"""Optional local LLM, with a zero-cost default of "no LLM".
 
-Set ML_LLM_URL to any OpenAI-compatible chat endpoint you can use for free, e.g.
-  - a local Ollama:  ML_LLM_URL=http://localhost:11434/v1  ML_LLM_MODEL=llama3.2
-  - a free-tier hosted API (Groq / OpenRouter free models) with ML_LLM_API_KEY.
-If unset or the call fails, callers fall back to extractive methods.
+Set ML_LLM_URL to an OpenAI-compatible server running on this machine. No API
+key and no paid host:
+
+  ollama serve
+  ML_LLM_URL=http://127.0.0.1:11434/v1 ML_LLM_MODEL=llama3.2
+
+  llama-server -m model.gguf --port 8080
+  ML_LLM_URL=http://127.0.0.1:8080/v1 ML_LLM_MODEL=local
+
+If ML_LLM_URL is unset or the call fails, callers fall back to extractive methods.
 """
 from __future__ import annotations
 

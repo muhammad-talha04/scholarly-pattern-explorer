@@ -39,25 +39,54 @@ class AskResponse(BaseModel):
     sources: list[str] = []
 
 
+class ExamplePaper(BaseModel):
+    """A paper cited as an illustration on a gap or emerging-topic row."""
+    id: str
+    title: str = ""
+    year: int | None = None
+    score: float | None = None
+
+
 class Pattern(BaseModel):
     items: list[str]
     support: float
     window_start: int
     window_end: int
-    # Optional, filled only for trend=gap (research-gap finder, ml/gaps.py).
+    # Optional, filled for trend=gap and trend=emerging.
     gap_score: float | None = None
     growth_rate: float | None = None
     paper_count: int | None = None
     top_countries: list[str] | None = None
+    explanation: str | None = None
+    example_papers: list[ExamplePaper] | None = None
+
+
+class CountryYearCount(BaseModel):
+    year: int
+    paper_count: int
+    fractional_count: float
 
 
 class CountryStats(BaseModel):
     code: str
     name: str
-    papers: float  # fractional counts by default
+    papers: float  # value for `counting`; fractional counts are not integers
     growth_pct: float | None = None
     top_topics: list[str] = []
     counting: CountingMethod = "fractional"
+    paper_count: int = 0            # whole papers, every country on the paper counted once
+    fractional_count: float = 0     # sum of 1/N over distinct countries
+    by_year: list[CountryYearCount] = []
+
+
+class TopicCountryYear(BaseModel):
+    """One row of the topic × country × year aggregate."""
+    topic_id: str
+    topic_name: str
+    country_code: str
+    year: int
+    paper_count: int
+    fractional_count: float
 
 
 class Run(BaseModel):
@@ -73,3 +102,14 @@ class Collaboration(BaseModel):
     source: str   # ISO 3166 alpha-2
     target: str
     papers: float  # fractional or full, per the request's counting method
+
+
+class GalaxyPoint(BaseModel):
+    """One paper in the galaxy. (x, y) is the 2D layout; (x, y, z) is the 3D layout."""
+    id: str
+    x: float
+    y: float
+    z: float
+    cluster_id: int
+    cluster_label: str = ""
+    year: int | None = None

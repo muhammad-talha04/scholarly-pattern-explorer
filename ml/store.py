@@ -19,6 +19,7 @@ class VectorStore(Protocol):
     def search(self, query: np.ndarray, k: int = 10) -> list[tuple[str, float, dict]]: ...
     def get(self, work_id: str) -> dict | None: ...
     def vector(self, work_id: str): ...
+    def rows(self): ...
     def __len__(self) -> int: ...
 
 
@@ -33,14 +34,23 @@ class LocalStore:
         self.vecs = np.zeros((0, dim), dtype=np.float32)
         if self.path and (self.path / "vectors.npy").exists():
             self.vecs = np.load(self.path / "vectors.npy")
+            self.dim = int(self.vecs.shape[1])
             data = json.loads((self.path / "meta.json").read_text(encoding="utf-8"))
             self.ids, self.meta = data["ids"], data["meta"]
 
     def __len__(self):
         return len(self.ids)
 
+    def rows(self):
+        return list(self.ids), self.vecs, [self.meta.get(i, {}) for i in self.ids]
+
     def upsert(self, ids, vectors, meta):
         vectors = np.asarray(vectors, dtype=np.float32)
+        if vectors.ndim == 1:
+            vectors = vectors.reshape(1, -1)
+        if len(self.ids) == 0 and vectors.shape[1] != self.vecs.shape[1]:
+            self.dim = int(vectors.shape[1])
+            self.vecs = np.zeros((0, self.dim), dtype=np.float32)
         index = {w: i for i, w in enumerate(self.ids)}
         new_rows = []
         for wid, v, m in zip(ids, vectors, meta):
@@ -153,6 +163,19 @@ class PgVectorStore:
             cur.execute("SELECT embedding::text FROM paper_embeddings WHERE work_id = %s", (work_id,))
             row = cur.fetchone()
         return None if not row else np.array(json.loads(row[0]), dtype=np.float32)
+
+    def rows(self):
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT work_id, embedding::text, meta FROM paper_embeddings")
+            fetched = cur.fetchall()
+        if not fetched:
+            return [], np.zeros((0, 384), dtype=np.float32), []
+        ids, vecs, metas = [], [], []
+        for wid, emb, meta in fetched:
+            ids.append(wid)
+            vecs.append(np.array(json.loads(emb), dtype=np.float32))
+            metas.append(meta if isinstance(meta, dict) else json.loads(meta))
+        return ids, np.stack(vecs), metas
 
 
 def get_store():

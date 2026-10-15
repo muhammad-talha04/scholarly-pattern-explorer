@@ -8,6 +8,8 @@ sentence-transformers>=2.6     # all-MiniLM-L6-v2, runs on CPU
 # optional backends
 faiss-cpu                      # faster local search (numpy fallback if missing)
 psycopg[binary]>=3.1           # Supabase Postgres + pgvector
+# umap-learn                   # optional: UMAP + HDBSCAN clustering (k-means is the fallback)
+# hdbscan
 # tests
 pytest
 httpx

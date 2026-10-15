@@ -17,12 +17,21 @@ def test_inverted_index_and_links():
 
 def test_real_embedder_uses_minilm_mocked(monkeypatch):
     class Fake:
+        def __init__(self):
+            self.seen = []
         def encode(self, texts, **kw):
+            self.seen.append(list(texts))
             return np.ones((len(texts), 384))
     e = Embedder()
     assert "all-MiniLM-L6-v2" in e.model_name
     e._model = Fake()
     assert e.encode(["a", "b"]).shape == (2, 384)
+    assert e._model.seen == [["a", "b"]]
+    e5 = Embedder("intfloat/e5-small-v2")
+    e5._model = Fake()
+    e5.encode_queries(["hello"])
+    e5.encode_documents(["hello"])
+    assert e5._model.seen[-2:] == [["query: hello"], ["passage: hello"]]
 
 
 def test_local_store_persist_and_upsert(tmp_path):
@@ -33,6 +42,31 @@ def test_local_store_persist_and_upsert(tmp_path):
     s2 = LocalStore(tmp_path)
     assert len(s2) == 3 and s2.get("a") == {"t": 9}
     assert s2.search(v[1], 1)[0][0] == "b"
+
+
+def test_similar_orders_by_cosine(tmp_path):
+    store = LocalStore(tmp_path / "v", dim=4)
+    a = np.array([1, 0, 0, 0], dtype=np.float32)
+    b = np.array([0.9, 0.1, 0, 0], dtype=np.float32)
+    b /= np.linalg.norm(b)
+    c = np.array([0, 0, 1, 0], dtype=np.float32)
+
+    def meta(wid, title):
+        return {"work_id": wid, "title": title, "pub_year": 2024, "topics": [title],
+                "authors": [], "countries": [], "cited_by": 0, "abstract": "",
+                "doi": None, "original_url": None}
+
+    store.upsert(["A", "B", "C"], np.stack([a, b, c]),
+                 [meta("A", "Alpha"), meta("B", "Beta"), meta("C", "Gamma")])
+    from ml.embeddings import HashEmbedder
+    from ml.service import MLService, SummaryCache
+    svc = MLService(embedder=HashEmbedder(), store=store, cache=SummaryCache(":memory:"))
+    hits = svc.similar("A", k=2)
+    assert [h["work_id"] for h in hits] == ["B", "C"]
+    assert hits[0]["score"] > hits[1]["score"] >= 0
+    assert hits[0]["score"] > 0
+    assert all(h["work_id"] != "A" for h in hits)
+    assert svc.similar("missing") is None
 
 
 def test_search_ranks_relevant_paper_first(service):
@@ -90,3 +124,16 @@ def test_pgvector_store_sql_with_fake_conn():
     assert st.search(np.zeros(384), 5) == [("W1", 0.9, {"title": "x"})]
     assert any("CREATE EXTENSION IF NOT EXISTS vector" in q for q, _ in c.log)
     assert any("<=>" in q for q, _ in c.log)
+
+
+def test_pgvector_rows_parse_embeddings():
+    class Cur:
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def execute(self, sql, params=None): pass
+        def fetchall(self): return [("W1", "[0.0, 1.0]", {"title": "t", "pub_year": 2020})]
+        def fetchone(self): return None
+    class Conn:
+        def cursor(self): return Cur()
+    ids, vecs, metas = PgVectorStore(conn=Conn()).rows()
+    assert ids == ["W1"] and vecs.shape == (1, 2) and metas[0]["pub_year"] == 2020

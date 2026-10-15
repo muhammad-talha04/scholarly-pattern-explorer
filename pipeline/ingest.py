@@ -25,6 +25,25 @@ def abstract_from_index(inv: dict | None) -> str | None:
     return " ".join(pos[i] for i in sorted(pos)) or None
 
 
+def topic_refs(w: dict) -> list[dict]:
+    """One {id, name} per OpenAlex topic. Id is the short OpenAlex id when present."""
+    refs, seen = [], set()
+    for t in w.get("topics") or []:
+        if not isinstance(t, dict):
+            continue
+        name = t.get("display_name")
+        raw_id = t.get("id")
+        tid = raw_id.rsplit("/", 1)[-1] if isinstance(raw_id, str) and raw_id else None
+        if not tid and not name:
+            continue
+        key = tid or name
+        if key in seen:
+            continue
+        seen.add(key)
+        refs.append({"id": key, "name": name or key})
+    return refs
+
+
 def normalize(w: dict) -> dict:
     countries = sorted({c for a in w.get("authorships") or []
                         for c in (a.get("countries") or [])
@@ -44,6 +63,7 @@ def normalize(w: dict) -> dict:
         "authors": [n for a in w.get("authorships") or [] if (n := (a.get("author") or {}).get("display_name"))],
         "countries": countries,
         "topics": [t["display_name"] for t in w.get("topics") or [] if t.get("display_name")],
+        "topic_refs": topic_refs(w),
         "raw": w,  # kept so build_db.py / Tom's ml/ can read the original shape
     }
 

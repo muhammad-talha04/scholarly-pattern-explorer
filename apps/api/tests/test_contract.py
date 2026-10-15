@@ -17,6 +17,6 @@ def test_search_shape():
 def test_all_contract_routes_exist():
     paths = set(app.openapi()["paths"])
     for p in ["/search", "/papers/{paper_id}", "/papers/{paper_id}/ask",
-              "/papers/{paper_id}/related", "/patterns", "/countries",
-              "/countries/{code}", "/runs"]:
+              "/papers/{paper_id}/related", "/papers/{paper_id}/similar", "/patterns",
+              "/countries", "/countries/{code}", "/topic-country-years", "/runs", "/galaxy"]:
         assert "/api/v1" + p in paths
