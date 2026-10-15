@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .paths import REPO_ROOT, resolve
+
 
 def abstract_from_inverted_index(inv: dict | None) -> str:
     """OpenAlex ships abstracts as {word: [positions]}; rebuild the text."""
@@ -102,13 +104,14 @@ V2_PATH = "data/works_v2.jsonl"
 LEGACY_PATHS = ("data/works.jsonl", "data/works_sample.jsonl")
 
 
-def default_works_path(root: str | Path = ".") -> Path | None:
+def default_works_path(root: str | Path | None = None) -> Path | None:
     """ML_WORKS_PATH, else data/works_v2.jsonl, else the old JSONL files."""
     env = os.getenv("ML_WORKS_PATH")
     if env:
-        return Path(env)
+        return resolve(env)
+    root = REPO_ROOT if root is None else Path(root)
     for rel in (V2_PATH, *LEGACY_PATHS):
-        p = Path(root) / rel
+        p = root / rel
         if p.exists():
             return p
     return None

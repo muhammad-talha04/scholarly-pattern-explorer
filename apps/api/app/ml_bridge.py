@@ -12,12 +12,13 @@ if str(ROOT) not in sys.path:
 
 from ml.gaps import find_gaps, load_inputs  # noqa: E402
 from ml.incremental import IncrementalMiner  # noqa: E402
+from ml.paths import country_snapshot, ml_data_dir  # noqa: E402
 from ml.service import MLService  # noqa: E402
 from ml.text import sentences  # noqa: E402
 
 
 def data_dir() -> Path:
-    return Path(os.getenv("ML_DATA_DIR", str(ROOT / "data" / "ml")))
+    return ml_data_dir()
 
 
 @lru_cache(maxsize=1)
@@ -38,7 +39,7 @@ def one_line(summary: str | None) -> str | None:
 
 
 def snapshot_path() -> Path:
-    return Path(os.getenv("COUNTRY_SNAPSHOT", str(ROOT / "data" / "country_snapshot.json")))
+    return country_snapshot()
 
 
 def get_gaps(limit: int = 20) -> list[dict]:

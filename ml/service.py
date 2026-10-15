@@ -11,6 +11,7 @@ from pathlib import Path
 from .embeddings import get_embedder
 from .llm import chat_complete
 from .papers import Paper
+from .paths import ml_data_dir
 from .store import get_store
 from .text import best_sentences, extractive_summary
 
@@ -67,7 +68,7 @@ class MLService:
     def __init__(self, embedder=None, store=None, cache=None):
         self.embedder = embedder or get_embedder()
         self.store = store if store is not None else get_store()
-        data_dir = Path(os.getenv("ML_DATA_DIR", "data/ml"))
+        data_dir = ml_data_dir()
         self.cache = cache or SummaryCache(data_dir / "summaries.sqlite")
 
     # ---- 1. embeddings ----

@@ -4,7 +4,10 @@ import json, os
 from functools import lru_cache
 from pathlib import Path
 
-SNAPSHOT = Path(os.environ.get("COUNTRY_SNAPSHOT", "data/country_snapshot.json"))
+_ROOT = Path(__file__).resolve().parents[1]
+_env = Path(os.environ.get("COUNTRY_SNAPSHOT", "data/country_snapshot.json"))
+# Anchored to the repo root so the API finds the snapshot whatever its working directory.
+SNAPSHOT = _env if _env.is_absolute() else _ROOT / _env
 
 
 @lru_cache(maxsize=1)
