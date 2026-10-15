@@ -1,6 +1,5 @@
 /** Deterministic fixtures shaped exactly like apps/api/app/schemas.py. */
 import type { AskResponse, Collaboration, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchParams, SearchResponse, TopicCountryYear, TopicYearQuery } from "./types";
-import { buildTopicGraph } from "@/lib/graph";
 
 export const TOPICS = [
   "Large language models", "Graph neural networks", "Federated learning", "Climate modelling",
@@ -19,9 +18,19 @@ const COUNTRY_META: [string, string, number, number][] = [
 
 function rng(seed: number) { seed = (seed * 9301 + 49297) % 233280 + 1; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); }
 
-const PAPERS: PaperDetail[] = Array.from({ length: 24 }, (_, i) => {
+/** Papers past the original 42, spread across the four themes so each cluster stays populated. */
+const EXTRA_TOPICS = [
+  "Large language models", "Climate modelling", "Edge computing", "Privacy",
+  "Graph neural networks", "Protein folding", "Robotics", "Energy systems",
+  "Federated learning", "Quantum computing", "Computer vision", "Drug discovery",
+  "Explainable AI", "Climate modelling", "Robotics", "Privacy",
+  "Reinforcement learning", "Protein folding", "Edge computing", "Energy systems",
+  "Computer vision", "Quantum computing", "Robotics", "Privacy",
+];
+const PAPERS: PaperDetail[] = Array.from({ length: 66 }, (_, i) => {
   const r = rng(i + 7);
-  const t1 = TOPICS[i % TOPICS.length], t2 = TOPICS[(i * 5 + 3) % TOPICS.length];
+  const t1 = i < 42 ? TOPICS[i % TOPICS.length] : EXTRA_TOPICS[i - 42];
+  const t2 = TOPICS[(i * 5 + 3) % TOPICS.length];
   const c = [COUNTRY_META[i % COUNTRY_META.length][0], COUNTRY_META[(i * 3 + 1) % COUNTRY_META.length][0]];
   const id = `W${4100000000 + i * 7919}`;
   return {
@@ -93,6 +102,13 @@ export function patterns(window?: number): Pattern[] {
   }
   return window === undefined ? out : out.filter((p) => p.window_start === window);
 }
+export function emerging(): Pattern[] {
+  return ["Climate modelling", "Protein folding", "Quantum computing"].map((t, i) => ({
+    items: [t], support: 0.7 - i * 0.12, window_start: 2024, window_end: 2026,
+    growth_rate: 0.9 - i * 0.2, paper_count: 80 - i * 15,
+    top_countries: [["US", "GB"], ["DE", "CH"], ["CN", "JP"]][i],
+  }));
+}
 export function gaps(): Pattern[] {
   return ["Federated learning", "Edge computing", "Protein folding", "Energy systems"].map((t, i) => ({
     items: [t], support: 0.82 - i * 0.13, window_start: 2023, window_end: 2025,
@@ -121,24 +137,36 @@ export function collaborations(counting: Counting = "fractional"): Collaboration
   return COLLAB_BASE.map(([source, target, papers]) => ({ source, target, papers: Math.round(papers * scale * 10) / 10 }));
 }
 function slug(name: string) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
-const CLUSTERS = [
-  { id: "methods", name: "Methods" },
-  { id: "science", name: "Science" },
-  { id: "systems", name: "Systems" },
-  { id: "society", name: "Society" },
+const THEMES: { id: string; name: string; topics: string[] }[] = [
+  { id: "methods", name: "Methods", topics: ["Large language models", "Graph neural networks", "Federated learning", "Explainable AI", "Reinforcement learning", "Computer vision"] },
+  { id: "science", name: "Science", topics: ["Climate modelling", "Protein folding", "Quantum computing", "Drug discovery"] },
+  { id: "systems", name: "Systems", topics: ["Edge computing", "Robotics"] },
+  { id: "society", name: "Society", topics: ["Privacy", "Energy systems"] },
 ];
+function themeFor(topic: string) { return THEMES.find((t) => t.topics.includes(topic)) ?? THEMES[0]; }
+/** One dot per fixture paper. The cluster name is the topic group that colors it. */
 export function galaxy(): GalaxyGraph {
-  const graph = buildTopicGraph(patterns(), gaps());
   const golden = Math.PI * (3 - Math.sqrt(5));
-  const nodes = graph.nodes.map((n, i) => {
-    const r = 6 * Math.sqrt((i + 0.5) / graph.nodes.length), a = i * golden;
+  const nodes = PAPERS.map((p, i) => {
+    const theme = themeFor(p.topics[0]);
+    const r = 6 * Math.sqrt((i + 0.5) / PAPERS.length), a = i * golden;
     return {
-      topic_id: slug(n.id), topic_name: n.id,
+      topic_id: slug(p.topics[0]), topic_name: p.title,
       x: r * Math.cos(a), y: (((i * 7919) % 13) / 13 - 0.5) * 1.6, z: r * Math.sin(a),
-      cluster_id: CLUSTERS[i % CLUSTERS.length].id, support: n.support,
+      cluster_id: theme.id, color_index: THEMES.findIndex((t) => t.id === theme.id),
+      support: Math.round((0.15 + (p.cited_by % 70) / 100) * 100) / 100,
     };
   });
-  return { nodes, clusters: CLUSTERS, links: graph.links };
+  const links: GalaxyGraph["links"] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const mate = nodes.find((n, j) => j > i && n.cluster_id === nodes[i].cluster_id);
+    if (mate) links.push({ source: nodes[i].topic_name, target: mate.topic_name, weight: 0.4 });
+  }
+  const clusters = THEMES.map(({ id, name }, i) => ({
+    id, name, color_index: i,
+    ...(id === "science" ? { emerging_score: 0.72 } : {}),
+  }));
+  return { nodes, clusters, links };
 }
 export function topicCountryYears(q: TopicYearQuery = {}): TopicCountryYear[] {
   const years = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];

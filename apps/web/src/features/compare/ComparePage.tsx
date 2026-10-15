@@ -15,7 +15,7 @@ export function ComparePage() {
     return (
       <div>
         <PageHeader title="Compare" subtitle="Two papers, field by field. Pin them from search." />
-        <EmptyState title="Pin two papers" body="Open Search, choose Compare on two results, then come back. The pair is remembered in this tab." action={<Link className="btn bg-sky-400/20" href="/search">Go to search</Link>} />
+        <EmptyState title="Pin two papers" body="Open Search, choose Compare on two results, then come back. The pair is remembered in this tab." action={<Link className="btn bg-accent/20" href="/search">Go to search</Link>} />
       </div>
     );
   }
@@ -37,8 +37,8 @@ export function ComparePage() {
         {[left.data, right.data].map((p) => (
           <article key={p.id} className="glass p-4">
             <h2 className="font-display text-2xl leading-snug text-white">{p.title}</h2>
-            <a className="mt-2 inline-block text-sm text-sky-200 underline-offset-2 hover:underline" href={`/search?paper=${encodeURIComponent(p.id)}&q=${encodeURIComponent(p.topics[0] ?? p.title)}`}>Open in search</a>
-            {p.original_url && <a className="ml-3 text-sm text-sky-200 underline-offset-2 hover:underline" href={p.original_url} target="_blank" rel="noopener noreferrer">Original</a>}
+            <a className="mt-2 inline-block text-sm text-accent underline-offset-2 hover:underline" href={`/search?paper=${encodeURIComponent(p.id)}&q=${encodeURIComponent(p.topics[0] ?? p.title)}`}>Open in search</a>
+            {p.original_url && <a className="ml-3 text-sm text-accent underline-offset-2 hover:underline" href={p.original_url} target="_blank" rel="noopener noreferrer">Original</a>}
           </article>
         ))}
       </div>
@@ -63,5 +63,5 @@ export function ComparePage() {
 function Topics({ mine, other }: { mine: string[]; other: string[] }) {
   const only = new Set(mine.filter((t) => !other.includes(t)));
   if (!mine.length) return <>—</>;
-  return <span className="flex flex-wrap gap-1">{mine.map((t) => <span key={t} className={`chip ${only.has(t) ? "border-pink-300/50 text-pink-100" : ""}`}>{t}</span>)}</span>;
+  return <span className="flex flex-wrap gap-1">{mine.map((t) => <span key={t} className={`chip ${only.has(t) ? "border-gap/50 text-gap" : ""}`}>{t}</span>)}</span>;
 }

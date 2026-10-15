@@ -15,7 +15,7 @@ export function CollectionsPage() {
     <div>
       <PageHeader title="Saved" subtitle="Collections live in this browser only. Clearing site data removes them." />
       {collections.length === 0 ? (
-        <EmptyState title="Nothing saved yet" body="Open a paper and choose Save to collection. A reading list is created the first time you save." action={<Link className="btn bg-sky-400/20" href="/search">Find a paper</Link>} />
+        <EmptyState title="Nothing saved yet" body="Open a paper and choose Save to collection. A reading list is created the first time you save." action={<Link className="btn bg-accent/20" href="/search">Find a paper</Link>} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {collections.map((c) => (
@@ -44,7 +44,7 @@ function SavedRow({ id, onOpen, onRemove }: { id: string; onOpen: (id: string) =
   const title = (p.data as PaperDetail | undefined)?.title ?? id;
   return (
     <li className="flex items-center gap-2 rounded-xl bg-white/5 px-2 py-1.5">
-      <button className="min-w-0 flex-1 truncate text-left text-sm hover:text-sky-200" onClick={() => onOpen(id)}>{title}</button>
+      <button className="min-w-0 flex-1 truncate text-left text-sm hover:text-accent" onClick={() => onOpen(id)}>{title}</button>
       <button className="chip shrink-0 hover:text-white" onClick={onRemove} aria-label={`Remove ${title}`}>Remove</button>
     </li>
   );

@@ -47,12 +47,12 @@ export function CountriesPage() {
           <label className="flex min-w-[12rem] flex-1 items-center gap-3 text-sm text-mist">
             <span className="shrink-0">{year === "all" ? "Every year" : year}</span>
             <input type="range" aria-label="Year" min={range[0]} max={range[1]} disabled={year === "all"} value={year === "all" ? range[1] : year}
-              onChange={(e) => setYear(Number(e.target.value))} className="w-full accent-sky-300 disabled:opacity-40" />
+              onChange={(e) => setYear(Number(e.target.value))} className="w-full accent-accent disabled:opacity-40" />
           </label>
         </div>
       )}
       {!yearlyReady && tcy.source === "mock" && !prefersFixtures() && (
-        <p className="mb-3 text-xs text-amber-200">The topic × country × year table is not on this API yet, so the year slider stays off. Country bars use the live /countries route.</p>
+        <p className="mb-3 text-xs text-accent">The topic × country × year table is not on this API yet, so the year slider stays off. Country bars use the live /countries route.</p>
       )}
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="glass relative h-[420px] overflow-hidden sm:h-[560px]">
@@ -86,7 +86,7 @@ function CountryTable({ list, sel, onSelect, fmt }: { list: CountryStats[]; sel:
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-ink/90 text-left text-xs uppercase text-mist"><tr><th className="p-2">Country</th><th className="p-2 text-right">Papers</th><th className="p-2 text-right">Growth</th></tr></thead>
         <tbody>{list.map((c) => (
-          <tr key={c.code} className={sel === c.code ? "bg-pink-400/10" : ""}>
+          <tr key={c.code} className={sel === c.code ? "bg-gap/10" : ""}>
             <td className="p-0"><button className="w-full px-2 py-2 text-left hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => onSelect(c.code)} aria-pressed={sel === c.code}>{c.name}<div className="text-xs text-slate-400">{c.top_topics.slice(0, 2).join(" · ")}</div></button></td>
             <td className="p-2 text-right tabular-nums">{fmt(c.papers)}</td>
             <td className="p-2 text-right"><Growth v={c.growth_pct} /></td>
@@ -98,5 +98,5 @@ function CountryTable({ list, sel, onSelect, fmt }: { list: CountryStats[]; sel:
 
 function Growth({ v }: { v: number | null }) {
   if (v == null) return <span className="text-slate-400">n/a</span>;
-  return <span className={v >= 0 ? "text-emerald-300" : "text-rose-300"}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>;
+  return <span className={v >= 0 ? "text-up" : "text-down"}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>;
 }

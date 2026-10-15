@@ -53,6 +53,16 @@ describe("normalizeGalaxy", () => {
     ]);
   });
 
+  it("keeps optional color_index and emerging_score when /galaxy sends them", () => {
+    const graph = normalizeGalaxy({
+      nodes: [{ ...GRAPH.nodes[0], color_index: 2 }],
+      clusters: [{ id: "methods", name: "Methods", color_index: 2, emerging_score: 1.4 }],
+      links: [],
+    });
+    expect(graph.nodes[0].color_index).toBe(2);
+    expect(graph.clusters[0]).toEqual({ id: "methods", name: "Methods", color_index: 2, emerging_score: 1 });
+  });
+
   it("returns an empty graph for an unexpected body and does not throw", () => {
     for (const raw of [null, undefined, "nope", 3, {}, { nodes: "nope" }, { points: FLAT }]) {
       expect(normalizeGalaxy(raw)).toEqual({ nodes: [], clusters: [], links: [] });

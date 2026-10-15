@@ -17,5 +17,5 @@ vi.mock("@/lib/api/client", () => ({
 it("an un-normalized galaxy list shows the empty state instead of throwing", async () => {
   const { GalaxyHero } = await import("@/features/galaxy/GalaxyHero");
   render(<GalaxyHero />);
-  expect(await screen.findByTestId("galaxy-empty")).toHaveTextContent(/No topics in this snapshot/);
+  expect(await screen.findByTestId("galaxy-empty")).toHaveTextContent(/No papers in this snapshot/);
 });

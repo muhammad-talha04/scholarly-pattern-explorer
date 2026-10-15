@@ -1,59 +1,245 @@
 "use client";
-import { useMemo, useState } from "react";
-import type { TopicLink, TopicNode } from "@/lib/graph";
-import { linkPairs, positionNodes, type Positioned } from "./layout";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { TopicLink } from "@/lib/graph";
+import { gap as gapColor, ink } from "@/lib/theme";
+import { breathAmount, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
 
-const PALETTE = ["#7dd3fc", "#c4b5fd", "#6ee7b7", "#fcd34d", "#fb923c", "#f9a8d4"];
-function colorFor(n: { id: string; cluster?: string; gap: boolean }, showGaps: boolean) {
-  if (showGaps && n.gap) return "#f9a8d4";
-  const key = n.cluster ?? n.id;
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h + key.charCodeAt(i) * 13) % PALETTE.length;
-  return PALETTE[h];
-}
+type Frame = {
+  time: number;
+  motion: number;
+  unit: number;
+  shift: number;
+  ox: number;
+  oy: number;
+  rx: number;
+  ry: number;
+  rz: number;
+};
 
-/** Flat drawing for reduced motion, low power, or no WebGL. */
-export function Galaxy2D({ nodes, links, showGaps, focus, onFocus, onPick }: {
-  nodes: (TopicNode & { pos?: [number, number, number] })[]; links: TopicLink[]; showGaps: boolean;
-  focus?: string | null; onFocus?: (id: string) => void; onPick?: (id: string) => void;
+/** Flat plexus. Same band, orbit, and breathing zoom as the 3D view, unless motion is reduced. */
+export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null, onFocus, onHighlight, onPick }: {
+  nodes: (Partial<Star> & Pick<Star, "id" | "support" | "gap">)[]; links: TopicLink[]; showGaps: boolean;
+  focus?: string | null; highlight?: Set<string> | null; pose?: PlexusPose;
+  onFocus?: (id: string) => void; onHighlight?: (cluster?: string) => void; onPick?: (id: string) => void;
 }) {
-  const placed = useMemo(() => (nodes.some((n) => n.pos) ? nodes as Positioned[] : positionNodes(nodes)), [nodes]);
-  const pairs = useMemo(() => linkPairs(placed, links), [placed, links]);
-  const maxS = Math.max(...nodes.map((n) => n.support), 0.01);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const net = useMemo(() => heroNetwork(nodes), [nodes]);
   const [hover, setHover] = useState<string | null>(null);
+  const hoverRef = useRef(hover);
+  const focusRef = useRef(focus);
+  const highlightRef = useRef(highlight);
+  const poseRef = useRef(pose);
+  const reduceRef = useRef(false);
+  const frameRef = useRef<Frame>({ time: 0, motion: 0, unit: 1, shift: 0, ox: 0, oy: 0, rx: 0, ry: 0, rz: 0 });
+  hoverRef.current = hover;
+  focusRef.current = focus;
+  highlightRef.current = highlight;
+  poseRef.current = pose;
   const activeId = hover ?? focus ?? null;
-  const active = placed.find((n) => n.id === activeId);
-  const X = (v: number) => 400 + v * 55, Y = (v: number) => 280 + v * 36;
+  const active = net.nodes.find((n) => n.paper && n.id === activeId);
+  const near = useMemo(() => {
+    if (!hover) return new Set<string>();
+    const ids = neighborIds(hover, networkLinks(net.edges));
+    for (const id of neighborIds(hover, links)) ids.add(id);
+    return ids;
+  }, [hover, net.edges, links]);
+  const nearRef = useRef(near);
+  nearRef.current = near;
+
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    const apply = () => { reduceRef.current = mq.matches; };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent || typeof ResizeObserver === "undefined") return;
+    let raf = 0;
+    let time = 0;
+    let last = performance.now();
+    const draw = () => {
+      const rect = parent.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      let ctx: CanvasRenderingContext2D | null = null;
+      try { ctx = canvas.getContext("2d"); } catch { ctx = null; }
+      if (!ctx) return;
+      const pinned = poseRef.current === "in" ? 1 : poseRef.current === "out" ? 0 : null;
+      const still = reduceRef.current || pinned != null;
+      const breath = reduceRef.current ? 0 : (pinned ?? breathAmount(time));
+      const motion = still ? 0 : 1;
+      const base = Math.min(w, h) / 18.5;
+      const unit = base * zoomScale(breath);
+      const wide = w >= WIDE_CANVAS;
+      const frame: Frame = {
+        time,
+        motion,
+        unit,
+        shift: wide ? REST_SHIFT * (1 - breath) * unit : 0,
+        ox: w * 0.5,
+        oy: h * 0.52,
+        rx: still ? 0 : Math.sin(time * ROCK_X_HZ + 0.7) * 0.045,
+        ry: still ? 0 : time * ORBIT_SPEED,
+        rz: still ? 0 : Math.sin(time * ROCK_Z_HZ + 1.4) * 0.03,
+      };
+      frameRef.current = frame;
+      const project = (pos: [number, number, number], phase: number) => {
+        const d = plexusDrift(phase, frame.time, frame.motion);
+        const [x, z] = spinPoint(pos[0] + d[0], pos[1] + d[1], pos[2] + d[2], frame.rx, frame.ry, frame.rz);
+        return [frame.ox + x * frame.unit + frame.shift, frame.oy + z * frame.unit] as [number, number];
+      };
+      const hoverId = hoverRef.current;
+      const focusId = focusRef.current;
+      const lit = highlightRef.current;
+      const nearIds = nearRef.current;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = ink;
+      ctx.fillRect(0, 0, w, h);
+      const hub = project(net.hub, 0);
+      const washR = unit * 4.2;
+      const wash = ctx.createRadialGradient(hub[0], hub[1], 0, hub[0], hub[1], washR);
+      wash.addColorStop(0, "rgba(245, 165, 74, 0.20)");
+      wash.addColorStop(0.45, "rgba(253, 231, 176, 0.06)");
+      wash.addColorStop(1, "rgba(245, 165, 74, 0)");
+      ctx.fillStyle = wash;
+      ctx.beginPath();
+      ctx.arc(hub[0], hub[1], washR, 0, Math.PI * 2);
+      ctx.fill();
+      const tintAt = new Map(net.nodes.map((n) => [n.id, n.t]));
+      const phaseAt = new Map(net.nodes.map((n) => [n.id, n.phase]));
+      for (const edge of net.edges) {
+        const [x1, y1] = project(edge.a, phaseAt.get(edge.source) ?? 0);
+        const [x2, y2] = project(edge.b, phaseAt.get(edge.target) ?? 0);
+        const hot = edge.source === hoverId || edge.target === hoverId || nearIds.has(edge.source) || nearIds.has(edge.target);
+        ctx.strokeStyle = hexAlpha(plexusTint(tintAt.get(edge.source) ?? 0.5), hot ? Math.min(0.85, edge.alpha * 2.2) : edge.alpha);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+      for (const node of net.nodes) {
+        const [x, y] = project(node.pos, node.phase);
+        const hot = node.id === hoverId || node.id === focusId || nearIds.has(node.id) || lit?.has(node.id);
+        const tint = plexusTint(node.t);
+        const core = showGaps && node.gap ? gapColor : plexusCore(node.t);
+        ctx.globalAlpha = Math.min(1, node.fade * (hot ? 1 : 0.92));
+        ctx.fillStyle = hexAlpha(tint, 0.28);
+        ctx.beginPath();
+        ctx.arc(x, y, hot ? 4.2 : 3.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.arc(x, y, hot ? 2.1 : 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    };
+    const tick = (now: number) => {
+      const poseNow = poseRef.current;
+      const still = reduceRef.current || poseNow != null;
+      if (!document.hidden && !still) time += Math.min(0.05, (now - last) / 1000);
+      last = now;
+      draw();
+      raf = requestAnimationFrame(tick);
+    };
+    draw();
+    raf = requestAnimationFrame(tick);
+    const observer = new ResizeObserver(draw);
+    observer.observe(parent);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [net, showGaps]);
+
+  const pick = (ev: { clientX: number; clientY: number }) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const frame = frameRef.current;
+    const px = ev.clientX - rect.left;
+    const py = ev.clientY - rect.top;
+    let best: string | null = null;
+    let bestD = 12 * 12;
+    for (const node of net.nodes) {
+      const d = plexusDrift(node.phase, frame.time, frame.motion);
+      const [x, z] = spinPoint(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2], frame.rx, frame.ry, frame.rz);
+      const sx = frame.ox + x * frame.unit + frame.shift;
+      const sy = frame.oy + z * frame.unit;
+      const dd = (sx - px) ** 2 + (sy - py) ** 2;
+      if (dd < bestD) { bestD = dd; best = node.id; }
+    }
+    return best;
+  };
+
   return (
     <div className="relative h-full w-full">
-      <svg viewBox="0 0 800 560" className="h-full w-full" role="img" aria-label="Topic galaxy, flat drawing">
-        {pairs.map(({ a, b, w }, i) => <line key={i} x1={X(a.pos[0])} y1={Y(a.pos[2])} x2={X(b.pos[0])} y2={Y(b.pos[2])} stroke="#7dd3fc" strokeOpacity={0.28} strokeWidth={0.6 + w * 7} />)}
-        {placed.map((n) => {
-          const r = 6 + 16 * Math.sqrt(n.support / maxS);
-          const gap = showGaps && n.gap;
-          return (
-            <g key={n.id} className="cursor-pointer" data-testid={gap ? "gap-node" : "topic-node"}
-              onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover((h) => (h === n.id ? null : h))}
-              onClick={() => onFocus?.(n.id)}>
-              {gap && <circle cx={X(n.pos[0])} cy={Y(n.pos[2])} r={r * 1.8} fill="#f9a8d4" opacity={0.16} />}
-              <circle cx={X(n.pos[0])} cy={Y(n.pos[2])} r={r} fill={colorFor(n, showGaps)} opacity={0.95} />
-            </g>
-          );
-        })}
-      </svg>
+      <canvas
+        ref={canvasRef}
+        className="h-full w-full"
+        role="img"
+        aria-label="Paper plexus. Color runs from copper at the lower left to pale gold at the upper right."
+        onPointerMove={(ev) => setHover(pick(ev))}
+        onPointerLeave={() => setHover(null)}
+        onClick={(ev) => {
+          const id = pick(ev);
+          const node = net.nodes.find((n) => n.id === id);
+          if (!node?.paper) return;
+          onFocus?.(node.id);
+          if (node.gap) onHighlight?.(node.cluster);
+        }}
+      />
       <ul className="sr-only">
-        {placed.map((n) => (
-          <li key={n.id}><button onClick={() => { onFocus?.(n.id); onPick?.(n.id); }}>{n.id}{showGaps && n.gap ? ", research gap" : ""}</button></li>
+        {net.nodes.filter((n) => n.paper).map((n) => (
+          <li key={n.id}>
+            <button data-testid={showGaps && n.gap ? "gap-node" : "topic-node"} onClick={() => { onFocus?.(n.id); onPick?.(n.id); }}>
+              {n.id}, paper{n.cluster ? `, topic cluster ${n.cluster}` : ""}{showGaps && n.gap ? ", research gap" : ""}
+            </button>
+          </li>
         ))}
       </ul>
       {active && (
         <div className="glass absolute left-3 top-24 z-10 w-52 p-3 text-xs sm:left-auto sm:right-4" role="tooltip">
           <p className="font-medium text-white">{active.id}</p>
-          <p className="mt-1 text-mist">Support {active.support.toFixed(2)}{active.cluster ? ` · ${active.cluster}` : ""}</p>
-          {showGaps && active.gap && <p className="text-pink-200">Research gap</p>}
-          <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(active.id)}>Search this topic</button>
+          <p className="mt-1 text-mist">Paper{active.cluster ? ` · topic cluster ${active.cluster}` : ""}</p>
+          {showGaps && active.gap && <p className="text-gap">Research gap</p>}
+          <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(active.id)}>Search this paper</button>
         </div>
       )}
     </div>
   );
+}
+
+/** Three.js XYZ euler: Rx, then Ry, then Rz. Returns screen-facing x and z. */
+function spinPoint(x: number, y: number, z: number, rx: number, ry: number, rz: number): [number, number] {
+  const cx = Math.cos(rx);
+  const sx = Math.sin(rx);
+  const y1 = y * cx - z * sx;
+  const z1 = y * sx + z * cx;
+  const cy = Math.cos(ry);
+  const sy = Math.sin(ry);
+  const x2 = x * cy + z1 * sy;
+  const z2 = -x * sy + z1 * cy;
+  const cz = Math.cos(rz);
+  const sz = Math.sin(rz);
+  return [x2 * cz - y1 * sz, z2];
+}
+
+function hexAlpha(hex: string, alpha: number) {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

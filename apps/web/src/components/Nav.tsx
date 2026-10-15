@@ -33,8 +33,8 @@ export function Nav() {
             const active = href === "/" ? path === "/" : path.startsWith(href);
             return (
               <Link key={href} href={href} data-tour={href === "/collections" ? "saved" : undefined} aria-current={active ? "page" : undefined}
-                className="relative rounded-lg px-2.5 py-1.5 text-sm text-mist hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                {active && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-white/10" transition={{ type: "spring", bounce: 0.18, duration: 0.45 }} />}
+                className={`relative rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${active ? "text-accent" : "text-mist hover:text-white"}`}>
+                {active && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-lg bg-accent/20" transition={{ type: "spring", bounce: 0.18, duration: 0.45 }} />}
                 <span className="relative">{label}</span>
               </Link>
             );
@@ -57,7 +57,7 @@ export function Nav() {
             const active = href === "/" ? path === "/" : path.startsWith(href);
             return (
               <Link key={href} href={href} onClick={close} aria-current={active ? "page" : undefined}
-                className={`block rounded-xl px-3 py-2.5 text-sm ${active ? "bg-white/10 text-white" : "text-mist hover:bg-white/5 hover:text-white"}`}>
+                className={`block rounded-xl px-3 py-2.5 text-sm ${active ? "bg-accent/20 text-accent" : "text-mist hover:bg-white/5 hover:text-white"}`}>
                 {label}
               </Link>
             );

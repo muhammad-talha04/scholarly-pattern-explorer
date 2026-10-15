@@ -76,8 +76,15 @@ export interface TopicCountryYear {
   fractional_count: number;
 }
 
-export interface GalaxyCluster { id: string; name: string }
-/** A topic placed in 3D, plus the cluster it belongs to (GET /galaxy). */
+export interface GalaxyCluster {
+  id: string;
+  name: string;
+  /** Optional 0-based swatch. Missing means the client derives one from the id. */
+  color_index?: number;
+  /** Optional 0–1 warmth from /galaxy. Missing means the cluster does not glow warmer. */
+  emerging_score?: number;
+}
+/** One paper in the galaxy. `topic_name` is the label; `cluster_id` is its topic cluster. */
 export interface GalaxyPoint {
   topic_id: string;
   topic_name: string;
@@ -86,6 +93,7 @@ export interface GalaxyPoint {
   z: number;
   cluster_id: string;
   support: number;
+  color_index?: number;
 }
 export interface GalaxyGraph {
   nodes: GalaxyPoint[];

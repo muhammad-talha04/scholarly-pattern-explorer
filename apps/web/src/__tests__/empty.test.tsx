@@ -13,6 +13,6 @@ vi.mock("@/lib/api/client", () => ({
 it("empty galaxy is a designed state, not a blank canvas", async () => {
   const { GalaxyHero } = await import("@/features/galaxy/GalaxyHero");
   render(<GalaxyHero />);
-  expect(await screen.findByTestId("galaxy-empty")).toHaveTextContent(/No topics in this snapshot/);
+  expect(await screen.findByTestId("galaxy-empty")).toHaveTextContent(/No papers in this snapshot/);
   expect(screen.getByRole("link", { name: /Search papers/ })).toBeInTheDocument();
 });
