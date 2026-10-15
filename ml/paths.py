@@ -13,10 +13,18 @@ def resolve(p: str | Path) -> Path:
     return p if p.is_absolute() else REPO_ROOT / p
 
 
-# Committed snapshots built from the live corpus (see docs/STATUS.md). Used only when
-# the env var is unset and the regular data/ file is missing, e.g. on a fresh deploy
+# Committed snapshots built from the live corpus (see docs/STATUS.md). Used only on
+# Render (or with SPE_DEPLOY_SNAPSHOTS=1) when the env var is unset and the regular data/ file is missing, e.g. on a fresh deploy
 # whose disk is ephemeral.
 DEPLOY_DATA = REPO_ROOT / "deploy" / "data"
+
+
+def _deploy_snapshots_enabled() -> bool:
+    """On by default on Render (it sets RENDER=true); SPE_DEPLOY_SNAPSHOTS=1/0 overrides."""
+    flag = os.getenv("SPE_DEPLOY_SNAPSHOTS")
+    if flag is not None:
+        return flag == "1"
+    return bool(os.getenv("RENDER"))
 
 
 def _with_fallback(env: str, default: str, deployed: Path) -> Path:
@@ -24,7 +32,7 @@ def _with_fallback(env: str, default: str, deployed: Path) -> Path:
     if raw:
         return resolve(raw)
     p = resolve(default)
-    if not p.exists() and deployed.exists() and os.getenv("SPE_DEPLOY_SNAPSHOTS", "1") != "0":
+    if not p.exists() and deployed.exists() and _deploy_snapshots_enabled():
         return deployed
     return p
 
