@@ -1,11 +1,13 @@
 """Read-side helpers for the /countries routes. core.py calls these."""
 from __future__ import annotations
-import json, os
+import json
 from functools import lru_cache
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parents[1]
-SNAPSHOT = Path(os.environ.get("COUNTRY_SNAPSHOT", _ROOT / "data" / "country_snapshot.json"))
+from ml.paths import country_snapshot
+
+# Anchored to the repo root (ml/paths.py). Absolute COUNTRY_SNAPSHOT values are kept.
+SNAPSHOT = country_snapshot()
 
 
 @lru_cache(maxsize=8)

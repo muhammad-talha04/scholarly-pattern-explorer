@@ -51,3 +51,7 @@ debug_api.py`
 # personal folders, never publish
 _old/
 _fixes_2026_09/
+
+# Search evaluation query set is source, not data.
+!eval/search_queries.jsonl
+eval/report.json

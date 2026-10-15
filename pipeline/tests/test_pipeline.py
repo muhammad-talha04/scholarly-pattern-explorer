@@ -198,6 +198,22 @@ def test_topic_country_year_updates_incrementally(tmp_path):
     assert json.loads(out.read_text())["topic_country_year"] == full
 
 
+def test_output_paths_anchor_to_repo_root(tmp_path, monkeypatch):
+    from ml.paths import REPO_ROOT
+    from pipeline.country_stats import output_paths
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("TOPIC_COUNTRY_YEAR_DB", raising=False)
+    out, table = output_paths("data/country_snapshot.json", None)
+    assert out == REPO_ROOT / "data" / "country_snapshot.json"
+    assert table == REPO_ROOT / "data" / "topic_country_year.sqlite"
+    out_abs, table_abs = output_paths(str(tmp_path / "snap.json"), None)
+    assert out_abs == tmp_path / "snap.json"
+    assert table_abs == tmp_path / "topic_country_year.sqlite"
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", "custom/t.sqlite")
+    _, table_env = output_paths(str(tmp_path / "snap.json"), None)
+    assert table_env == REPO_ROOT / "custom" / "t.sqlite"
+
+
 def test_aggregate_seeds_once_from_corpus(tmp_path):
     """An older snapshot has no topic-country-year counters; the corpus fills them once."""
     import pipeline.country_stats as cs

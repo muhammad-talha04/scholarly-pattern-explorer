@@ -11,12 +11,13 @@ Each run also refreshes the topic × country × year aggregate
 fractional_count) inside the snapshot and rewrites the SQLite table next to it.
 """
 from __future__ import annotations
-import argparse, json, sqlite3, sys
+import argparse, json, os, sqlite3, sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from countries import COUNTRIES  # noqa: E402  (existing ISO table in repo root)
+from ml.paths import resolve, topic_country_year_db  # noqa: E402
 
 KEYS = ("by_year", "frac", "topics", "topic_years", "topic_countries",
         "pairs_frac", "pairs_1n", "topic_names", "tcy_papers", "tcy_frac")
@@ -249,6 +250,23 @@ def snapshot(t: dict) -> dict:
     }
 
 
+def output_paths(out: str, table: str | None) -> tuple[Path, Path]:
+    """Snapshot JSON and the topic-country-year SQLite file.
+
+    Relative paths are anchored to the repo root (ml/paths.resolve), same as
+    COUNTRY_SNAPSHOT. An explicit absolute --out keeps the sqlite beside it
+    unless TOPIC_COUNTRY_YEAR_DB or --table says otherwise.
+    """
+    out_p = resolve(out)
+    if table:
+        table_p = resolve(table)
+    elif os.getenv("TOPIC_COUNTRY_YEAR_DB"):
+        table_p = topic_country_year_db()
+    else:
+        table_p = out_p.with_name("topic_country_year.sqlite")
+    return out_p, table_p
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--new", required=True, help="JSONL of works added this run")
@@ -257,23 +275,25 @@ def main(argv=None):
     ap.add_argument("--table", help="SQLite file for topic_country_year (default: beside --out)")
     ap.add_argument("--corpus", help="full works JSONL; read once if --prev has no topic-country-year counters")
     a = ap.parse_args(argv)
-    with open(a.new, encoding="utf-8") as fh:
+    new_path = resolve(a.new)
+    prev_path = resolve(a.prev) if a.prev else None
+    corpus_path = resolve(a.corpus) if a.corpus else None
+    with open(new_path, encoding="utf-8") as fh:
         new = tally(json.loads(l) for l in fh if l.strip())
-    prev = json.loads(Path(a.prev).read_text())["tally"] if a.prev and Path(a.prev).exists() else None
+    prev = json.loads(prev_path.read_text())["tally"] if prev_path and prev_path.exists() else None
     combined = combine(prev, new)
     # Snapshots written before this aggregate existed have country counters but no
     # topic × country × year cells. Seed those cells from the corpus once; later
     # runs only add --new on top of the stored counters.
-    if prev is not None and "tcy_papers" not in prev and a.corpus and Path(a.corpus).is_file():
-        with open(a.corpus, encoding="utf-8") as fh:
+    if prev is not None and "tcy_papers" not in prev and corpus_path and corpus_path.is_file():
+        with open(corpus_path, encoding="utf-8") as fh:
             seeded = tally(json.loads(l) for l in fh if l.strip())
         for key in ("topic_names", "tcy_papers", "tcy_frac"):
             combined[key] = seeded[key]
     snap = snapshot(combined)
-    out = Path(a.out)
+    out, table = output_paths(a.out, a.table)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(snap))
-    table = Path(a.table) if a.table else out.with_name("topic_country_year.sqlite")
     write_topic_country_year(snap["topic_country_year"], table)
     print(f"{len(snap['countries'])} countries, {len(snap['topic_year_counts'])} topics, "
           f"{len(snap['topic_country_year'])} topic-country-year rows")
