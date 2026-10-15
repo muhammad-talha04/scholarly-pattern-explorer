@@ -65,20 +65,28 @@ def _keep(meta: dict, country: str | None, year_from: int | None) -> bool:
 
 
 class MLService:
-    def __init__(self, embedder=None, store=None, cache=None):
+    def __init__(self, embedder=None, store=None, cache=None, galaxy_dir=None):
         self.embedder = embedder or get_embedder()
         self.store = store if store is not None else get_store()
         data_dir = ml_data_dir()
         self.cache = cache or SummaryCache(data_dir / "summaries.sqlite")
+        self.galaxy_dir = Path(galaxy_dir) if galaxy_dir is not None else data_dir / "galaxy"
 
     # ---- 1. embeddings ----
     def index_papers(self, papers: list[Paper], batch: int = 64) -> int:
         papers = [p for p in papers if p.text]
+        encode_docs = getattr(self.embedder, "encode_documents", None) or self.embedder.encode
         for i in range(0, len(papers), batch):
             chunk = papers[i:i + batch]
-            vecs = self.embedder.encode([p.text for p in chunk])
+            vecs = encode_docs([p.text for p in chunk])
             self.store.upsert([p.work_id for p in chunk], vecs, [p.to_dict() for p in chunk])
         return len(papers)
+
+    def galaxy(self, refit: bool = False) -> list[dict]:
+        """2D/3D layout plus cluster id and label for every indexed paper."""
+        from .galaxy import GalaxyMap
+        ids, vecs, metas = self.store.rows()
+        return GalaxyMap(self.galaxy_dir).sync(ids, vecs, metas, refit=refit)
 
     @staticmethod
     def links(meta: dict) -> dict:
@@ -92,7 +100,8 @@ class MLService:
                year_from: int | None = None) -> list[dict]:
         if len(self.store) == 0:          # nothing indexed: don't load the model
             return []
-        q = self.embedder.encode([query])[0]
+        encode_q = getattr(self.embedder, "encode_queries", None) or self.embedder.encode
+        q = encode_q([query])[0]
         filtered = bool(country or year_from)
         hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
         return [_hit(w, s, m) for w, s, m in hits if _keep(m, country, year_from)][:k]

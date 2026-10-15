@@ -21,15 +21,14 @@ def test_relative_paths_resolve_from_repo_root(monkeypatch, tmp_path):
     assert paths.ml_data_dir() == ROOT / "custom" / "ml"
 
 
-def test_topic_country_year_db_follows_snapshot(monkeypatch, tmp_path):
-    monkeypatch.delenv("TOPIC_COUNTRY_YEAR_DB", raising=False)
-    monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "snap.json"))
-    assert paths.topic_country_year_db() == tmp_path / "topic_country_year.sqlite"
+def test_topic_country_year_db_is_root_anchored(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", "custom/tcy.sqlite")
-    assert paths.topic_country_year_db() == paths.REPO_ROOT / "custom" / "tcy.sqlite"
-    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", str(tmp_path / "abs.sqlite"))
-    assert paths.topic_country_year_db() == tmp_path / "abs.sqlite"
+    monkeypatch.delenv("TOPIC_COUNTRY_YEAR_DB", raising=False)
+    assert paths.topic_country_year_db() == ROOT / "data" / "topic_country_year.sqlite"
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", "custom/t.sqlite")
+    assert paths.topic_country_year_db() == ROOT / "custom" / "t.sqlite"
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", str(tmp_path / "t.sqlite"))
+    assert paths.topic_country_year_db() == tmp_path / "t.sqlite"
 
 
 def test_absolute_env_paths_are_kept(monkeypatch, tmp_path):

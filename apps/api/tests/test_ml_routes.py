@@ -64,6 +64,17 @@ def test_paper_detail_summary_and_ask(client):
     assert client.post("/api/v1/papers/NOPE/ask", json={"question": "x"}).status_code == 404
 
 
+def test_galaxy_layout(client):
+    rows = client.get("/api/v1/galaxy").json()
+    assert {r["id"] for r in rows} == {"W1", "W2", "W3"}
+    for row in rows:
+        assert set(row) == {"id", "x", "y", "z", "cluster_id", "cluster_label", "year"}
+        assert isinstance(row["cluster_id"], int) and row["cluster_label"]
+        assert isinstance(row["x"], float) and isinstance(row["y"], float) and isinstance(row["z"], float)
+    assert {r["id"]: r["year"] for r in rows} == {"W1": 2021, "W2": 2023, "W3": 2020}
+    assert client.get("/api/v1/galaxy").json() == rows
+
+
 def test_related(client):
     r = client.get("/api/v1/papers/W1/related").json()
     assert r[0]["id"] == "W2" and all(x["id"] != "W1" for x in r)

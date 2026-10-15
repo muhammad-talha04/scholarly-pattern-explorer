@@ -22,11 +22,5 @@ def country_snapshot() -> Path:
 
 
 def topic_country_year_db() -> Path:
-    """SQLite aggregate from PR #6: topic_id, topic_name, country_code, year, paper_count, fractional_count.
-
-    Defaults to the file written beside the country snapshot (`data/topic_country_year.sqlite`).
-    """
-    env = os.getenv("TOPIC_COUNTRY_YEAR_DB")
-    if env:
-        return resolve(env)
-    return country_snapshot().with_name("topic_country_year.sqlite")
+    """SQLite aggregate written by pipeline/country_stats.py. Same anchoring as the snapshot."""
+    return resolve(os.getenv("TOPIC_COUNTRY_YEAR_DB", "data/topic_country_year.sqlite"))
