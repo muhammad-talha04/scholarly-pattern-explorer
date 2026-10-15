@@ -13,12 +13,29 @@ def resolve(p: str | Path) -> Path:
     return p if p.is_absolute() else REPO_ROOT / p
 
 
+# Committed snapshots built from the live corpus (see docs/STATUS.md). Used only when
+# the env var is unset and the regular data/ file is missing, e.g. on a fresh deploy
+# whose disk is ephemeral.
+DEPLOY_DATA = REPO_ROOT / "deploy" / "data"
+
+
+def _with_fallback(env: str, default: str, deployed: Path) -> Path:
+    raw = os.getenv(env)
+    if raw:
+        return resolve(raw)
+    p = resolve(default)
+    if not p.exists() and deployed.exists() and os.getenv("SPE_DEPLOY_SNAPSHOTS", "1") != "0":
+        return deployed
+    return p
+
+
 def ml_data_dir() -> Path:
-    return resolve(os.getenv("ML_DATA_DIR", "data/ml"))
+    return _with_fallback("ML_DATA_DIR", "data/ml", DEPLOY_DATA / "ml")
 
 
 def country_snapshot() -> Path:
-    return resolve(os.getenv("COUNTRY_SNAPSHOT", "data/country_snapshot.json"))
+    return _with_fallback("COUNTRY_SNAPSHOT", "data/country_snapshot.json",
+                          DEPLOY_DATA / "country_snapshot.json")
 
 
 def topic_country_year_db() -> Path:
