@@ -428,13 +428,16 @@ def test_incremental_pair_weights_equal_full(raw_batches, tmp_path):
     assert dict(inc["pairs"]) == dict(full["pairs"])
 
 
+PER_COUNTRY_BUG = pytest.mark.xfail(
+    reason="BUG (apps/api/app/routers/core.py collaborations(), tom): looks up snapshot key "
+           "'collaborations_per_country' but pipeline/country_stats writes 'collaborations_1n', then "
+           "falls back to country_api.collaborations(limit), passing limit as the counting arg, so "
+           "?counting=per_country serves fractional weights. Fix: call "
+           "country_api.collaborations(counting, limit)", strict=True)
+
+
 @pytest.mark.parametrize("counting", ["fractional", "full",
-    pytest.param("per_country", marks=pytest.mark.xfail(
-        reason="GAP: schemas.CountingMethod is Literal['fractional','full'] (#1), so "
-               "/countries/collaborations?counting=per_country is rejected with 422 although "
-               "pipeline/country_api.collaborations supports it (#3). Also core.py collaborations() looks up snapshot key "collaborations_per_country" "
-               "(snapshot writes collaborations_1n) and falls back to country_api.collaborations(limit), "
-               "passing limit as the counting arg, so it would silently serve fractional weights", strict=True))])
+                                      pytest.param("per_country", marks=PER_COUNTRY_BUG)])
 def test_api_collaborations_by_counting(client, country_snapshot, counting):
     r = client.get("/api/v1/countries/collaborations", params={"counting": counting})
     assert r.status_code == 200, r.text
