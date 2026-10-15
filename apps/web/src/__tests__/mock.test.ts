@@ -14,7 +14,7 @@ it("full counting >= fractional counting", () => {
 it("galaxy fixtures are papers in topic clusters", () => {
   const g = m.galaxy();
   expect(g.clusters.map((c) => c.name).sort()).toEqual(["Methods", "Science", "Society", "Systems"]);
-  expect(g.nodes).toHaveLength(52);
+  expect(g.nodes).toHaveLength(66);
   const byCluster = new Map<string, number>();
   for (const n of g.nodes) byCluster.set(n.cluster_id, (byCluster.get(n.cluster_id) ?? 0) + 1);
   expect(Math.min(...byCluster.values())).toBeGreaterThanOrEqual(8);

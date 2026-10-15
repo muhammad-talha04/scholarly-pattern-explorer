@@ -12,62 +12,112 @@ function papers(count: number) {
   }));
 }
 
-function bow(pts: { pos: [number, number, number] }[]) {
-  const a = pts[0].pos;
-  const b = pts[pts.length - 1].pos;
-  const mid = pts[Math.floor(pts.length / 2)].pos;
-  const dx = b[0] - a[0];
-  const dz = b[2] - a[2];
-  const len2 = dx * dx + dz * dz || 1;
-  const t = ((mid[0] - a[0]) * dx + (mid[2] - a[2]) * dz) / len2;
-  return Math.hypot(mid[0] - (a[0] + dx * t), mid[2] - (a[2] + dz * t));
+function hypot(a: [number, number, number], b: [number, number, number]) {
+  return Math.hypot(a[0] - b[0], a[2] - b[2]);
 }
 
-it("grows a curved filament web with hubs, junctions, and specks", () => {
-  const net = heroNetwork(papers(52));
-  expect(net.nodes).toHaveLength(52);
-  const hubs = net.nodes.filter((n) => n.role === "hub");
-  expect(hubs.length).toBeGreaterThanOrEqual(5);
-  expect(hubs.length).toBeLessThanOrEqual(7);
-  expect(hubs.filter((n) => n.hubRank === 0)).toHaveLength(1);
+it("lays papers out as a seeded neural web of small clusters", () => {
+  const net = heroNetwork(papers(66));
+  expect(net.nodes).toHaveLength(66);
   expect(net.nodes.some((n) => n.gap)).toBe(true);
+  expect("filaments" in net).toBe(false);
+
+  const groups = new Map<string, typeof net.nodes>();
+  for (const node of net.nodes) {
+    const list = groups.get(node.group) ?? [];
+    list.push(node);
+    groups.set(node.group, list);
+  }
+  expect(groups.size).toBeGreaterThanOrEqual(7);
+  expect(groups.size).toBeLessThanOrEqual(9);
+
   let min = Infinity;
   let maxR = 0;
   for (let i = 0; i < net.nodes.length; i++) {
     maxR = Math.max(maxR, Math.hypot(net.nodes[i].pos[0], net.nodes[i].pos[2]));
-    for (let j = i + 1; j < net.nodes.length; j++) {
-      min = Math.min(min, Math.hypot(net.nodes[i].pos[0] - net.nodes[j].pos[0], net.nodes[i].pos[2] - net.nodes[j].pos[2]));
-    }
+    for (let j = i + 1; j < net.nodes.length; j++) min = Math.min(min, hypot(net.nodes[i].pos, net.nodes[j].pos));
   }
-  expect(min).toBeGreaterThan(0.4);
-  expect(maxR).toBeLessThan(9.2);
-  let hubSpan = 0;
-  for (let i = 0; i < hubs.length; i++) {
-    for (let j = i + 1; j < hubs.length; j++) {
-      hubSpan = Math.max(hubSpan, Math.hypot(hubs[i].pos[0] - hubs[j].pos[0], hubs[i].pos[2] - hubs[j].pos[2]));
-    }
-  }
-  expect(hubSpan).toBeGreaterThan(8);
-  const bridges = net.filaments.filter((f) => f.kind === "bridge");
-  const branches = net.filaments.filter((f) => f.kind === "branch");
-  const longBranches = branches.filter((f) => {
-    let length = 0;
-    for (let i = 1; i < f.pts.length; i++) {
-      length += Math.hypot(f.pts[i].pos[0] - f.pts[i - 1].pos[0], f.pts[i].pos[2] - f.pts[i - 1].pos[2]);
-    }
-    return length > 3;
+  expect(min).toBeGreaterThan(0.7);
+  expect(maxR).toBeLessThan(8.5);
+
+  const centroids = [...groups.entries()].map(([id, members]) => {
+    const c = members.reduce((a, n) => [a[0] + n.pos[0], a[1] + n.pos[2]], [0, 0]);
+    return { id, c: [c[0] / members.length, c[1] / members.length] as [number, number] };
   });
-  expect(bridges.length).toBeGreaterThanOrEqual(5);
-  expect(branches.length).toBeGreaterThan(40);
-  expect(longBranches.length).toBeGreaterThan(12);
-  expect(bridges.filter((f) => bow(f.pts) > 0.2).length).toBeGreaterThan(bridges.length / 2);
-  expect(bridges.every((f) => f.pts[0].depth < 0.15 && f.pts[f.pts.length - 1].depth < 0.15)).toBe(true);
-  expect(bridges.every((f) => f.pts[Math.floor(f.pts.length / 2)].depth > 0.7)).toBe(true);
-  expect(net.specks.length).toBeGreaterThanOrEqual(280);
-  expect(net.specks.length).toBeLessThanOrEqual(800);
-  expect(net.specks.filter((s) => s.bright).length).toBeGreaterThan(20);
-  expect(net.filaments.some((f) => f.pts.some((p) => p.pulse > 0))).toBe(true);
-  expect(heroNetwork(papers(70)).nodes).toHaveLength(56);
+  let gap = Infinity;
+  for (let i = 0; i < centroids.length; i++) {
+    for (let j = i + 1; j < centroids.length; j++) {
+      gap = Math.min(gap, Math.hypot(centroids[i].c[0] - centroids[j].c[0], centroids[i].c[1] - centroids[j].c[1]));
+    }
+  }
+  expect(gap).toBeGreaterThan(2.2);
+
+  for (const members of groups.values()) {
+    expect(members.length).toBeGreaterThanOrEqual(5);
+    expect(members.length).toBeLessThanOrEqual(12);
+    expect(members.filter((n) => n.role === "secondary")).toHaveLength(1);
+    const ids = new Set(members.map((n) => n.id));
+    const local = net.edges.filter((e) => e.kind === "near" && ids.has(e.source) && ids.has(e.target));
+    const possible = (members.length * (members.length - 1)) / 2;
+    expect(local.length).toBeGreaterThan(0);
+    expect(local.length).toBeLessThan(possible);
+    const deg = new Map(members.map((n) => [n.id, 0]));
+    for (const edge of local) {
+      deg.set(edge.source, (deg.get(edge.source) ?? 0) + 1);
+      deg.set(edge.target, (deg.get(edge.target) ?? 0) + 1);
+    }
+    for (const member of members) {
+      const d = deg.get(member.id) ?? 0;
+      if (member.role === "secondary") {
+        expect(d).toBeGreaterThanOrEqual(4);
+        expect(d).toBeLessThanOrEqual(5);
+      } else {
+        expect(d).toBeGreaterThanOrEqual(1);
+        expect(d).toBeLessThanOrEqual(3);
+      }
+    }
+  }
+
+  const pair = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const groupOf = new Map(net.nodes.map((n) => [n.id, n.group]));
+  const bridgeCount = new Map<string, number>();
+  for (const edge of net.edges.filter((e) => e.kind === "hub")) {
+    const a = groupOf.get(edge.source)!;
+    const b = groupOf.get(edge.target)!;
+    expect(a).not.toBe(b);
+    const key = pair(a, b);
+    bridgeCount.set(key, (bridgeCount.get(key) ?? 0) + 1);
+  }
+  const neigh = new Set<string>();
+  for (const c of centroids) {
+    const near = centroids
+      .filter((o) => o.id !== c.id)
+      .sort((a, b) => Math.hypot(a.c[0] - c.c[0], a.c[1] - c.c[1]) - Math.hypot(b.c[0] - c.c[0], b.c[1] - c.c[1]))
+      .slice(0, 2);
+    for (const n of near) neigh.add(pair(c.id, n.id));
+  }
+  for (const key of neigh) {
+    const count = bridgeCount.get(key) ?? 0;
+    expect(count).toBeGreaterThanOrEqual(1);
+    expect(count).toBeLessThanOrEqual(3);
+  }
+  const centroidDist = (key: string) => {
+    const [a, b] = key.split("|");
+    const left = centroids.find((c) => c.id === a)!;
+    const right = centroids.find((c) => c.id === b)!;
+    return Math.hypot(left.c[0] - right.c[0], left.c[1] - right.c[1]);
+  };
+  const neighD = [...neigh].map(centroidDist).sort((a, b) => a - b);
+  const skips = [...bridgeCount.keys()].filter((key) => !neigh.has(key));
+  expect(skips.length).toBeGreaterThanOrEqual(1);
+  const median = neighD[Math.floor(neighD.length / 2)];
+  expect(Math.max(...skips.map(centroidDist))).toBeGreaterThan(median);
+
+  const again = heroNetwork(papers(66));
+  expect(again.nodes.map((n) => n.pos)).toEqual(net.nodes.map((n) => n.pos));
+  expect(again.edges.map((e) => [e.source, e.target, e.kind])).toEqual(net.edges.map((e) => [e.source, e.target, e.kind]));
+
+  expect(heroNetwork(papers(80)).nodes).toHaveLength(70);
   expect(heroNetwork(papers(2)).nodes).toHaveLength(2);
   const shades = new Set(papers(12).map((n) => nodeAmber(0, n.clusterId, n.id)));
   expect(shades.size).toBeGreaterThan(1);

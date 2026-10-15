@@ -18,13 +18,16 @@ const COUNTRY_META: [string, string, number, number][] = [
 
 function rng(seed: number) { seed = (seed * 9301 + 49297) % 233280 + 1; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); }
 
-/** Ten papers past the original 42, so each topic cluster gains a few nodes. */
+/** Papers past the original 42, spread across the four themes so each cluster stays populated. */
 const EXTRA_TOPICS = [
   "Large language models", "Climate modelling", "Edge computing", "Privacy",
   "Graph neural networks", "Protein folding", "Robotics", "Energy systems",
-  "Reinforcement learning", "Drug discovery",
+  "Federated learning", "Quantum computing", "Computer vision", "Drug discovery",
+  "Explainable AI", "Climate modelling", "Robotics", "Privacy",
+  "Reinforcement learning", "Protein folding", "Edge computing", "Energy systems",
+  "Computer vision", "Quantum computing", "Robotics", "Privacy",
 ];
-const PAPERS: PaperDetail[] = Array.from({ length: 52 }, (_, i) => {
+const PAPERS: PaperDetail[] = Array.from({ length: 66 }, (_, i) => {
   const r = rng(i + 7);
   const t1 = i < 42 ? TOPICS[i % TOPICS.length] : EXTRA_TOPICS[i - 42];
   const t2 = TOPICS[(i * 5 + 3) % TOPICS.length];

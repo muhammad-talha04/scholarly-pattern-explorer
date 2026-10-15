@@ -17,12 +17,8 @@ export const dust = "#9EBFDE";
 export const gap = "#CC79A7";
 export const up = "#009E73";
 export const down = "#D55E00";
-/** Filament color at a hub: bright yellow-amber. */
-export const filamentHot = "#FFE08A";
-/** Thin amber filaments between papers. */
+/** Thin straight links between papers. */
 export const linkAmber = "#F5A54A";
-/** Filament tips, deep orange with a magenta tint. */
-export const filamentTip = "#C4476A";
 /** Grey for a galaxy cluster past the five amber tones. */
 export const otherColor = "#6D7C96";
 
