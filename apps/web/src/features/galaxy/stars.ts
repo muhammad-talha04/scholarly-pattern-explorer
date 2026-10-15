@@ -99,12 +99,12 @@ type Drawn<T> = T & { pos: Vec; center: Vec; role: NetRole; hubRank?: number };
 
 /** Uneven soma positions. Slot 0 is the largest cell body, near the middle of the disc. */
 const HUB_SLOTS: Vec[] = [
-  [0.15, 0.04, -0.35],
-  [-3.7, 0.08, -2.1],
-  [3.55, -0.06, -1.6],
-  [-2.15, 0.1, 3.35],
-  [3.15, -0.02, 2.85],
-  [-0.55, 0.12, -4.15],
+  [-1.45, 0.05, 1.25],
+  [-3.9, 0.08, -1.55],
+  [3.45, -0.05, -2.35],
+  [-2.55, 0.1, 3.55],
+  [3.4, 0.02, 2.45],
+  [0.95, -0.08, -3.85],
 ];
 
 interface RawPoint { pos: Vec; depth: number }
@@ -277,8 +277,8 @@ function bridge<T extends { id: string; pos: Vec }>(a: T, b: T, seed: number): R
   const n = 6;
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    const bow = Math.sin(t * Math.PI) * (0.62 + rand() * 0.7) * sign;
-    const wave = Math.sin(t * Math.PI * 2 + rand() * 4) * 0.16;
+    const bow = Math.sin(t * Math.PI) * (1.35 + rand() * 0.75) * sign;
+    const wave = Math.sin(t * Math.PI * 2.15 + rand() * 4) * 0.55;
     const y = a.pos[1] * (1 - t) + b.pos[1] * t + Math.sin(t * Math.PI) * (rand() - 0.5) * 0.28;
     ctrl.push(clampDisc([
       a.pos[0] * (1 - t) + b.pos[0] * t + px * (bow + wave),
@@ -316,7 +316,7 @@ function dendrite<T extends { id: string; pos: Vec }>(
   let joined: T | null = null;
   while (depth < 0.96 && guard * step < reach && guard < 18) {
     guard++;
-    const turn = (rand() - 0.5) * (gen === 0 ? 0.42 : 0.7);
+    const turn = (rand() - 0.5) * (gen === 0 ? 0.95 : 1.15);
     if (aim && gen === 0 && depth > 0.2) {
       const toward = Math.atan2(aim.pos[2] - p[2], aim.pos[0] - p[0]);
       const heading = Math.atan2(d[1], d[0]);
@@ -328,7 +328,7 @@ function dendrite<T extends { id: string; pos: Vec }>(
     p = clampDisc([p[0] + d[0] * step, p[1] + (rand() - 0.5) * 0.05, p[2] + d[1] * step]);
     depth = Math.min(0.98, depth + step / reach);
     pts.push({ pos: p, depth });
-    if (gen < 2 && depth > 0.28 && depth < 0.75 && rand() < 0.42) {
+    if (gen < 2 && depth > 0.22 && depth < 0.78 && rand() < 0.62) {
       const spin = (rand() < 0.5 ? -1 : 1) * (0.55 + rand() * 0.4);
       children.push(...dendrite(origin, p, depth, rot(d, spin), null, rand, gen + 1));
     }

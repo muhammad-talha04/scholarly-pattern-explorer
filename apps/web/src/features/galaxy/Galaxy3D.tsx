@@ -254,7 +254,7 @@ function ribbonGeometry(filaments: Filament[]) {
       const len = Math.hypot(tx, tz) || 1;
       const px = -tz / len;
       const pz = tx / len;
-      const w = 0.155 * (1 - point.depth) + 0.02 * point.depth;
+      const w = 0.32 * (1 - point.depth) + 0.028 * point.depth;
       for (const s of [-1, 1]) {
         pos.push(point.pos[0] + px * w * s, point.pos[1], point.pos[2] + pz * w * s);
         depth.push(point.depth);

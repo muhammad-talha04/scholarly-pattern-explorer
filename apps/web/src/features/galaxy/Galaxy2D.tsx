@@ -58,7 +58,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
           const stroke = depth < 0.4 ? filamentHot : depth < 0.72 ? linkAmber : filamentTip;
           return (
             <line key={`fil-${fi}-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke}
-              strokeOpacity={0.55 * (1 - depth) + 0.16} strokeWidth={2.8 * (1 - depth) + 0.45} strokeLinecap="round" />
+              strokeOpacity={0.62 * (1 - depth) + 0.18} strokeWidth={11 * (1 - depth) + 0.9} strokeLinecap="round" />
           );
         }))}
         {net.specks.map((speck, i) => {
