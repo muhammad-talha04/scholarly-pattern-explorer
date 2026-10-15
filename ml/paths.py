@@ -19,3 +19,8 @@ def ml_data_dir() -> Path:
 
 def country_snapshot() -> Path:
     return resolve(os.getenv("COUNTRY_SNAPSHOT", "data/country_snapshot.json"))
+
+
+def topic_country_year_db() -> Path:
+    """SQLite aggregate written by pipeline/country_stats.py. Same anchoring as the snapshot."""
+    return resolve(os.getenv("TOPIC_COUNTRY_YEAR_DB", "data/topic_country_year.sqlite"))

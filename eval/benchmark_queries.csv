@@ -1,0 +1,12 @@
+query_id,query,work_id,relevance
+q_qec,quantum error correction with surface codes,W01,2
+q_qec,quantum error correction with surface codes,W02,2
+q_qec,quantum error correction with surface codes,W03,1
+q_prot,protein structure prediction with transformer language models,W06,2
+q_prot,protein structure prediction with transformer language models,W07,2
+q_prot,protein structure prediction with transformer language models,W08,1
+q_crop,forecasting crop yield from satellite imagery,W10,2
+q_crop,forecasting crop yield from satellite imagery,W11,2
+q_batt,solid-state electrolytes for lithium batteries,W13,2
+q_batt,solid-state electrolytes for lithium batteries,W14,1
+q_gw,gravitational waves from merging black holes,W19,2

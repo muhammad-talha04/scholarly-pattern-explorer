@@ -31,3 +31,20 @@ CREATE TABLE IF NOT EXISTS snapshots (
     payload JSONB,
     PRIMARY KEY (run_id, kind)
 );
+
+-- Topic × country × year counts. country_stats rewrites the same columns into
+-- data/topic_country_year.sqlite (view topic_country_year_v) on each ingest,
+-- adding only the works new since the previous snapshot.
+CREATE TABLE IF NOT EXISTS topic_country_year (
+    topic_id          VARCHAR NOT NULL,
+    topic_name        VARCHAR NOT NULL,
+    country_code      VARCHAR NOT NULL,
+    year              INTEGER NOT NULL,
+    paper_count       INTEGER NOT NULL,
+    fractional_count  DOUBLE PRECISION NOT NULL,
+    PRIMARY KEY (topic_id, country_code, year)
+);
+
+CREATE OR REPLACE VIEW topic_country_year_v AS
+SELECT topic_id, topic_name, country_code, year, paper_count, fractional_count
+FROM topic_country_year;
