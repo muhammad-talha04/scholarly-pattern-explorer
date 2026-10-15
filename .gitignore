@@ -52,6 +52,7 @@ debug_api.py`
 _old/
 _fixes_2026_09/
 
-# Search evaluation query set is source, not data.
+# Search evaluation query set and judgements are source, not data.
 !eval/search_queries.jsonl
+!eval/search_qrels.jsonl
 eval/report.json
