@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 by #6 (country analytics) and #8 (embedding benchmark, paper galaxy); earlier 05:15 PKT by tom (ML row) and ami (integration tests row).
+Last updated: 2026-10-15 by #6 (country analytics), #8 (embedding benchmark, paper galaxy) and #9 (research gaps, similar papers, emerging topics); earlier 05:15 PKT by tom (ML row) and ami (integration tests row).
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -37,7 +37,9 @@ harry `/workspace/spe-web`, michal `/workspace/michal-spe`, ami `/workspace/spe-
 
 ## Where we left off
 - [x] #6 country counts and topic-country-year aggregate: `GET /api/v1/countries` and `/countries/{code}` serve whole `paper_count` and fractional `fractional_count` (1/N over distinct countries) with `by_year`. The aggregate (`topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`) updates inside each `country_stats` run. SQLite `data/topic_country_year.sqlite`, view `topic_country_year_v`, path `ml/paths.py` `topic_country_year_db()` (repo-root anchored, same rule as `COUNTRY_SNAPSHOT`; override `TOPIC_COUNTRY_YEAR_DB`). DDL in `pipeline/schema_v2.sql`. Endpoint: `GET /api/v1/topic-country-years`.
-- [ ] Next: emerging-topics detector and timeline/globe UI on that aggregate.
+- [x] #9 research gaps, similar papers, emerging topics:
+  - Done: `/api/v1/patterns?trend=gap` still returns fast-growing small topics, and now also ranks embedding-space gaps (related topics that rarely appear on the same paper, and topics that are thin next to their nearest neighbors). Each gap includes a short explanation and example papers. `GET /api/v1/papers/{id}/similar` returns nearest neighbours from the existing embedding index with cosine scores. `/api/v1/patterns?trend=emerging` ranks topics by smoothed year-over-year growth (`min` of the mean and the median, with a minimum-count threshold) and takes an optional `country`. Counts are read from `topic_country_year` (`topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`) when that SQLite table or the snapshot list is present, and otherwise computed from `works_v2.jsonl` in the same shape. `python -m ml.cli discover` (also run at the end of `update`) writes a dated snapshot under the repo-root ML data dir. Paths follow `ml/paths.py`.
+  - Next: Call `python -m ml.cli discover` from the 1st/15th workflow after the vector index is in the data store, and let the front end add the gap and emerging views.
 - [ ] #1 (olli): ready for review, waiting for Prince to merge
 - [ ] #3 (grok): draft; fractional-counting change and STATUS entry not pushed yet, waiting on Prince's OK in 1:1
 - [ ] #2 (tom): draft. Merge after #1 and #3, because the branch already contains both (merged, not rebased).

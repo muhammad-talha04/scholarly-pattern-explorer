@@ -44,6 +44,31 @@ def test_local_store_persist_and_upsert(tmp_path):
     assert s2.search(v[1], 1)[0][0] == "b"
 
 
+def test_similar_orders_by_cosine(tmp_path):
+    store = LocalStore(tmp_path / "v", dim=4)
+    a = np.array([1, 0, 0, 0], dtype=np.float32)
+    b = np.array([0.9, 0.1, 0, 0], dtype=np.float32)
+    b /= np.linalg.norm(b)
+    c = np.array([0, 0, 1, 0], dtype=np.float32)
+
+    def meta(wid, title):
+        return {"work_id": wid, "title": title, "pub_year": 2024, "topics": [title],
+                "authors": [], "countries": [], "cited_by": 0, "abstract": "",
+                "doi": None, "original_url": None}
+
+    store.upsert(["A", "B", "C"], np.stack([a, b, c]),
+                 [meta("A", "Alpha"), meta("B", "Beta"), meta("C", "Gamma")])
+    from ml.embeddings import HashEmbedder
+    from ml.service import MLService, SummaryCache
+    svc = MLService(embedder=HashEmbedder(), store=store, cache=SummaryCache(":memory:"))
+    hits = svc.similar("A", k=2)
+    assert [h["work_id"] for h in hits] == ["B", "C"]
+    assert hits[0]["score"] > hits[1]["score"] >= 0
+    assert hits[0]["score"] > 0
+    assert all(h["work_id"] != "A" for h in hits)
+    assert svc.similar("missing") is None
+
+
 def test_search_ranks_relevant_paper_first(service):
     res = service.search("surface codes qubits noise", k=2)
     assert res[0]["work_id"] == "W2"

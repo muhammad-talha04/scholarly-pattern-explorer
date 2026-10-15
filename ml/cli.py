@@ -4,7 +4,8 @@
   python -m ml.cli index --model BAAI/bge-small-en-v1.5   # a different free model
   python -m ml.cli galaxy                                  # layout from the current index
   python -m ml.cli galaxy --refit                          # recompute layout (points may move)
-  python -m ml.cli update                                  # incremental patterns
+  python -m ml.cli update                                  # incremental patterns, then discoveries
+  python -m ml.cli discover                                # emerging topics + embedding gaps only
   python -m ml.cli index  --jsonl data/works.jsonl         # old JSONL fallback
   python -m ml.cli update --db data/openalex.duckdb
 """
@@ -25,7 +26,7 @@ def read_jsonl(path=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["index", "update", "galaxy"])
+    ap.add_argument("cmd", choices=["index", "update", "galaxy", "discover"])
     ap.add_argument("--jsonl")
     ap.add_argument("--db")
     ap.add_argument("--model", help="sentence-transformers model id (ignored when ML_EMBEDDER=hash)")
@@ -33,6 +34,10 @@ def main(argv=None):
     ap.add_argument("--min-support", type=float, default=0.05)
     ap.add_argument("--window", type=int, default=3)
     a = ap.parse_args(argv)
+    if a.cmd == "discover":
+        from .discover import refresh_discoveries
+        print(refresh_discoveries())
+        return
     if a.cmd in ("index", "galaxy"):
         from .service import MLService
         if os.getenv("ML_EMBEDDER", "").lower() == "hash" or not a.model:
@@ -54,7 +59,14 @@ def main(argv=None):
         papers = papers_since_from_db(DB(a.db))
     else:
         papers = [p.to_dict() for p in read_jsonl(a.jsonl)]
-    print(miner.update(papers))
+    summary = miner.update(papers)
+    print(summary)
+    # Pattern state is already saved. A discovery failure must not fail that update.
+    try:
+        from .discover import refresh_discoveries
+        print(refresh_discoveries(summary.get("run_date")))
+    except Exception as exc:
+        print(f"discoveries skipped: {exc}")
 
 
 if __name__ == "__main__":
