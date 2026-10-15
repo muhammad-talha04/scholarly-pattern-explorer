@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from .. import ml_bridge as ml
 from pipeline import country_api  # repo root is on sys.path via ml_bridge
 from ..schemas import (AskRequest, AskResponse, Collaboration, CountingMethod, CountryStats, PaperDetail,
-                       PaperSummary, Pattern, Run, SearchResponse)
+                       PaperSummary, Pattern, Run, SearchResponse, TopicCountryYear)
 
 router = APIRouter()
 
@@ -108,6 +108,12 @@ def country(code: str, counting: CountingMethod = "fractional") -> CountryStats:
     if r is None:
         raise HTTPException(404, "country not found")
     return CountryStats(**r)
+
+
+@router.get("/topic-country-years", response_model=list[TopicCountryYear])
+def topic_country_years(topic_id: str | None = None, country: str | None = None,
+                        year: int | None = None, limit: int = 1000) -> list[TopicCountryYear]:
+    return country_api.topic_country_years(topic_id, country, year, limit)
 
 
 @router.get("/runs", response_model=list[Run])

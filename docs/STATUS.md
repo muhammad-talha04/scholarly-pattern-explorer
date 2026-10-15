@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 05:15 PKT by tom (ML row) and ami (integration tests row); earlier by michal, olli.
+Last updated: 2026-10-15 by country analytics (#6); earlier 05:15 PKT by tom (ML row) and ami (integration tests row).
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -36,7 +36,8 @@ harry `/workspace/spe-web`, michal `/workspace/michal-spe`, ami `/workspace/spe-
   side-by-side comparison, influential citations.
 
 ## Where we left off
-Nothing is merged into main yet.
+- [x] #6 country counts and topic-country-year aggregate: `GET /api/v1/countries` and `/countries/{code}` serve whole `paper_count` and fractional `fractional_count` (1/N over distinct countries) with `by_year`. The aggregate (`topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`) updates inside each `country_stats` run. SQLite `data/topic_country_year.sqlite`, view `topic_country_year_v`, path `ml/paths.py` `topic_country_year_db()` (repo-root anchored, same rule as `COUNTRY_SNAPSHOT`; override `TOPIC_COUNTRY_YEAR_DB`). DDL in `pipeline/schema_v2.sql`. Endpoint: `GET /api/v1/topic-country-years`.
+- [ ] Next: emerging-topics detector and timeline/globe UI on that aggregate.
 - [ ] #1 (olli): ready for review, waiting for Prince to merge
 - [ ] #3 (grok): draft; fractional-counting change and STATUS entry not pushed yet, waiting on Prince's OK in 1:1
 - [ ] #2 (tom): draft. Merge after #1 and #3, because the branch already contains both (merged, not rebased).
