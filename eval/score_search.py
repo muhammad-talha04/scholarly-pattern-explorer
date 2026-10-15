@@ -14,8 +14,10 @@ ml.paths.resolve, so the score does not depend on the working directory.
     python eval/score_search.py --works data/works_v2.jsonl
     python eval/score_search.py --fetch          # index the judged works from OpenAlex
 
-The pytest in ml/tests/test_score_search.py uses an in-memory fixture and does
-not call OpenAlex.
+`--fetch` loads 50 ids per page. The first page is anonymous. Further pages
+need the free OPENALEX_API_KEY (repo secret, already set). The pytest in
+ml/tests/test_score_search.py uses an in-memory fixture and does not call
+OpenAlex.
 """
 from __future__ import annotations
 
@@ -159,24 +161,36 @@ def score_service(service, qrels: list[dict], ndcg_k: int = NDCG_K, recall_k: in
 
 
 def fetch_openalex(work_ids: list[str]) -> list[Paper]:
-    """Download judged works from the public OpenAlex API. Not used by tests."""
+    """Download judged works from OpenAlex. Not used by tests.
+
+    One page holds 50 ids. A second page is bulk access and requires the
+    free OPENALEX_API_KEY (repo secret, already set).
+    """
     import requests
 
     ids = list(dict.fromkeys(work_ids))
+    page_size = 50
+    api_key = os.environ.get("OPENALEX_API_KEY") or None
+    if len(ids) > page_size and not api_key:
+        raise SystemExit(
+            "OpenAlex bulk fetch past the first page needs OPENALEX_API_KEY "
+            "(free; repo secret, already set)")
     papers = []
     mailto = os.environ.get("OPENALEX_MAILTO")
     session = requests.Session()
     session.headers["User-Agent"] = "scholarly-pattern-explorer/score-search"
-    for i in range(0, len(ids), 50):
-        chunk = ids[i:i + 50]
+    for i in range(0, len(ids), page_size):
+        chunk = ids[i:i + page_size]
         params = {
             "filter": "openalex:" + "|".join(chunk),
-            "per-page": "50",
+            "per-page": str(page_size),
             "select": ("id,display_name,publication_year,cited_by_count,doi,topics,"
                        "authorships,abstract_inverted_index,open_access,primary_location"),
         }
         if mailto:
             params["mailto"] = mailto
+        if api_key:
+            params["api_key"] = api_key
         for attempt in range(5):
             resp = session.get("https://api.openalex.org/works", params=params, timeout=60)
             if resp.status_code == 200:
@@ -195,7 +209,8 @@ def main(argv=None):
     ap.add_argument("--qrels", default=str(QRELS_PATH))
     ap.add_argument("--works", help="works JSONL. Relative paths are from the repo root")
     ap.add_argument("--fetch", action="store_true",
-                    help="index the judged work ids from the OpenAlex API")
+                    help="index the judged work ids from OpenAlex "
+                         "(OPENALEX_API_KEY required past the first page of 50)")
     ap.add_argument("--ndcg-k", type=int, default=NDCG_K)
     ap.add_argument("--recall-k", type=int, default=RECALL_K)
     ap.add_argument("--out", help="write the full JSON report here")
