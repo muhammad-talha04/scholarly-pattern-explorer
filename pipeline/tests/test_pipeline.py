@@ -45,8 +45,10 @@ def test_incremental_matches_full_and_counting():
     assert pkf["papers"] == 2 and pkf["growth_pct"] == 0.0
     assert all(None not in r["top_topics"] for r in full["countries"])
     assert full["topic_year_counts"]["AI"] == {"2025": 1, "2026": 1}
-    assert full["topic_top_countries"]["AI"][0] == "PK"
+    assert full["topic_top_countries"]["AI"][0] == ["PK", 1.5]
     assert full["collaborations"] == [{"source": "CA", "target": "PK", "papers": 1}]
+    assert full["collaborations_1n"] == [{"source": "CA", "target": "PK", "papers": 0.5}]
+    assert full["collaborations_full"] == [{"source": "CA", "target": "PK", "papers": 1}]
 
 
 def test_partial_run_keeps_pages(tmp_path, monkeypatch):
@@ -68,4 +70,12 @@ def test_country_api(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "SNAPSHOT", p)
     assert api.country("pk")["papers"] == 1.5
     assert api.country("PK", "full")["papers"] == 2
-    assert api.collaborations()[0]["target"] == "PK"
+    assert api.collaborations()[0]["papers"] == 1 and api.collaborations("per_country")[0]["papers"] == 0.5 and api.collaborations("full")[0]["papers"] == 1
+
+
+def test_pair_weights_sum_to_one_per_paper():
+    w = {**normalize(W), "countries": ["A", "B", "C", "D"]}
+    t = tally([w])
+    assert abs(sum(t["pairs_frac"]["all"].values()) - 1) < 1e-9
+    assert abs(sum(t["pairs_1n"]["all"].values()) - 1.5) < 1e-9
+    assert not tally([{**w, "countries": ["A"]}])["pairs"]
