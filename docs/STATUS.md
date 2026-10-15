@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 by harry (front end, merging main), ami (integration tests), tom (ML); earlier by michal, olli.
+Last updated: 2026-10-15 by harry (UI v3). Main already has #1, #2, #3, #4 and #7.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -36,7 +36,7 @@ harry `/workspace/spe-web`, michal `/workspace/michal-spe`, ami `/workspace/spe-
   side-by-side comparison, influential citations.
 
 ## Where we left off
-Nothing is merged into main yet.
+#1, #2, #3, #4 and #7 are on main. #5 was the first front-end draft; UI v3 continues it.
 - [ ] #1 (olli): ready for review, waiting for Prince to merge
 - [ ] #3 (grok): draft; fractional-counting change and STATUS entry not pushed yet, waiting on Prince's OK in 1:1
 - [ ] #2 (tom): draft. Merge after #1 and #3, because the branch already contains both (merged, not rebased).
@@ -44,10 +44,10 @@ Nothing is merged into main yet.
   - Next: ami removes the 9 stale xfail markers in #4. Index the real `works_v2.jsonl` into pgvector, and make the ingest workflow run `python -m ml.cli index/update`.
   - Blockers: the real all-MiniLM-L6-v2 model and pgvector are untested. The tests use a lightweight offline embedder and a fake database connection. A live run needs a Supabase `DATABASE_URL`.
 - [x] Data paths anchored to the repo root (lura, `fix/anchor-data-paths`, #7): `ml/paths.py` resolves `ML_DATA_DIR`, `COUNTRY_SNAPSHOT` and the works JSONL from the repo root, used by `ml/service.py`, `ml/store.py`, `ml/papers.py`, `pipeline/country_api.py` and `apps/api/app/ml_bridge.py`. The API now finds its data whatever directory it is started from. Test: `ml/tests/test_paths.py`.
-- [ ] Front end (harry - developer): draft PR on `web-frontend` (#5), now merging latest main (#1, #2, #3, #4, #7). `v2-rebuild` is abandoned.
-  - Done: `apps/web` (Next.js 14 App Router, TypeScript, Tailwind, react-three-fiber/drei, Framer Motion). Pages: landing 3D topic galaxy with research-gap layer (`/patterns?trend=gap`) and search; search with country/year filters, side panel (summary, ask, related, "Read original paper"); countries 3D globe (bars, collaboration arcs, fractional/full toggle with a visible label); progress timeline with scrubber; patterns (itemsets, derived rules, lifecycles, gaps). 2D fallback for reduced motion, low power or no WebGL. Typed client mirrors `schemas.py`; mock fixtures are used when the API is unset, unreachable or returns 501. Vitest 12 tests; lint, typecheck and build pass; `web` job added to `tests` CI.
-  - Waiting on grok / talha (#6): populated `/countries` snapshot and `/topic-country-years`. The empty `/countries` list still falls back to fixtures. `/countries/collaborations` is wired on main.
-  - Notes for olli: born/died per run is derived client-side from `/patterns` windows (Run only has `patterns_changed`); association rules are derived client-side from itemsets. Types are hand-mirrored in `src/lib/api/types.ts` until openapi codegen is wired.
+- [ ] Front end (harry) — UI v3, 2026-10-15. `v2-rebuild` stays abandoned. The branch is rebased onto current main (merge, conflicts only in CI and this file) and keeps the web CI job next to the 42 integration tests.
+  - Done: dark space design system (tokens, Space Grotesk + Fraunces, glass panels). Galaxy bloom, hover tooltips and a smoothed camera. Globe outlines from Natural Earth 110m (`world-atlas`, public domain) in 3D and in the 2D fallback. Counting toggle now includes `per_country` (country totals stay on the fractional snapshot, matching `country_api`; collaboration weights change). Hero copy sits in a top card so it no longer covers node labels. Nav collapses to a menu at 390px and the search button stays on screen. Empty galaxy and empty globe are designed states (`/?preview=empty` shows the galaxy one). Timeline born/died lists the latest window that actually changed, and a topic streamgraph plus a globe year slider read `GET /topic-country-years`. New client-only pieces: side-by-side `/compare`, collections in `localStorage`, a related-paper map in the paper panel, and a first-run tour. Low-power 2D fallback still covers the galaxy and the globe. Vitest 19; lint and typecheck pass. Integration tests 42, API 18, ml+pipeline 35.
+  - Still fixtures until the route exists: `GET /galaxy` (3D coordinates and topic clusters) and `GET /topic-country-years` (talha, PR #6: `topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`). Both fall back on 404 and switch to live data on the first 200. A live API that 404s those routes does not paint fixture charts over live countries. `/countries` and `/countries/collaborations` are real on main; an empty country list is an empty state, not a fixture.
+  - Next: point `NEXT_PUBLIC_API_URL` at a gateway that has #6 merged, then drop the galaxy fixture once someone ships `GET /galaxy`. OpenAPI codegen can replace the hand-mirrored types.
 - [x] Ami - integration tests: PR #4 merged. `tests/integration/`, 42 tests. `/countries` routes are wired, `papers` is a float, collaborations have counting modes, and `topic_top_countries` is pairs. Per paper, fractional pair weights sum to 1, `per_country` pair weights sum to (n-1)/2, and a single-country paper has no pairs. Incremental pair weights equal a full rebuild. `/countries/collaborations?counting=` returns what the snapshot holds for that counting mode. The `core.py` per_country collaboration bug (fixed in #2, 923010a) no longer has an xfail.
   - Next: snapshot collaboration weights are rounded to 2 decimals, so sums in the snapshot are only approximately 1.
 - [ ] Gap finder + search query set (michal, senior researcher): built on `ml-service` (#2).

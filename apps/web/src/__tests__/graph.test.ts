@@ -1,4 +1,5 @@
-import { buildTopicGraph, lifecycles } from "@/lib/graph";
+import { patterns } from "@/lib/api/mock";
+import { buildTopicGraph, lifecycles, selectBornDied } from "@/lib/graph";
 import { deriveRules } from "@/features/patterns/rules";
 const P = (items: string[], support: number, w = 2020) => ({ items, support, window_start: w, window_end: w + 1 });
 it("builds nodes and co-occurrence links, flags gaps", () => {
@@ -16,4 +17,11 @@ it("computes lifecycles born/died", () => {
   const l = lifecycles([P(["A"], 0.1, 2019), P(["A"], 0.1, 2021), P(["B"], 0.1, 2021), P(["B"], 0.1, 2023), P(["C"], 0.1, 2023)]);
   const by = Object.fromEntries(l.rows.map((r) => [r.key, r]));
   expect(by.A.died).toBe(2023); expect(by.B.born).toBe(2021); expect(by.C.died).toBeNull();
+});
+it("mock patterns born and died in the latest window", () => {
+  const life = selectBornDied(patterns(), 2026);
+  expect(life.note).toBe("matched");
+  expect(life.win).toBe(2025);
+  expect(life.born.length).toBeGreaterThan(0);
+  expect(life.died.length).toBeGreaterThan(0);
 });

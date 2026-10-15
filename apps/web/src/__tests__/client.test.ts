@@ -16,6 +16,7 @@ describe("api client fallback", () => {
     expect((await request("/x", () => 1, undefined, mk(501))).source).toBe("mock");
     expect((await request("/x", () => 1, undefined, (async () => { throw new TypeError("down"); }) as unknown as typeof fetch)).source).toBe("mock");
     await expect(request("/x", () => 1, undefined, mk(404))).rejects.toBeInstanceOf(ApiError);
+    expect((await request("/galaxy", () => ({ nodes: [] }), undefined, mk(404), { notFoundIsMock: true })).source).toBe("mock");
     const ok = (async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 })) as unknown as typeof fetch;
     expect(await request("/health", () => ({ status: "m" }), undefined, ok)).toEqual({ data: { status: "ok" }, source: "live" });
   });

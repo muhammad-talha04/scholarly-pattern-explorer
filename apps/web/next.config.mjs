@@ -1,2 +1,2 @@
 /** @type {import('next').NextConfig} */
-export default { reactStrictMode: true, transpilePackages: ["three"] };
+export default { reactStrictMode: true, transpilePackages: ["three", "postprocessing"] };

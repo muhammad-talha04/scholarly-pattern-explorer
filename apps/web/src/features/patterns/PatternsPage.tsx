@@ -25,7 +25,7 @@ export function PatternsPage() {
       <PageHeader title="Patterns" subtitle="Frequent topic itemsets, derived rules, lifecycles and research gaps.">
         <select aria-label="Window" value={win ?? ""} onChange={(e) => setWin(Number(e.target.value))} className="input">{windows.map((w) => <option key={w} value={w}>Window {w}</option>)}</select>
       </PageHeader>
-      <div className="mb-4 flex gap-1">{(["itemsets", "rules", "lifecycles", "gaps"] as Tab[]).map((t) => (
+      <div className="mb-4 flex gap-1 overflow-x-auto">{(["itemsets", "rules", "lifecycles", "gaps"] as Tab[]).map((t) => (
         <button key={t} onClick={() => setTab(t)} className="relative rounded-lg px-4 py-1.5 text-sm capitalize">
           {tab === t && <motion.span layoutId="pat-tab" className="absolute inset-0 rounded-lg bg-white/10" />}<span className="relative">{t}</span>
         </button>))}</div>

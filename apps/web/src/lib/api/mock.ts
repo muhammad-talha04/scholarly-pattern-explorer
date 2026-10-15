@@ -1,5 +1,6 @@
 /** Deterministic fixtures shaped exactly like apps/api/app/schemas.py. */
-import type { AskResponse, Collaboration, Counting, CountryStats, PaperDetail, PaperSummary, Pattern, Run, SearchParams, SearchResponse } from "./types";
+import type { AskResponse, Collaboration, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchParams, SearchResponse, TopicCountryYear, TopicYearQuery } from "./types";
+import { buildTopicGraph } from "@/lib/graph";
 
 export const TOPICS = [
   "Large language models", "Graph neural networks", "Federated learning", "Climate modelling",
@@ -65,14 +66,29 @@ export function related(id: string, limit = 6): PaperSummary[] {
   const p = paper(id);
   return PAPERS.filter((x) => x.id !== id && x.topics.some((t) => p.topics.includes(t))).slice(0, limit).map(toSummary);
 }
+const WINDOWS = [2019, 2021, 2023, 2025];
+/** First two topics fade out after 2023 (they die in the 2025 window). The last two are born in 2025. */
+function topicSpan(i: number): [number, number] {
+  if (i < 2) return [2019, 2023];
+  if (i >= TOPICS.length - 2) return [2025, 2025];
+  return [2019, 2025];
+}
+function active(i: number, w: number) { const [a, b] = topicSpan(i); return w >= a && w <= b; }
+
 export function patterns(window?: number): Pattern[] {
   const out: Pattern[] = [];
-  for (let w = 2019; w <= 2025; w += 2) {
+  for (const w of WINDOWS) {
     TOPICS.forEach((t, i) => {
+      if (!active(i, w)) return;
       const r = rng(i * 31 + w);
       out.push({ items: [t], support: Math.round((0.05 + r() * 0.3) * 1000) / 1000, window_start: w, window_end: w + 1 });
-      if (i % 2 === 0) out.push({ items: [t, TOPICS[(i + 3) % TOPICS.length]], support: Math.round((0.02 + r() * 0.12) * 1000) / 1000, window_start: w, window_end: w + 1 });
-      if (i % 4 === 0 && w >= 2021) out.push({ items: [t, TOPICS[(i + 1) % TOPICS.length], TOPICS[(i + 6) % TOPICS.length]], support: Math.round((0.01 + r() * 0.05) * 1000) / 1000, window_start: w, window_end: w + 1 });
+      if (i % 2 === 0 && active((i + 3) % TOPICS.length, w)) {
+        out.push({ items: [t, TOPICS[(i + 3) % TOPICS.length]], support: Math.round((0.02 + r() * 0.12) * 1000) / 1000, window_start: w, window_end: w + 1 });
+      }
+      const j = (i + 1) % TOPICS.length, k = (i + 6) % TOPICS.length;
+      if (i % 4 === 0 && w >= 2021 && active(j, w) && active(k, w)) {
+        out.push({ items: [t, TOPICS[j], TOPICS[k]], support: Math.round((0.01 + r() * 0.05) * 1000) / 1000, window_start: w, window_end: w + 1 });
+      }
     });
   }
   return window === undefined ? out : out.filter((p) => p.window_start === window);
@@ -86,15 +102,68 @@ export function gaps(): Pattern[] {
 }
 export function countries(counting: Counting = "fractional"): CountryStats[] {
   return COUNTRY_META.map(([code, name, papers, growth], i) => ({
-    code, name, papers: counting === "full" ? Math.round(papers * 1.38) : papers,
+    code, name,
+    // per_country changes collaboration weights, not country totals (same as country_api).
+    papers: counting === "full" ? Math.round(papers * 1.38) : papers,
     growth_pct: growth, top_topics: [TOPICS[i % TOPICS.length], TOPICS[(i + 4) % TOPICS.length], TOPICS[(i + 9) % TOPICS.length]],
+    counting: counting === "full" ? "full" : "fractional",
+    paper_count: Math.round(papers * 1.38),
+    fractional_count: papers,
   }));
 }
-export function country(code: string): CountryStats { return countries().find((c) => c.code === code) ?? { code, name: code, papers: 0, growth_pct: null, top_topics: [] }; }
-export function collaborations(): Collaboration[] {
-  return [["US", "CN", 420], ["US", "GB", 310], ["US", "CA", 280], ["DE", "FR", 190], ["CN", "SG", 150], ["GB", "IN", 120],
-    ["PK", "CN", 95], ["PK", "SA", 60], ["JP", "US", 140], ["AU", "CN", 130], ["BR", "US", 80], ["NG", "GB", 45], ["ZA", "GB", 50], ["KR", "US", 110], ["NL", "DE", 90]]
-    .map(([source, target, papers]) => ({ source: source as string, target: target as string, papers: papers as number }));
+export function country(code: string, counting: Counting = "fractional"): CountryStats {
+  return countries(counting).find((c) => c.code === code) ?? { code, name: code, papers: 0, growth_pct: null, top_topics: [] };
+}
+const COLLAB_BASE: [string, string, number][] = [["US", "CN", 420], ["US", "GB", 310], ["US", "CA", 280], ["DE", "FR", 190], ["CN", "SG", 150], ["GB", "IN", 120],
+  ["PK", "CN", 95], ["PK", "SA", 60], ["JP", "US", 140], ["AU", "CN", 130], ["BR", "US", 80], ["NG", "GB", 45], ["ZA", "GB", 50], ["KR", "US", 110], ["NL", "DE", 90]];
+export function collaborations(counting: Counting = "fractional"): Collaboration[] {
+  const scale = counting === "full" ? 1 : counting === "per_country" ? 0.5 : 0.34;
+  return COLLAB_BASE.map(([source, target, papers]) => ({ source, target, papers: Math.round(papers * scale * 10) / 10 }));
+}
+function slug(name: string) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
+const CLUSTERS = [
+  { id: "methods", name: "Methods" },
+  { id: "science", name: "Science" },
+  { id: "systems", name: "Systems" },
+  { id: "society", name: "Society" },
+];
+export function galaxy(): GalaxyGraph {
+  const graph = buildTopicGraph(patterns(), gaps());
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const nodes = graph.nodes.map((n, i) => {
+    const r = 6 * Math.sqrt((i + 0.5) / graph.nodes.length), a = i * golden;
+    return {
+      topic_id: slug(n.id), topic_name: n.id,
+      x: r * Math.cos(a), y: (((i * 7919) % 13) / 13 - 0.5) * 1.6, z: r * Math.sin(a),
+      cluster_id: CLUSTERS[i % CLUSTERS.length].id, support: n.support,
+    };
+  });
+  return { nodes, clusters: CLUSTERS, links: graph.links };
+}
+export function topicCountryYears(q: TopicYearQuery = {}): TopicCountryYear[] {
+  const years = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+  const rows: TopicCountryYear[] = [];
+  TOPICS.forEach((name, ti) => {
+    const slice = COUNTRY_META.slice(ti % 6, (ti % 6) + 5);
+    years.forEach((year, yi) => {
+      if (ti < 2 && year > 2023) return;
+      if (ti >= TOPICS.length - 2 && year < 2024) return;
+      slice.forEach(([code], ci) => {
+        const base = 6 + ((ti * 5 + ci * 3 + yi * 2) % 19);
+        const trend = 0.55 + yi / 12;
+        rows.push({
+          topic_id: slug(name), topic_name: name, country_code: code, year,
+          paper_count: Math.max(1, Math.round(base * trend)),
+          fractional_count: Math.round(base * trend * 0.62 * 10) / 10,
+        });
+      });
+    });
+  });
+  return rows.filter((r) =>
+    (!q.topic_id || r.topic_id === q.topic_id) &&
+    (!q.country || r.country_code === q.country.toUpperCase()) &&
+    (q.year == null || r.year === q.year)
+  ).slice(0, q.limit ?? rows.length);
 }
 export function runs(): Run[] {
   const out: Run[] = [];
