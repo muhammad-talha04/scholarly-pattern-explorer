@@ -15,7 +15,9 @@ SNAP = {
                         "top_topics": ["AI"], "counting": "full"},
                        {"code": "CA", "name": "Canada", "papers": 1, "growth_pct": None,
                         "top_topics": [], "counting": "full"}],
-    "collaborations": [{"source": "CA", "target": "PK", "papers": 1}],
+    "collaborations": [{"source": "CA", "target": "PK", "papers": 0.25}],
+    "collaborations_1n": [{"source": "CA", "target": "PK", "papers": 0.5}],
+    "collaborations_full": [{"source": "CA", "target": "PK", "papers": 1}],
 }
 
 
@@ -41,9 +43,18 @@ def test_country_detail(client):
     assert client.get("/api/v1/countries/ZZ").status_code == 404
 
 
-def test_collaborations(client):
-    r = client.get("/api/v1/countries/collaborations", params={"counting": "full"}).json()
-    assert r == [{"source": "CA", "target": "PK", "papers": 1.0}]
+@pytest.mark.parametrize("counting,papers", [(None, 0.25), ("fractional", 0.25),
+                                             ("per_country", 0.5), ("full", 1.0)])
+def test_collaborations_all_counting_modes(client, counting, papers):
+    params = {"counting": counting} if counting else {}
+    r = client.get("/api/v1/countries/collaborations", params=params).json()
+    assert r == [{"source": "CA", "target": "PK", "papers": papers}]
+
+
+@pytest.mark.parametrize("counting", ["fractional", "per_country", "full"])
+def test_countries_accept_all_counting_modes(client, counting):
+    assert client.get("/api/v1/countries", params={"counting": counting}).status_code == 200
+    assert client.get("/api/v1/countries/PK", params={"counting": counting}).status_code == 200
 
 
 def test_no_snapshot_is_empty(tmp_path, monkeypatch):

@@ -98,11 +98,7 @@ def countries(counting: CountingMethod = "fractional") -> list[CountryStats]:
 
 @router.get("/countries/collaborations", response_model=list[Collaboration])
 def collaborations(counting: CountingMethod = "fractional", limit: int = 200) -> list[Collaboration]:
-    # The pipeline snapshot currently has one pair list (papers co-authored by both
-    # countries). Use a counting-specific list if the snapshot ever provides one.
-    rows = country_api.snapshot().get(f"collaborations_{counting}")
-    if rows is None:
-        rows = country_api.collaborations(limit)
+    rows = country_api.collaborations(counting, limit)
     return [Collaboration(**r) for r in rows[:limit]]
 
 
