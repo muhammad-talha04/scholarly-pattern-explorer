@@ -46,13 +46,32 @@ class Pattern(BaseModel):
     window_end: int
 
 
+class CountryYearCount(BaseModel):
+    year: int
+    paper_count: int
+    fractional_count: float
+
+
 class CountryStats(BaseModel):
     code: str
     name: str
-    papers: int
+    papers: float  # value for `counting`; fractional counts are not integers
     growth_pct: float | None = None
     top_topics: list[str] = []
     counting: CountingMethod = "fractional"
+    paper_count: int = 0            # whole papers, every country on the paper counted once
+    fractional_count: float = 0     # sum of 1/N over distinct countries
+    by_year: list[CountryYearCount] = []
+
+
+class TopicCountryYear(BaseModel):
+    """One row of the topic × country × year aggregate."""
+    topic_id: str
+    topic_name: str
+    country_code: str
+    year: int
+    paper_count: int
+    fractional_count: float
 
 
 class Run(BaseModel):
