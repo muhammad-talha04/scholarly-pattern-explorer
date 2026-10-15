@@ -1,5 +1,5 @@
 import type { TopicLink } from "@/lib/graph";
-import { clusterColors, galaxyColor } from "@/lib/palette";
+import { accent, clusterColors, galaxyColor, plexusCopper, plexusGold } from "@/lib/palette";
 
 /** One paper placed in the galaxy, with the cluster fields the shaders read. */
 export interface Star {
@@ -52,24 +52,6 @@ export function centroid(nodes: { pos: [number, number, number] }[]): [number, n
   return [s[0] / nodes.length, s[1] / nodes.length, s[2] / nodes.length];
 }
 
-/** Above this, the hero keeps a round-robin sample so the web stays readable. */
-const NETWORK_CAP = 70;
-/** Nodes stay inside this disc so the web fits the right-hand pane. */
-const FIELD = 8.15;
-
-type Vec = [number, number, number];
-type Placed = { id: string; support: number; clusterId?: string; gap?: boolean; pos?: Vec };
-
-export type NetRole = "node" | "secondary";
-export interface NetEdge {
-  source: string;
-  target: string;
-  a: Vec;
-  b: Vec;
-  /** `near` is a link inside a cluster. `hub` is a bridge, and the line shader pulses it. */
-  kind: "near" | "hub";
-}
-
 /** Amber shade for one paper. Stays on the cluster ramp, with a small per-paper shift. */
 export function nodeAmber(colorIndex: number | null | undefined, clusterId: string, id: string) {
   const base = galaxyColor(colorIndex, clusterId);
@@ -79,345 +61,281 @@ export function nodeAmber(colorIndex: number | null | undefined, clusterId: stri
   return clusterColors[((at < 0 ? 0 : at) + (h % 3)) % clusterColors.length];
 }
 
-type Drawn<T> = T & { pos: Vec; center: Vec; role: NetRole; group: string };
-
-interface Group<T> {
+type Vec = [number, number, number];
+type Placed = {
   id: string;
+  support: number;
+  clusterId?: string;
+  cluster?: string;
+  gap?: boolean;
+  colorIndex?: number;
+  emerging?: number;
+  fresh?: boolean;
+  pos?: Vec;
+};
+
+/** How many tiny vertices the hero plexus draws. */
+export const PLEXUS_COUNT = 310;
+/** Neighbours farther than this are not linked. */
+export const LINK_REACH = 1.05;
+
+const LEN = 15.6;
+const DIR_X = Math.SQRT1_2;
+const DIR_Z = -Math.SQRT1_2;
+const PER_X = Math.SQRT1_2;
+const PER_Z = Math.SQRT1_2;
+
+export type NetRole = "node";
+export interface NetEdge {
+  source: string;
+  target: string;
+  a: Vec;
+  b: Vec;
+  span: number;
+  alpha: number;
+}
+
+export interface PlexusNode {
+  id: string;
+  support: number;
+  gap: boolean;
+  gapScore?: number;
+  cluster?: string;
+  clusterId: string;
+  colorIndex?: number;
+  emerging: number;
+  fresh?: boolean;
+  pos: Vec;
   center: Vec;
-  members: Drawn<T>[];
+  role: NetRole;
+  /** 0 at the copper lower-left, 1 at the pale-gold upper-right. */
+  t: number;
+  phase: number;
+  fade: number;
+  paper: boolean;
+  twinkle: number;
+}
+
+/** Copper → amber → pale gold along the band. */
+export function plexusTint(t: number) {
+  const u = Math.min(1, Math.max(0, t));
+  if (u < 0.5) return mixHex(plexusCopper, accent, u * 2);
+  return mixHex(accent, plexusGold, (u - 0.5) * 2);
+}
+
+/** Near-white core, still tinted by the band. */
+export function plexusCore(t: number) {
+  return mixHex(plexusTint(t), "#FFF8EE", 0.8);
 }
 
 /**
- * Hero drawing. Papers sit in small irregular clusters with sparse local links
- * and a few straight bridges. The same seed lays the web out the same way on every load.
+ * Hero drawing. A seeded low-poly plexus: one diagonal band of tiny nodes,
+ * each linked only to its nearby neighbours. Real papers are bound onto the band.
  */
-export function heroNetwork<T extends Placed>(nodes: T[]): {
-  nodes: Drawn<T>[]; edges: NetEdge[]; hub: Vec;
-} {
-  const picked = nodes.length > NETWORK_CAP ? pickNetwork(nodes) : nodes.slice();
-  if (!picked.length) return { nodes: [], edges: [], hub: [0, 0, 0] };
-  return layClusters(picked);
+export function heroNetwork<T extends Placed>(papers: T[]): { nodes: PlexusNode[]; edges: NetEdge[]; hub: Vec } {
+  if (!papers.length) return { nodes: [], edges: [], hub: [0, 0, 0] };
+  const rand = mulberry(0x51eed);
+  const dots = buildBand(rand);
+  const nodes = bindPapers(dots, papers);
+  const edges = linkBand(nodes, rand);
+  return { nodes, edges, hub: centroid(nodes) };
 }
 
-function pickNetwork<T extends Placed>(nodes: T[]): T[] {
-  const groups = new Map<string, T[]>();
-  for (const n of nodes) {
-    const list = groups.get(n.clusterId || "") ?? [];
-    list.push(n);
-    groups.set(n.clusterId || "", list);
+interface Dot { t: number; s: number; pos: Vec; fade: number }
+
+function buildBand(rand: () => number): Dot[] {
+  const dots: Dot[] = [];
+  const cell = 0.34;
+  const grid = new Map<string, number[]>();
+  const bucket = (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}`;
+  let minDist = 0.38;
+  let spins = 0;
+  while (dots.length < PLEXUS_COUNT && spins < 12) {
+    spins++;
+    let tries = 0;
+    let added = 0;
+    while (dots.length < PLEXUS_COUNT && tries < 7000) {
+      tries++;
+      const t = 0.5 + gauss(rand) * 0.2;
+      if (t <= 0.02 || t >= 0.98) continue;
+      const s = gauss(rand) * 0.42;
+      if (s < -1 || s > 1) continue;
+      const edge = 0.86 + 0.16 * Math.sin(t * 9.2 + 0.4) + 0.08 * Math.sin(t * 21.0 + 1.4);
+      if (Math.abs(s) > edge) continue;
+      const y = (rand() - 0.5) * 0.62;
+      const pos = place(t, s, y);
+      const dist = minDist * (0.72 + 0.55 * (Math.abs(t - 0.5) * 2) + 0.35 * Math.abs(s));
+      if (tooClose(dots, grid, cell, pos, dist)) continue;
+      const along = Math.exp(-((t - 0.5) ** 2) / 0.12);
+      const across = Math.exp(-(s * s) / 0.28);
+      const idx = dots.length;
+      dots.push({ t, s, pos, fade: 0.34 + 0.66 * Math.min(1, along * 0.7 + across * 0.5) });
+      const k = bucket(pos[0], pos[2]);
+      const list = grid.get(k);
+      if (list) list.push(idx);
+      else grid.set(k, [idx]);
+      added++;
+    }
+    if (!added) minDist *= 0.88;
+    else minDist *= 0.94;
   }
-  for (const list of groups.values()) list.sort((a, b) => b.support - a.support || a.id.localeCompare(b.id));
-  const picked: T[] = [];
-  const seen = new Set<string>();
-  const take = (n: T) => {
-    if (picked.length >= NETWORK_CAP || seen.has(n.id)) return;
-    seen.add(n.id);
-    picked.push(n);
-  };
-  const gap = nodes.filter((n) => n.gap).sort((a, b) => b.support - a.support || a.id.localeCompare(b.id))[0];
-  if (gap) take(gap);
-  const keys = [...groups.keys()];
-  let round = 0;
-  while (picked.length < NETWORK_CAP) {
-    let added = false;
-    for (const key of keys) {
-      const list = groups.get(key)!;
-      if (round < list.length) {
-        take(list[round]);
-        added = true;
-        if (picked.length >= NETWORK_CAP) break;
+  return dots;
+}
+
+function halfWidth(t: number) {
+  const env = Math.sin(Math.PI * Math.min(1, Math.max(0, t))) ** 0.72;
+  const blob = 0.76 + 0.24 * Math.sin(t * 8.4 + 0.5) + 0.14 * Math.sin(t * 16.2 + 1.7) + 0.08 * Math.sin(t * 28.0);
+  return (0.42 + 3.45 * env) * Math.max(0.4, blob);
+}
+
+function centerShift(t: number) {
+  return 0.48 * Math.sin(t * 6.3 + 0.6) + 0.26 * Math.sin(t * 14.4 + 2.1);
+}
+
+function place(t: number, s: number, y: number): Vec {
+  const along = (t - 0.5) * LEN;
+  const across = s * halfWidth(t) + centerShift(t);
+  return [DIR_X * along + PER_X * across, y, DIR_Z * along + PER_Z * across];
+}
+
+function tooClose(dots: Dot[], grid: Map<string, number[]>, cell: number, pos: Vec, min: number) {
+  const min2 = min * min;
+  const cx = Math.floor(pos[0] / cell);
+  const cz = Math.floor(pos[2] / cell);
+  const reach = Math.ceil(min / cell) + 1;
+  for (let gx = cx - reach; gx <= cx + reach; gx++) {
+    for (let gz = cz - reach; gz <= cz + reach; gz++) {
+      const list = grid.get(`${gx}:${gz}`);
+      if (!list) continue;
+      for (const i of list) {
+        const o = dots[i].pos;
+        const dx = o[0] - pos[0];
+        const dz = o[2] - pos[2];
+        if (dx * dx + dz * dz < min2) return true;
       }
     }
-    if (!added) break;
-    round++;
   }
-  return picked;
+  return false;
 }
 
-function layClusters<T extends Placed>(nodes: T[]): { nodes: Drawn<T>[]; edges: NetEdge[]; hub: Vec } {
-  const rand = mulberry(0x5eed ^ Math.imul(nodes.length, 0x9e3779b1));
-  const count = clusterCount(nodes.length);
-  const sizes = clusterSizes(nodes.length, count, rand);
-  const centers = placeCenters(count, rand);
-  const drawn: Drawn<T>[] = [];
-  const groups: Group<T>[] = [];
-  let cursor = 0;
-  for (let g = 0; g < count; g++) {
-    const slice = nodes.slice(cursor, cursor + sizes[g]);
-    cursor += sizes[g];
-    const spots = scatter(centers[g], slice.length, rand);
-    const hubAt = slice.reduce((best, node, i) => {
-      const lead = slice[best];
-      if (node.support > lead.support) return i;
-      if (node.support === lead.support && node.id.localeCompare(lead.id) < 0) return i;
-      return best;
-    }, 0);
-    let nearest = 0;
-    let nearestD = Infinity;
-    spots.forEach((spot, i) => {
-      const d = dist2(spot, centers[g]);
-      if (d < nearestD) { nearestD = d; nearest = i; }
-    });
-    if (nearest !== hubAt) {
-      const swap = spots[hubAt];
-      spots[hubAt] = spots[nearest];
-      spots[nearest] = swap;
+function bindPapers<T extends Placed>(dots: Dot[], papers: T[]): PlexusNode[] {
+  const order = dots.map((_, i) => i).sort((a, b) => dots[a].t - dots[b].t || a - b);
+  const taken = new Set<number>();
+  const bound = new Map<number, T>();
+  papers.forEach((paper, i) => {
+    const target = Math.round(((i + 0.5) / papers.length) * (order.length - 1));
+    for (let hop = 0; hop < order.length; hop++) {
+      const step = hop === 0 ? 0 : hop % 2 === 0 ? hop / 2 : -Math.ceil(hop / 2);
+      const at = Math.min(order.length - 1, Math.max(0, target + step));
+      const idx = order[at];
+      if (taken.has(idx)) continue;
+      taken.add(idx);
+      bound.set(idx, paper);
+      break;
     }
-    const id = `c${g}`;
-    const members = slice.map((node, i) => ({
-      ...node,
-      pos: spots[i],
-      center: spots[i],
-      role: (i === hubAt ? "secondary" : "node") as NetRole,
-      group: id,
-    }));
-    drawn.push(...members);
-    groups.push({ id, center: centroid(members), members });
-  }
-  separate(drawn, 0.74);
-  clampField(drawn);
-  for (const group of groups) group.center = centroid(group.members);
-
-  const edges: NetEdge[] = [];
-  const used = new Set<string>();
-  for (const group of groups) {
-    for (const [a, b] of linkCluster(group.members, rand)) {
-      const left = group.members.find((m) => m.id === a)!;
-      const right = group.members.find((m) => m.id === b)!;
-      used.add(pairKey(a, b));
-      edges.push({ source: a, target: b, a: left.pos, b: right.pos, kind: "near" });
+  });
+  return dots.map((dot, i) => {
+    const paper = bound.get(i);
+    const phase = ((Math.imul(i + 3, 0x9e3779b1) >>> 0) % 10000) / 10000 * Math.PI * 2;
+    const base = {
+      pos: dot.pos,
+      center: dot.pos,
+      role: "node" as const,
+      t: dot.t,
+      phase,
+      fade: dot.fade,
+      twinkle: phase % 1 > 0.86 || paper?.fresh ? 1 : 0,
+    };
+    if (!paper) {
+      return {
+        ...base,
+        id: `dot-${i}`,
+        support: 0.2,
+        gap: false,
+        clusterId: "",
+        emerging: 0,
+        paper: false,
+      };
     }
-  }
-  addBridges(groups, rand, edges, used);
-  return { nodes: drawn, edges, hub: centroid(drawn) };
+    return {
+      ...base,
+      id: paper.id,
+      support: paper.support,
+      gap: !!paper.gap,
+      gapScore: undefined,
+      cluster: paper.cluster,
+      clusterId: paper.clusterId || "",
+      colorIndex: paper.colorIndex,
+      emerging: paper.emerging ?? 0,
+      fresh: paper.fresh,
+      paper: true,
+      twinkle: (base.twinkle || paper.fresh) ? 1 : 0,
+    };
+  });
 }
 
-/** Seven to nine groups when the paper count can fill them. Smaller graphs use fewer. */
-function clusterCount(n: number) {
-  if (n <= 12) return 1;
-  const lo = Math.max(1, Math.ceil(n / 12));
-  const hi = Math.floor(n / 5);
-  if (hi < lo) return lo;
-  if (lo <= 8 && 8 <= hi) return 8;
-  let best = lo;
-  for (let k = lo; k <= hi; k++) if (Math.abs(k - 8) < Math.abs(best - 8)) best = k;
-  return best;
-}
-
-function clusterSizes(n: number, k: number, rand: () => number) {
-  if (k <= 1) return [n];
-  const sizes = Array.from({ length: k }, () => 5);
-  let extra = n - 5 * k;
-  let guard = 0;
-  while (extra > 0 && guard++ < n * 8) {
-    const i = Math.floor(rand() * k);
-    if (sizes[i] < 12) { sizes[i]++; extra--; }
-  }
-  return sizes;
-}
-
-function placeCenters(k: number, rand: () => number): Vec[] {
-  if (k <= 1) return [[(rand() - 0.5) * 0.3, 0, (rand() - 0.5) * 0.3]];
-  const field = 6.15;
-  let minSep = 3.55;
-  const centers: Vec[] = [];
-  let spins = 0;
-  while (centers.length < k && spins < 48) {
-    spins++;
-    let hit: Vec | null = null;
-    let best = -1;
-    let bestPos: Vec | null = null;
-    for (let t = 0; t < 56; t++) {
-      const ang = rand() * Math.PI * 2;
-      const rad = field * Math.sqrt(0.12 + 0.88 * rand());
-      const pos: Vec = [Math.cos(ang) * rad, (rand() - 0.5) * 0.35, Math.sin(ang) * rad];
-      const d = centers.length ? Math.min(...centers.map((c) => dist2(c, pos))) : 99;
-      if (d >= minSep) { hit = pos; break; }
-      if (d > best) { best = d; bestPos = pos; }
-    }
-    if (hit) centers.push(hit);
-    else if (bestPos && minSep < 2.55) centers.push(bestPos);
-    else minSep *= 0.9;
-  }
-  while (centers.length < k) {
-    const ang = (centers.length / k) * Math.PI * 2;
-    centers.push([Math.cos(ang) * field * 0.7, 0, Math.sin(ang) * field * 0.7]);
-  }
-  return centers;
-}
-
-function scatter(center: Vec, count: number, rand: () => number): Vec[] {
-  const reach = 0.36 + 0.25 * Math.sqrt(count);
-  const pts: Vec[] = [];
-  for (let i = 0; i < count; i++) {
-    const ang = rand() * Math.PI * 2;
-    const rad = reach * Math.sqrt(rand());
-    pts.push([
-      center[0] + Math.cos(ang) * rad,
-      center[1] + (rand() - 0.5) * 0.18,
-      center[2] + Math.sin(ang) * rad,
-    ]);
-  }
-  const limit = reach * 1.22;
-  for (let iter = 0; iter < 28; iter++) {
-    for (let i = 0; i < pts.length; i++) {
-      for (let j = i + 1; j < pts.length; j++) {
-        let dx = pts[j][0] - pts[i][0];
-        let dz = pts[j][2] - pts[i][2];
-        const d = Math.hypot(dx, dz) || 0.001;
-        if (d < 0.76) {
-          const push = (0.76 - d) / 2;
-          dx /= d; dz /= d;
-          pts[i][0] -= dx * push; pts[i][2] -= dz * push;
-          pts[j][0] += dx * push; pts[j][2] += dz * push;
+function linkBand(nodes: PlexusNode[], rand: () => number): NetEdge[] {
+  const cell = LINK_REACH;
+  const grid = new Map<string, number[]>();
+  const key = (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}`;
+  nodes.forEach((node, i) => {
+    const k = key(node.pos[0], node.pos[2]);
+    const list = grid.get(k);
+    if (list) list.push(i);
+    else grid.set(k, [i]);
+  });
+  const pairs: { i: number; j: number; d: number }[] = [];
+  nodes.forEach((node, i) => {
+    const cx = Math.floor(node.pos[0] / cell);
+    const cz = Math.floor(node.pos[2] / cell);
+    for (let gx = cx - 1; gx <= cx + 1; gx++) {
+      for (let gz = cz - 1; gz <= cz + 1; gz++) {
+        const bucket = grid.get(`${gx}:${gz}`);
+        if (!bucket) continue;
+        for (const j of bucket) {
+          if (j <= i) continue;
+          const d = Math.hypot(node.pos[0] - nodes[j].pos[0], node.pos[2] - nodes[j].pos[2]);
+          if (d <= LINK_REACH) pairs.push({ i, j, d });
         }
       }
-      const dx = pts[i][0] - center[0];
-      const dz = pts[i][2] - center[2];
-      const d = Math.hypot(dx, dz);
-      if (d > limit) {
-        pts[i][0] = center[0] + (dx / d) * limit;
-        pts[i][2] = center[2] + (dz / d) * limit;
-      }
     }
-  }
-  return pts;
-}
-
-/** Push any two papers that landed on top of each other just far enough to read as separate spheres. */
-function separate(nodes: { pos: Vec }[], min: number) {
-  for (let iter = 0; iter < 16; iter++) {
-    let moved = false;
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        let dx = nodes[j].pos[0] - nodes[i].pos[0];
-        let dz = nodes[j].pos[2] - nodes[i].pos[2];
-        const d = Math.hypot(dx, dz) || 0.001;
-        if (d >= min) continue;
-        const push = (min - d) / 2;
-        dx /= d; dz /= d;
-        nodes[i].pos[0] -= dx * push; nodes[i].pos[2] -= dz * push;
-        nodes[j].pos[0] += dx * push; nodes[j].pos[2] += dz * push;
-        moved = true;
-      }
-    }
-    if (!moved) break;
-  }
-}
-
-function clampField(nodes: { pos: Vec; center: Vec }[]) {
-  for (const node of nodes) {
-    const d = Math.hypot(node.pos[0], node.pos[2]) || 0.001;
-    if (d <= FIELD) continue;
-    const s = FIELD / d;
-    node.pos = [node.pos[0] * s, node.pos[1], node.pos[2] * s];
-    node.center = node.pos;
-  }
-}
-
-function linkCluster<T extends Placed>(members: Drawn<T>[], rand: () => number): [string, string][] {
-  if (members.length < 2) return [];
-  const hub = members.find((m) => m.role === "secondary") ?? members[0];
-  const leafCap = Math.min(members.length - 1, 3);
-  const hubCap = Math.min(members.length - 1, 5);
-  const hubWant = members.length <= 4 ? members.length - 1 : 4 + (rand() < 0.5 ? 1 : 0);
-  const leafWant = new Map(members.filter((m) => m.id !== hub.id).map((m) => [
-    m.id,
-    members.length <= 3 ? 1 : 1 + Math.floor(rand() * 3),
-  ]));
-  const deg = new Map(members.map((m) => [m.id, 0]));
-  const used = new Set<string>();
-  const edges: [string, string][] = [];
-  const room = (m: Drawn<T>) => (deg.get(m.id) ?? 0) < (m.id === hub.id ? hubCap : leafCap);
-  const add = (a: Drawn<T>, b: Drawn<T>) => {
-    const key = pairKey(a.id, b.id);
-    if (a.id === b.id || used.has(key) || !room(a) || !room(b)) return false;
-    used.add(key);
-    edges.push([a.id, b.id]);
-    deg.set(a.id, (deg.get(a.id) ?? 0) + 1);
-    deg.set(b.id, (deg.get(b.id) ?? 0) + 1);
-    return true;
-  };
-  const others = members.filter((m) => m.id !== hub.id);
-  for (let i = others.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [others[i], others[j]] = [others[j], others[i]];
-  }
-  for (const other of others) {
-    if ((deg.get(hub.id) ?? 0) >= hubWant) break;
-    add(hub, other);
-  }
-  const open = () => members.filter((m) => (deg.get(m.id) ?? 0) === 0);
-  for (const member of open()) {
-    const pool = members.filter((m) => m.id !== member.id && room(m) && !used.has(pairKey(member.id, m.id)));
-    if (pool.length) add(member, pool[Math.floor(rand() * pool.length)]);
-  }
-  const leaves = others.filter((m) => (deg.get(m.id) ?? 0) < (leafWant.get(m.id) ?? 1));
-  for (const leaf of leaves) {
-    const want = leafWant.get(leaf.id) ?? 1;
-    let guard = 0;
-    while ((deg.get(leaf.id) ?? 0) < want && guard++ < members.length) {
-      const pool = others.filter((m) => m.id !== leaf.id && room(m) && !used.has(pairKey(leaf.id, m.id)));
-      if (!pool.length || !add(leaf, pool[Math.floor(rand() * pool.length)])) break;
-    }
+  });
+  pairs.sort((a, b) => a.d - b.d);
+  const cap = nodes.map(() => 3 + Math.floor(rand() * 4));
+  const deg = nodes.map(() => 0);
+  const edges: NetEdge[] = [];
+  for (const pair of pairs) {
+    if (deg[pair.i] >= cap[pair.i] || deg[pair.j] >= cap[pair.j]) continue;
+    deg[pair.i]++;
+    deg[pair.j]++;
+    const fade = 1 - pair.d / LINK_REACH;
+    edges.push({
+      source: nodes[pair.i].id,
+      target: nodes[pair.j].id,
+      a: nodes[pair.i].pos,
+      b: nodes[pair.j].pos,
+      span: pair.d,
+      alpha: 0.08 + 0.42 * fade * fade,
+    });
   }
   return edges;
 }
 
-function addBridges<T extends Placed>(groups: Group<T>[], rand: () => number, edges: NetEdge[], used: Set<string>) {
-  if (groups.length < 2) return;
-  const neigh = new Set<string>();
-  const neighPairs: [number, number][] = [];
-  for (let i = 0; i < groups.length; i++) {
-    const near = groups
-      .map((group, j) => ({ j, d: dist2(groups[i].center, group.center) }))
-      .filter((item) => item.j !== i)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, Math.min(2, groups.length - 1));
-    for (const item of near) {
-      const a = Math.min(i, item.j);
-      const b = Math.max(i, item.j);
-      const key = `${a}:${b}`;
-      if (neigh.has(key)) continue;
-      neigh.add(key);
-      neighPairs.push([a, b]);
-    }
-  }
-  for (const [a, b] of neighPairs) join(groups[a], groups[b], 1 + Math.floor(rand() * 3), rand, edges, used);
-  if (groups.length < 4) return;
-  const far: { a: number; b: number; d: number }[] = [];
-  for (let i = 0; i < groups.length; i++) {
-    for (let j = i + 1; j < groups.length; j++) {
-      if (neigh.has(`${i}:${j}`)) continue;
-      far.push({ a: i, b: j, d: dist2(groups[i].center, groups[j].center) });
-    }
-  }
-  far.sort((a, b) => b.d - a.d);
-  const pool = far.slice(0, Math.max(3, Math.ceil(far.length / 3)));
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  for (let s = 0; s < Math.min(3, pool.length); s++) join(groups[pool[s].a], groups[pool[s].b], 1, rand, edges, used);
+/** Same offset the vertex shaders add, so hover stays on the moving node. */
+export function plexusDrift(phase: number, time: number, motion: number): Vec {
+  if (!motion) return [0, 0, 0];
+  return [
+    Math.sin(time * 0.37 + phase) * 0.08,
+    Math.sin(time * 0.29 + phase * 1.7) * 0.045,
+    Math.cos(time * 0.33 + phase * 0.85) * 0.08,
+  ];
 }
 
-function join<T extends Placed>(a: Group<T>, b: Group<T>, count: number, rand: () => number, edges: NetEdge[], used: Set<string>) {
-  let made = 0;
-  let tries = 0;
-  while (made < count && tries < 28) {
-    tries++;
-    const left = a.members[Math.floor(rand() * a.members.length)];
-    const right = b.members[Math.floor(rand() * b.members.length)];
-    const key = pairKey(left.id, right.id);
-    if (used.has(key)) continue;
-    used.add(key);
-    edges.push({ source: left.id, target: right.id, a: left.pos, b: right.pos, kind: "hub" });
-    made++;
-  }
-}
-
-function pairKey(a: string, b: string) {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
+function mixHex(a: string, b: string, t: number) {
+  const pa = Number.parseInt(a.slice(1), 16);
+  const pb = Number.parseInt(b.slice(1), 16);
+  const ch = (shift: number) => Math.round(((pa >> shift) & 255) + (((pb >> shift) & 255) - ((pa >> shift) & 255)) * t);
+  return `#${[ch(16), ch(8), ch(0)].map((v) => v.toString(16).padStart(2, "0")).join("")}`.toUpperCase();
 }
 
 function mulberry(seed: number) {
@@ -428,12 +346,12 @@ function mulberry(seed: number) {
   };
 }
 
-function dist2(a: Vec, b: Vec) {
-  return Math.hypot(a[0] - b[0], a[2] - b[2]);
+function gauss(rand: () => number) {
+  const u = Math.max(1e-7, rand());
+  const v = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(Math.PI * 2 * v);
 }
 
 export function networkLinks(edges: NetEdge[]): TopicLink[] {
-  return edges
-    .filter((e) => e.source !== "hub" && e.target !== "hub")
-    .map((e) => ({ source: e.source, target: e.target, weight: e.kind === "hub" ? 0.8 : 0.45 }));
+  return edges.map((e) => ({ source: e.source, target: e.target, weight: e.alpha }));
 }

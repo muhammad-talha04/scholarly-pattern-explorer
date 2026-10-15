@@ -19,6 +19,10 @@ export const up = "#009E73";
 export const down = "#D55E00";
 /** Thin straight links between papers. */
 export const linkAmber = "#F5A54A";
+/** Plexus band, lower-left copper. */
+export const plexusCopper = "#C2410C";
+/** Plexus band, upper-right pale gold. */
+export const plexusGold = "#FDE7B0";
 /** Grey for a galaxy cluster past the five amber tones. */
 export const otherColor = "#6D7C96";
 

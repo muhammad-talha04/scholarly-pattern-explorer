@@ -125,7 +125,7 @@ export function GalaxyHero() {
           <h1 className="mt-3 font-sans text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
             Explore research <span className="text-accent">by meaning</span>
           </h1>
-          <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Each node is a paper. Amber marks a topic cluster. Papers sit together when their embeddings are close.</p>
+          <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Papers sit in a plexus. Color runs from copper to pale gold along the band.</p>
           <div className="mt-6">
             <SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} />
             <ul aria-label="Suggestions" className="mt-3 flex flex-wrap gap-2">
