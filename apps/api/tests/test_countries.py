@@ -10,15 +10,14 @@ sys.path.insert(0, str(ROOT))
 
 from app.main import app  # noqa: E402
 from pipeline.country_stats import snapshot, tally  # noqa: E402
-from pipeline.ingest import normalize  # noqa: E402
 import pipeline.country_api as country_api  # noqa: E402
 
 client = TestClient(app)
 
-W = {"id": "https://openalex.org/W1", "display_name": "T", "publication_year": 2025,
-     "authorships": [{"author": {"display_name": "A"}, "countries": ["PK"]},
-                     {"author": {"display_name": "B"}, "institutions": [{"country_code": "CA"}]}],
-     "topics": [{"id": "https://openalex.org/T1", "display_name": "AI"}]}
+# Already-normalized work. Kept here so this test does not import pipeline.ingest
+# (that module needs requests, which the API job does not install).
+BASE = {"id": "W1", "year": 2025, "countries": ["CA", "PK"], "topics": ["AI"],
+        "topic_refs": [{"id": "T1", "name": "AI"}]}
 
 
 def _use(tmp_path, monkeypatch, works):
@@ -36,11 +35,10 @@ def test_countries_empty_without_snapshot(monkeypatch, tmp_path):
 
 
 def test_countries_whole_and_fractional(monkeypatch, tmp_path):
-    base = normalize(W)
     works = [
-        base,
-        {**base, "id": "W2", "year": 2026, "countries": ["PK"]},
-        {**base, "id": "W0", "year": 2024, "countries": []},
+        BASE,
+        {**BASE, "id": "W2", "year": 2026, "countries": ["PK"]},
+        {**BASE, "id": "W0", "year": 2024, "countries": []},
     ]
     _use(tmp_path, monkeypatch, works)
     fractional = client.get("/api/v1/countries").json()
@@ -59,7 +57,7 @@ def test_countries_whole_and_fractional(monkeypatch, tmp_path):
 
 
 def test_topic_country_years_endpoint(monkeypatch, tmp_path):
-    paper = normalize(W)  # CA + PK, topic T1, year 2025
+    paper = BASE  # CA + PK, topic T1, year 2025
     _use(tmp_path, monkeypatch, [paper])
     rows = client.get("/api/v1/topic-country-years").json()
     assert len(rows) == 2
