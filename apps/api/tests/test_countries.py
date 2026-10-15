@@ -101,6 +101,27 @@ def test_countries_whole_and_fractional(monkeypatch, tmp_path):
     assert pairs == [{"source": "CA", "target": "PK", "papers": 1.0}]
 
 
+def test_topic_country_year_limit_clamped(monkeypatch):
+    from pipeline.country_api import (TOPIC_COUNTRY_YEAR_DEFAULT_LIMIT,
+                                      TOPIC_COUNTRY_YEAR_MAX_LIMIT)
+    rows = [{"topic_id": "T", "topic_name": "N", "country_code": "PK",
+             "year": i, "paper_count": 1, "fractional_count": 1.0}
+            for i in range(TOPIC_COUNTRY_YEAR_MAX_LIMIT + 1)]
+    monkeypatch.setattr(country_api, "snapshot", lambda: {"topic_country_year": rows})
+    assert len(country_api.topic_country_years()) == TOPIC_COUNTRY_YEAR_DEFAULT_LIMIT
+    assert len(country_api.topic_country_years(limit=3)) == 3
+    assert len(country_api.topic_country_years(limit=0)) == 1
+    assert len(country_api.topic_country_years(limit=-8)) == 1
+    assert len(country_api.topic_country_years(limit=10**9)) == TOPIC_COUNTRY_YEAR_MAX_LIMIT
+    client = TestClient(app)
+    assert len(client.get("/api/v1/topic-country-years", params={"limit": 2}).json()) == 2
+    assert len(client.get("/api/v1/topic-country-years", params={"limit": 0}).json()) == 1
+    assert len(client.get("/api/v1/topic-country-years", params={"limit": -3}).json()) == 1
+    capped = client.get("/api/v1/topic-country-years", params={"limit": 10**9})
+    assert capped.status_code == 200 and len(capped.json()) == TOPIC_COUNTRY_YEAR_MAX_LIMIT
+    assert client.get("/api/v1/topic-country-years", params={"limit": "many"}).status_code == 422
+
+
 def test_topic_country_years_endpoint(monkeypatch, tmp_path):
     client = _use(tmp_path, monkeypatch, [BASE])
     rows = client.get("/api/v1/topic-country-years").json()
