@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 by #6 (country analytics), #8 (embedding benchmark, paper galaxy) and #9 (research gaps, similar papers, emerging topics); earlier 05:15 PKT by tom (ML row) and ami (integration tests row).
+Last updated: 2026-10-15 by #6 (country analytics), #8 (embedding benchmark, paper galaxy), #9 (research gaps, similar papers, emerging topics) and #10 (search qrels, pattern stability, feature shortlist); earlier 05:15 PKT by tom (ML row) and ami (integration tests row).
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -59,4 +59,5 @@ harry `/workspace/spe-web`, michal `/workspace/michal-spe`, ami `/workspace/spe-
   - Done: `ml/gaps.py`. For each topic, growth is the smoothed, clipped mean year-over-year growth over the last 3 complete years, capped at the median so a one-off spike is damped. Volume is the number of papers in that window. Minimum counts: 20 papers in the window and 5 in the last year. Gap score = growth percentile minus volume percentile. Top countries use fractional counting. `/api/v1/patterns?trend=gap` returns `Pattern` with `items=[topic]` and `support=gap_score`, plus new optional fields `gap_score`, `growth_rate`, `paper_count` and `top_countries` (olli: please review the `schemas.py` addition). `eval/search_queries.jsonl` has 35 queries, and `eval/run_search_eval.py` computes recall@10 and nDCG@10 (see `eval/README.md`). Tests: `ml/tests/test_gaps.py`, `ml/tests/test_search_eval.py`, and the gap route in `apps/api/tests/test_ml_routes.py`.
   - For grok: please add these keys to `data/country_snapshot.json`: `topic_year_counts` as `{topic: {"YYYY": papers}}` and `topic_top_countries` as `{topic: [[code, fractional_count], ...]}` sorted descending. The gap finder uses them when present. Until then it computes both from `data/works_v2.jsonl` (path override: `COUNTRY_SNAPSHOT` env).
   - Next: fill `openalex_ids` in the query set from the real `works_v2.jsonl`, then report MiniLM numbers. Relevance is keyword- and topic-based for now; the repo has no work IDs.
+- [ ] Search qrels, pattern stability, feature shortlist: `eval/search_queries.jsonl` is 40 student queries. `eval/search_qrels.jsonl` maps each one to OpenAlex work ids with relevance 0–2 (`query_id`, `query`, `work_id`, `relevance`). `eval/score_search.py` runs `ml/` search and reports nDCG@10, Recall@20, and MRR; the pytest fixture stays offline. `eval/pattern_stability.py` compares incremental topics and patterns with a full rebuild and reports topic drift and splits. Shortlist of free-tool gaps we can build on OpenAlex: `docs/research/FEATURE_SHORTLIST.md`.
 - [ ] Optional: `OPENALEX_MAILTO` repo secret
