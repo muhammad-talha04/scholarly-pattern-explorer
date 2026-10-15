@@ -66,7 +66,7 @@ Index: `paper_embeddings_hnsw` on `embedding` with `vector_cosine_ops`. An older
 | `paper_count` | integer |
 | `fractional_count` | double precision |
 
-Primary key: `(topic_id, country_code, year)`. The view `topic_country_year_v` is `security_invoker` (Postgres 15, which Supabase provides), so it follows the table's row level security. The country pipeline still writes the same columns into SQLite `data/topic_country_year.sqlite`.
+Primary key: `(topic_id, country_code, year)`. The view `topic_country_year_v` is `security_invoker` (Postgres 15, which Supabase provides), so it follows the table's row level security. `pipeline/country_stats.py` replaces this table when `use_postgres()` is true (the same rule as `get_store`: `DATABASE_URL` selects Postgres unless `ML_VECTOR_BACKEND=local`, and `ML_VECTOR_BACKEND=pgvector` forces Postgres). Otherwise it rewrites SQLite `data/topic_country_year.sqlite`. An explicit `--table` always writes SQLite, so a local run can keep a file even when `DATABASE_URL` is set. Each run replaces the full combined row set. The snapshot tally is what makes the update incremental, so a second run does not add those rows on top of the table again. `GET /api/v1/topic-country-years` reads the same table and falls back to the snapshot list when the SQLite file is missing or Postgres cannot be reached. `/countries` totals stay on the snapshot tally, because summing this table would count a multi-topic paper more than once.
 
 `discovery_snapshots`
 
@@ -110,10 +110,13 @@ store.get_document("countries")
 `python -m ml.cli index` and `python -m ml.cli update` rebuild `galaxy` and
 `galaxy_state`. `GET /api/v1/galaxy` only reads the stored `galaxy` document.
 
-The typed topic × country × year aggregate from the country pipeline still
-lives in SQLite `topic_country_year` (`data/topic_country_year.sqlite`, view
-`topic_country_year_v`). The Postgres table of the same name is
+The typed topic × country × year aggregate is the `topic_country_year` table.
+`pipeline/country_stats.py` writes it to Postgres when `use_postgres()` is true
+and to SQLite `data/topic_country_year.sqlite` (view `topic_country_year_v`)
+otherwise. `--table` forces the SQLite file. The DDL is
 `db/migrations/002_topic_country_year.sql`. The `documents` row of kind
-`topic_country_year` is the shared JSON slot for the same counts.
+`topic_country_year` is a separate JSON slot and is not what the country
+pipeline writes.
+
 Gap and emerging runs can be stored in `discovery_snapshots` (`kind` is `gap`
 or `emerging`, `country_code` optional, `results` is the JSON payload).

@@ -22,5 +22,20 @@ def country_snapshot() -> Path:
 
 
 def topic_country_year_db() -> Path:
-    """SQLite aggregate written by pipeline/country_stats.py. Same anchoring as the snapshot."""
+    """SQLite topic × country × year file used when Postgres is not selected."""
     return resolve(os.getenv("TOPIC_COUNTRY_YEAR_DB", "data/topic_country_year.sqlite"))
+
+
+def use_postgres() -> bool:
+    """Same backend choice as ``ml.store.get_store``.
+
+    ``ML_VECTOR_BACKEND=local`` keeps files even when ``DATABASE_URL`` is set.
+    ``ML_VECTOR_BACKEND=pgvector`` selects Postgres and needs ``DATABASE_URL``.
+    When the variable is unset, a ``DATABASE_URL`` selects Postgres.
+    """
+    backend = os.getenv("ML_VECTOR_BACKEND", "").strip().lower()
+    if backend == "local":
+        return False
+    if backend == "pgvector":
+        return True
+    return bool(os.getenv("DATABASE_URL"))

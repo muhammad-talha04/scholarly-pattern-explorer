@@ -9,4 +9,6 @@
 -- 004 runs, paper_summaries, snapshots
 --
 -- The DuckDB/SQLite corpus schema is still schema.sql and indexes.sql.
--- pipeline/country_stats.py still writes the SQLite topic_country_year file.
+-- pipeline/country_stats.py writes topic_country_year to Postgres when
+-- DATABASE_URL selects that backend (see ml.paths.use_postgres), and to the
+-- SQLite file otherwise. --table forces SQLite.
