@@ -31,6 +31,19 @@ def test_topic_country_year_db_is_root_anchored(monkeypatch, tmp_path):
     assert paths.topic_country_year_db() == tmp_path / "t.sqlite"
 
 
+def test_discoveries_path_follows_ml_data_dir(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DISCOVERIES_PATH", raising=False)
+    monkeypatch.delenv("ML_DATA_DIR", raising=False)
+    assert paths.discoveries_path() == ROOT / "data" / "ml" / "discoveries.json"
+    monkeypatch.setenv("ML_DATA_DIR", "custom/ml")
+    assert paths.discoveries_path() == ROOT / "custom" / "ml" / "discoveries.json"
+    monkeypatch.setenv("DISCOVERIES_PATH", "custom/discoveries.json")
+    assert paths.discoveries_path() == ROOT / "custom" / "discoveries.json"
+    monkeypatch.setenv("DISCOVERIES_PATH", str(tmp_path / "snap.json"))
+    assert paths.discoveries_path() == tmp_path / "snap.json"
+
+
 def test_absolute_env_paths_are_kept(monkeypatch, tmp_path):
     monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
     monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "s.json"))

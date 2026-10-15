@@ -115,5 +115,9 @@ lives in SQLite `topic_country_year` (`data/topic_country_year.sqlite`, view
 `topic_country_year_v`). The Postgres table of the same name is
 `db/migrations/002_topic_country_year.sql`. The `documents` row of kind
 `topic_country_year` is the shared JSON slot for the same counts.
-Gap and emerging runs can be stored in `discovery_snapshots` (`kind` is `gap`
-or `emerging`, `country_code` optional, `results` is the JSON payload).
+`ml/discovery_store.py` stores each discover run in `discovery_snapshots` when
+the shared store is Postgres. `kind` is `gap`, `emerging` (`country_code` null
+for the global list, or one ISO code), `semantic_gaps`, `similar`, or `run`.
+`results` is the JSON payload. `ML_VECTOR_BACKEND=local`, or a missing
+`DATABASE_URL`, uses `data/ml/discoveries.json` instead. A Postgres run still
+writes that file so the 1st/15th workflow can upload it.

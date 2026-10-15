@@ -27,8 +27,9 @@ jobs:
       - name: Restore previous data
         env: {GH_TOKEN: "${{ github.token }}"}
         run: |
-          mkdir -p data
+          mkdir -p data data/ml
           gh release download data-store -p works_v2.jsonl -p ingest_state.json -p country_snapshot.json -D data --clobber || echo "first run"
+          gh release download data-store -p discoveries.json -D data/ml --clobber || echo "no discoveries yet"
       - name: Fetch only new works
         env:
           OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
@@ -55,6 +56,18 @@ jobs:
         env: {GH_TOKEN: "${{ github.token }}"}
         run: |
           f=data/ml/vectors/documents/galaxy.json
+          if [ -f "$f" ]; then
+            gh release upload data-store "$f" --clobber
+          fi
+      - name: Precompute gaps, emerging topics, and similar papers
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ML_DATA_DIR: data/ml
+        run: python -m ml.cli discover
+      - name: Save discoveries
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          f=data/ml/discoveries.json
           if [ -f "$f" ]; then
             gh release upload data-store "$f" --clobber
           fi
