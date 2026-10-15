@@ -148,7 +148,8 @@ def test_service_galaxy_round_trip(tmp_path):
     assert isinstance(by_id["W1"]["cluster_id"], str)
     assert {c["id"] for c in graph["clusters"]} >= {n["cluster_id"] for n in graph["nodes"]}
     for cluster in graph["clusters"]:
-        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index"}
+        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index", "emerging_score"}
+        assert cluster["emerging_score"] == 0.0
         assert isinstance(cluster["color_index"], int)
         assert cluster["name"] == cluster["label"]
         assert set(cluster["centroid"]) == {"x", "y", "z"}

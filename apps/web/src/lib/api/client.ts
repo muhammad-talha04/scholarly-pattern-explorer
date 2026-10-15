@@ -86,7 +86,12 @@ function fromGraph(raw: Record<string, unknown>): GalaxyGraph {
       const rec = c as Record<string, unknown>;
       const id = text(rec.id);
       if (!id) continue;
-      clusters.push({ id, name: text(rec.name) ?? id });
+      const cluster: GalaxyGraph["clusters"][number] = { id, name: text(rec.name) ?? id };
+      if (typeof rec.color_index === "number" && Number.isFinite(rec.color_index)) cluster.color_index = rec.color_index;
+      if (typeof rec.emerging_score === "number" && Number.isFinite(rec.emerging_score)) {
+        cluster.emerging_score = rec.emerging_score;
+      }
+      clusters.push(cluster);
     }
   }
   const links: GalaxyGraph["links"] = [];
