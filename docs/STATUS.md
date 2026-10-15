@@ -76,6 +76,15 @@ Merged into main, in order: #1 platform skeleton, #3 OpenAlex ingestion, #2 ML s
 
 The web app on Vercel is live. With `NEXT_PUBLIC_API_URL` unset it serves the built-in sample (66 papers). `render.yaml` at the repo root is a Render free-tier blueprint for `apps/api` (the API imports `ml/` and `pipeline/` from the repo root, so the service root is the repository). Build: `pip install -r apps/api/requirements.txt`. Start: `uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port $PORT`. Health check: `GET /api/v1/health`. No secret values are in the repo. Free-tier disk is ephemeral, so a file index disappears on restart; a persistent index needs `DATABASE_URL`.
 
+### Live data (2026-10-15)
+
+- API on Render: https://scholarly-pattern-explorer.onrender.com (free tier, `ML_EMBEDDER=hash`). Vercel `NEXT_PUBLIC_API_URL` points at it.
+- Supabase project `scholarly-pattern-explorer` (ref `obhzpotvdexzkaeheiun`, region `ap-south-1`, free plan). Migrations 001 to 004 applied; tables are owned by a dedicated login role `spe_api`, so row level security stays on with no policies and the API still reads and writes as the owner. `vector` lives in the `extensions` schema; the role's `search_path` is `public, extensions`.
+- Loaded 3000 real OpenAlex works (`primary_topic.subfield.id:subfields/1702`, articles since 2025-10-15) with `python -m pipeline.ingest --max-records 3000`, embedded with `ML_EMBEDDER=hash` (must match the API), plus the `galaxy` and `galaxy_state` documents from `python -m ml.cli index`.
+- `apps/api/requirements.txt` now includes `psycopg[binary]`; without it a `DATABASE_URL` makes the API fail on the first store call.
+- Render needs `DATABASE_URL` = the Supabase Session pooler string (port 5432, IPv4) for user `spe_api.obhzpotvdexzkaeheiun`. The value is never committed.
+- Pattern and discovery snapshots are still files under `ML_DATA_DIR`, so on the free tier they are rebuilt or missing after a restart.
+
 ### API env vars (Render)
 
 Set these in the Render dashboard. `render.yaml` lists them as `sync: false`.
@@ -129,5 +138,5 @@ Set these in the Render dashboard. `render.yaml` lists them as `sync: false`.
 - [ ] #16 read gaps and emerging topics from the precomputed discoveries snapshot: reviewed, tests pass with main merged in (ml+pipeline 91, api 27, integration 42). The merge resolution changes `.github/workflows/v2-ingest.yml` (discover step + upload of the refreshed `discoveries.json` after `ml.cli update`), and the push was refused because the bot token lacks the `workflow` permission. Needs a token with Workflows read/write, or the owner pushes the merge. Until #16 lands, gap/emerging routes still compute live.
 - [ ] `/galaxy` nodes are papers (#15). The hero used to say "Nodes are topics"; the galaxy-copy row above changes that wording. The client still normalises both payload shapes.
 - [ ] First successful 1st/15th run of `python -m ml.cli index` against the real `works_v2.jsonl`. The workflow step is in place. `python -m ml.cli update` also runs discoveries and rebuilds the galaxy.
-- [ ] Live pgvector / Supabase `DATABASE_URL` untested against a real database; tests use the file backend and the offline hash embedder.
+- [x] Live pgvector / Supabase: schema applied and 3000 works loaded on 2026-10-15 (see Live data under Deploy).
 - [ ] Deploy the API from `render.yaml` (free tier) and set Vercel `NEXT_PUBLIC_API_URL` to that origin. The web app is already on Vercel and, with the URL unset, serves the 66-paper sample. Env vars are listed under Deploy above. Do not commit secret values.
