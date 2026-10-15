@@ -2,17 +2,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TopicLink } from "@/lib/graph";
 import { gap as gapColor, ink } from "@/lib/theme";
-import { heroNetwork, neighborIds, networkLinks, plexusCore, plexusTint, type Star } from "./stars";
+import { breathAmount, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
 
-/** Flat plexus for reduced motion, low power, or no WebGL. Same band, no drift. */
-export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, onHighlight, onPick }: {
+type Frame = {
+  time: number;
+  motion: number;
+  unit: number;
+  shift: number;
+  ox: number;
+  oy: number;
+  rx: number;
+  ry: number;
+  rz: number;
+};
+
+/** Flat plexus. Same band, orbit, and breathing zoom as the 3D view, unless motion is reduced. */
+export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null, onFocus, onHighlight, onPick }: {
   nodes: (Partial<Star> & Pick<Star, "id" | "support" | "gap">)[]; links: TopicLink[]; showGaps: boolean;
-  focus?: string | null; highlight?: Set<string> | null;
+  focus?: string | null; highlight?: Set<string> | null; pose?: PlexusPose;
   onFocus?: (id: string) => void; onHighlight?: (cluster?: string) => void; onPick?: (id: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const net = useMemo(() => heroNetwork(nodes), [nodes]);
   const [hover, setHover] = useState<string | null>(null);
+  const hoverRef = useRef(hover);
+  const focusRef = useRef(focus);
+  const highlightRef = useRef(highlight);
+  const poseRef = useRef(pose);
+  const reduceRef = useRef(false);
+  const frameRef = useRef<Frame>({ time: 0, motion: 0, unit: 1, shift: 0, ox: 0, oy: 0, rx: 0, ry: 0, rz: 0 });
+  hoverRef.current = hover;
+  focusRef.current = focus;
+  highlightRef.current = highlight;
+  poseRef.current = pose;
   const activeId = hover ?? focus ?? null;
   const active = net.nodes.find((n) => n.paper && n.id === activeId);
   const near = useMemo(() => {
@@ -21,12 +43,26 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
     for (const id of neighborIds(hover, links)) ids.add(id);
     return ids;
   }, [hover, net.edges, links]);
+  const nearRef = useRef(near);
+  nearRef.current = near;
+
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    const apply = () => { reduceRef.current = mq.matches; };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const parent = canvas.parentElement;
     if (!parent || typeof ResizeObserver === "undefined") return;
+    let raf = 0;
+    let time = 0;
+    let last = performance.now();
     const draw = () => {
       const rect = parent.getBoundingClientRect();
       const w = Math.max(1, Math.floor(rect.width));
@@ -38,25 +74,53 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
       let ctx: CanvasRenderingContext2D | null = null;
       try { ctx = canvas.getContext("2d"); } catch { ctx = null; }
       if (!ctx) return;
+      const pinned = poseRef.current === "in" ? 1 : poseRef.current === "out" ? 0 : null;
+      const still = reduceRef.current || pinned != null;
+      const breath = reduceRef.current ? 0 : (pinned ?? breathAmount(time));
+      const motion = still ? 0 : 1;
+      const base = Math.min(w, h) / 18.5;
+      const unit = base * zoomScale(breath);
+      const wide = w >= WIDE_CANVAS;
+      const frame: Frame = {
+        time,
+        motion,
+        unit,
+        shift: wide ? REST_SHIFT * (1 - breath) * unit : 0,
+        ox: w * 0.5,
+        oy: h * 0.52,
+        rx: still ? 0 : Math.sin(time * ROCK_X_HZ + 0.7) * 0.045,
+        ry: still ? 0 : time * ORBIT_SPEED,
+        rz: still ? 0 : Math.sin(time * ROCK_Z_HZ + 1.4) * 0.03,
+      };
+      frameRef.current = frame;
+      const project = (pos: [number, number, number], phase: number) => {
+        const d = plexusDrift(phase, frame.time, frame.motion);
+        const [x, z] = spinPoint(pos[0] + d[0], pos[1] + d[1], pos[2] + d[2], frame.rx, frame.ry, frame.rz);
+        return [frame.ox + x * frame.unit + frame.shift, frame.oy + z * frame.unit] as [number, number];
+      };
+      const hoverId = hoverRef.current;
+      const focusId = focusRef.current;
+      const lit = highlightRef.current;
+      const nearIds = nearRef.current;
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = ink;
       ctx.fillRect(0, 0, w, h);
-      const unit = Math.min(w, h) / 18.5;
-      const project = (pos: [number, number, number]) => [w * 0.5 + pos[0] * unit, h * 0.52 + pos[2] * unit] as [number, number];
-      const hub = project(net.hub);
-      const wash = ctx.createRadialGradient(hub[0], hub[1], 0, hub[0], hub[1], unit * 4.2);
+      const hub = project(net.hub, 0);
+      const washR = unit * 4.2;
+      const wash = ctx.createRadialGradient(hub[0], hub[1], 0, hub[0], hub[1], washR);
       wash.addColorStop(0, "rgba(245, 165, 74, 0.20)");
       wash.addColorStop(0.45, "rgba(253, 231, 176, 0.06)");
       wash.addColorStop(1, "rgba(245, 165, 74, 0)");
       ctx.fillStyle = wash;
       ctx.beginPath();
-      ctx.arc(hub[0], hub[1], unit * 4.2, 0, Math.PI * 2);
+      ctx.arc(hub[0], hub[1], washR, 0, Math.PI * 2);
       ctx.fill();
       const tintAt = new Map(net.nodes.map((n) => [n.id, n.t]));
+      const phaseAt = new Map(net.nodes.map((n) => [n.id, n.phase]));
       for (const edge of net.edges) {
-        const [x1, y1] = project(edge.a);
-        const [x2, y2] = project(edge.b);
-        const hot = edge.source === hover || edge.target === hover || near.has(edge.source) || near.has(edge.target);
+        const [x1, y1] = project(edge.a, phaseAt.get(edge.source) ?? 0);
+        const [x2, y2] = project(edge.b, phaseAt.get(edge.target) ?? 0);
+        const hot = edge.source === hoverId || edge.target === hoverId || nearIds.has(edge.source) || nearIds.has(edge.target);
         ctx.strokeStyle = hexAlpha(plexusTint(tintAt.get(edge.source) ?? 0.5), hot ? Math.min(0.85, edge.alpha * 2.2) : edge.alpha);
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -65,8 +129,8 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
         ctx.stroke();
       }
       for (const node of net.nodes) {
-        const [x, y] = project(node.pos);
-        const hot = node.id === hover || node.id === focus || near.has(node.id) || highlight?.has(node.id);
+        const [x, y] = project(node.pos, node.phase);
+        const hot = node.id === hoverId || node.id === focusId || nearIds.has(node.id) || lit?.has(node.id);
         const tint = plexusTint(node.t);
         const core = showGaps && node.gap ? gapColor : plexusCore(node.t);
         ctx.globalAlpha = Math.min(1, node.fade * (hot ? 1 : 0.92));
@@ -81,25 +145,39 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
         ctx.globalAlpha = 1;
       }
     };
+    const tick = (now: number) => {
+      const poseNow = poseRef.current;
+      const still = reduceRef.current || poseNow != null;
+      if (!document.hidden && !still) time += Math.min(0.05, (now - last) / 1000);
+      last = now;
+      draw();
+      raf = requestAnimationFrame(tick);
+    };
     draw();
+    raf = requestAnimationFrame(tick);
     const observer = new ResizeObserver(draw);
     observer.observe(parent);
-    return () => observer.disconnect();
-  }, [net, hover, focus, highlight, near, showGaps]);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [net, showGaps]);
 
   const pick = (ev: { clientX: number; clientY: number }) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const unit = Math.min(rect.width, rect.height) / 18.5;
+    const frame = frameRef.current;
     const px = ev.clientX - rect.left;
     const py = ev.clientY - rect.top;
     let best: string | null = null;
     let bestD = 12 * 12;
     for (const node of net.nodes) {
-      const x = rect.width * 0.5 + node.pos[0] * unit;
-      const y = rect.height * 0.52 + node.pos[2] * unit;
-      const dd = (x - px) ** 2 + (y - py) ** 2;
+      const d = plexusDrift(node.phase, frame.time, frame.motion);
+      const [x, z] = spinPoint(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2], frame.rx, frame.ry, frame.rz);
+      const sx = frame.ox + x * frame.unit + frame.shift;
+      const sy = frame.oy + z * frame.unit;
+      const dd = (sx - px) ** 2 + (sy - py) ** 2;
       if (dd < bestD) { bestD = dd; best = node.id; }
     }
     return best;
@@ -141,6 +219,21 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
       )}
     </div>
   );
+}
+
+/** Three.js XYZ euler: Rx, then Ry, then Rz. Returns screen-facing x and z. */
+function spinPoint(x: number, y: number, z: number, rx: number, ry: number, rz: number): [number, number] {
+  const cx = Math.cos(rx);
+  const sx = Math.sin(rx);
+  const y1 = y * cx - z * sx;
+  const z1 = y * sx + z * cx;
+  const cy = Math.cos(ry);
+  const sy = Math.sin(ry);
+  const x2 = x * cy + z1 * sy;
+  const z2 = -x * sy + z1 * cy;
+  const cz = Math.cos(rz);
+  const sz = Math.sin(rz);
+  return [x2 * cz - y1 * sz, z2];
 }
 
 function hexAlpha(hex: string, alpha: number) {

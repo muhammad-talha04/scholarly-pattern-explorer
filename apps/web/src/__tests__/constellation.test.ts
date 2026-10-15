@@ -1,4 +1,4 @@
-import { heroNetwork, LINK_REACH, nodeAmber, PLEXUS_COUNT, plexusCore, plexusTint } from "@/features/galaxy/stars";
+import { breathAmount, BREATH_CYCLE, DRIFT_HZ, heroNetwork, LINK_REACH, nodeAmber, ORBIT_SPEED, PLEXUS_COUNT, plexusCore, plexusDrift, plexusTint, TWINKLE_HZ, zoomScale } from "@/features/galaxy/stars";
 import { accent, clusterColors, plexusCopper, plexusGold } from "@/lib/palette";
 
 function papers(count: number) {
@@ -83,4 +83,30 @@ it("builds a seeded diagonal plexus band", () => {
   const shades = new Set(papers(12).map((n) => nodeAmber(0, n.clusterId, n.id)));
   expect(shades.size).toBeGreaterThan(1);
   expect([...shades].every((hex) => (clusterColors as readonly string[]).includes(hex))).toBe(true);
+});
+
+it("breathes on a 14s loop and moves 1.5× faster", () => {
+  expect(BREATH_CYCLE).toBeGreaterThanOrEqual(12);
+  expect(BREATH_CYCLE).toBeLessThanOrEqual(16);
+  expect(breathAmount(0)).toBe(0);
+  expect(breathAmount(BREATH_CYCLE * 0.44)).toBe(1);
+  expect(breathAmount(BREATH_CYCLE * 0.94)).toBe(0);
+  expect(breathAmount(BREATH_CYCLE)).toBe(0);
+  let prev = 0;
+  for (let i = 0; i <= 8; i++) {
+    const v = breathAmount(BREATH_CYCLE * 0.36 * (i / 8));
+    expect(v).toBeGreaterThanOrEqual(prev - 1e-9);
+    prev = v;
+  }
+  expect(zoomScale(0)).toBe(1);
+  expect(zoomScale(1)).toBeGreaterThan(1.9);
+  expect(zoomScale(1)).toBeLessThan(2.3);
+  expect(DRIFT_HZ.x).toBeCloseTo(0.37 * 1.5);
+  expect(DRIFT_HZ.y).toBeCloseTo(0.29 * 1.5);
+  expect(DRIFT_HZ.z).toBeCloseTo(0.33 * 1.5);
+  expect(ORBIT_SPEED).toBeCloseTo(0.16 * 1.5);
+  expect(TWINKLE_HZ).toBeCloseTo(1.7 * 1.5);
+  const drift = plexusDrift(0.4, 1.2, 1);
+  expect(drift[0]).toBeCloseTo(Math.sin(1.2 * DRIFT_HZ.x + 0.4) * 0.08);
+  expect(plexusDrift(0.4, 1.2, 0)).toEqual([0, 0, 0]);
 });

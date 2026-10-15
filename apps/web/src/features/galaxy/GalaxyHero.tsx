@@ -16,7 +16,7 @@ import { SearchBar } from "@/features/search/SearchBar";
 import { galaxyColor } from "@/lib/palette";
 
 const SUGGESTIONS = ["Protein folding", "Climate modelling", "Large language models"];
-import { centroid, freshPaperIds, type Star } from "./stars";
+import { centroid, freshPaperIds, type PlexusPose, type Star } from "./stars";
 
 const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () => <GalaxyLoading /> });
 
@@ -73,10 +73,13 @@ export function GalaxyHero() {
   const [focus, setFocus] = useState<string | null>(null);
   const [clusterQuery, setClusterQuery] = useState<string | null>(null);
   const [previewEmpty, setPreviewEmpty] = useState(false);
+  const [pose, setPose] = useState<PlexusPose>(null);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setPreviewEmpty(q.get("preview") === "empty");
     setClusterQuery(q.get("cluster"));
+    const plexus = q.get("plexus");
+    setPose(plexus === "in" || plexus === "out" ? plexus : null);
   }, []);
   const pats = useApi(() => api.patterns(), []);
   const gaps = useApi(() => api.patterns({ trend: "gap" }), []);
@@ -110,13 +113,13 @@ export function GalaxyHero() {
       <EmptyState title="No papers in this snapshot" body="The galaxy groups papers by theme once they are indexed. You can still search, or open Patterns once a run has landed." action={<Link href="/search" className="btn bg-accent/20">Search papers</Link>} />
     </div>
   ) : lowPower ? (
-    <Galaxy2D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
+    <Galaxy2D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} pose={pose} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
   ) : (
-    <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
+    <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} pose={pose} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
   );
   return (
     <section className="relative -mx-3 -mt-20 h-[100dvh] min-h-[640px] overflow-hidden sm:-mx-4">
-      <div className="absolute inset-0 z-0 lg:left-[44%]">{sky}</div>
+      <div className="absolute inset-0 z-0">{sky}</div>
       <div aria-hidden className="hero-scrim pointer-events-none absolute inset-0 z-10" />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-gradient-to-b from-ink to-transparent" />
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pointer-events-none relative z-30 flex h-full flex-col justify-start px-4 pb-8 pt-28 sm:px-8 lg:w-[54%] lg:justify-center lg:pb-16 lg:pt-24">
@@ -125,7 +128,7 @@ export function GalaxyHero() {
           <h1 className="mt-3 font-sans text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
             Explore research <span className="text-accent">by meaning</span>
           </h1>
-          <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Papers sit in a plexus. Color runs from copper to pale gold along the band.</p>
+          <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Each dot is a paper. Nearby papers share ideas, linked by meaning.</p>
           <div className="mt-6">
             <SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} />
             <ul aria-label="Suggestions" className="mt-3 flex flex-wrap gap-2">

@@ -79,6 +79,40 @@ export const PLEXUS_COUNT = 310;
 /** Neighbours farther than this are not linked. */
 export const LINK_REACH = 1.05;
 
+/** Drift, rock, and twinkle, each 1.5× the original plexus motion. */
+export const DRIFT_HZ = { x: 0.555, y: 0.435, z: 0.495 } as const;
+export const TWINKLE_HZ = 2.55;
+/** Continuous yaw around the band centre, radians per second (1.5 × the old 0.16 rock). */
+export const ORBIT_SPEED = 0.24;
+export const ROCK_X_HZ = 0.18;
+export const ROCK_Z_HZ = 0.15;
+/** One zoom-in, hold, zoom-out, hold. */
+export const BREATH_CYCLE = 14;
+/** Resting camera distance and the close end of the breath. */
+export const REST_DISTANCE = 22.5;
+export const NEAR_DISTANCE = 10.6;
+/** World-space shift that parks the band in the right half while zoomed out. */
+export const REST_SHIFT = 6.15;
+/** Desktop layout: the hero is a left column, so the resting band sits to the right. */
+export const WIDE_CANVAS = 1024;
+/** Screenshot pin. `in` freezes the close zoom, `out` freezes the resting size. */
+export type PlexusPose = "in" | "out" | null;
+
+/** 0 at the resting (right-half) size, 1 at the close zoom. Eases in, holds, eases out, holds. */
+export function breathAmount(time: number) {
+  const u = ((time % BREATH_CYCLE) + BREATH_CYCLE) % BREATH_CYCLE / BREATH_CYCLE;
+  if (u < 0.36) return smoothstep(u / 0.36);
+  if (u < 0.52) return 1;
+  if (u < 0.88) return 1 - smoothstep((u - 0.52) / 0.36);
+  return 0;
+}
+
+/** How much larger the band reads. 1 at rest, about 2.1 when breathed in. */
+export function zoomScale(breath: number) {
+  const ratio = NEAR_DISTANCE / REST_DISTANCE;
+  return 1 / (1 + (ratio - 1) * breath);
+}
+
 const LEN = 15.6;
 const DIR_X = Math.SQRT1_2;
 const DIR_Z = -Math.SQRT1_2;
@@ -125,7 +159,7 @@ export function plexusTint(t: number) {
 
 /** Near-white core, still tinted by the band. */
 export function plexusCore(t: number) {
-  return mixHex(plexusTint(t), "#FFF8EE", 0.8);
+  return mixHex(plexusTint(t), "#FFF8EE", 0.9);
 }
 
 /**
@@ -160,8 +194,10 @@ function buildBand(rand: () => number): Dot[] {
       if (t <= 0.02 || t >= 0.98) continue;
       const s = gauss(rand) * 0.42;
       if (s < -1 || s > 1) continue;
-      const edge = 0.86 + 0.16 * Math.sin(t * 9.2 + 0.4) + 0.08 * Math.sin(t * 21.0 + 1.4);
-      if (Math.abs(s) > edge) continue;
+      const edge = 0.8 + 0.04 * Math.sin(t * 2.2 + 0.4);
+      const ax = Math.abs(s);
+      if (ax > edge) continue;
+      if (ax > edge * 0.88 && hash01(t * 4.1, s) > ((edge - ax) / (edge * 0.12)) ** 1.4) continue;
       const y = (rand() - 0.5) * 0.62;
       const pos = place(t, s, y);
       const dist = minDist * (0.72 + 0.55 * (Math.abs(t - 0.5) * 2) + 0.35 * Math.abs(s));
@@ -190,6 +226,11 @@ function halfWidth(t: number) {
 
 function centerShift(t: number) {
   return 0.48 * Math.sin(t * 6.3 + 0.6) + 0.26 * Math.sin(t * 14.4 + 2.1);
+}
+
+function hash01(a: number, b: number) {
+  const n = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return n - Math.floor(n);
 }
 
 function place(t: number, s: number, y: number): Vec {
@@ -325,10 +366,15 @@ function linkBand(nodes: PlexusNode[], rand: () => number): NetEdge[] {
 export function plexusDrift(phase: number, time: number, motion: number): Vec {
   if (!motion) return [0, 0, 0];
   return [
-    Math.sin(time * 0.37 + phase) * 0.08,
-    Math.sin(time * 0.29 + phase * 1.7) * 0.045,
-    Math.cos(time * 0.33 + phase * 0.85) * 0.08,
+    Math.sin(time * DRIFT_HZ.x + phase) * 0.08,
+    Math.sin(time * DRIFT_HZ.y + phase * 1.7) * 0.045,
+    Math.cos(time * DRIFT_HZ.z + phase * 0.85) * 0.08,
   ];
+}
+
+function smoothstep(x: number) {
+  const t = Math.min(1, Math.max(0, x));
+  return t * t * (3 - 2 * t);
 }
 
 function mixHex(a: string, b: string, t: number) {

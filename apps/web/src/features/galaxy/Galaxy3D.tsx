@@ -7,7 +7,7 @@ import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
 import { accent, gap as gapColor, ink, plexusGold } from "@/lib/theme";
-import { heroNetwork, neighborIds, networkLinks, plexusCore, plexusDrift, plexusTint, type Star } from "./stars";
+import { breathAmount, DRIFT_HZ, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, TWINKLE_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
 
 /** Nearly overhead so the XZ diagonal reads lower-left to upper-right, with a little parallax. */
 const CAMERA_POS = new Vector3(0.2, 22.5, 2.8);
@@ -16,9 +16,9 @@ const CAMERA_FOV = 46;
 const DRIFT = `
 vec3 bandDrift(float phase) {
   return vec3(
-    sin(uTime * 0.37 + phase) * 0.08,
-    sin(uTime * 0.29 + phase * 1.7) * 0.045,
-    cos(uTime * 0.33 + phase * 0.85) * 0.08
+    sin(uTime * ${DRIFT_HZ.x} + phase) * 0.08,
+    sin(uTime * ${DRIFT_HZ.y} + phase * 1.7) * 0.045,
+    cos(uTime * ${DRIFT_HZ.z} + phase * 0.85) * 0.08
   ) * uMotion;
 }
 `;
@@ -41,12 +41,13 @@ varying vec3 vTint;
 varying vec3 vCore;
 uniform float uTime;
 uniform float uMotion;
+uniform float uZoom;
 ${DRIFT}
 void main() {
   vec3 drifted = position + bandDrift(aPhase);
   vec4 world = modelMatrix * vec4(drifted, 1.0);
   gl_Position = projectionMatrix * viewMatrix * world;
-  gl_PointSize = aSize;
+  gl_PointSize = aWash > 0.5 ? aSize * uZoom : aSize;
   vPhase = aPhase;
   vFade = aFade;
   vWash = aWash;
@@ -77,13 +78,13 @@ void main() {
     float a = exp(-2.6 * d * d) * 0.075;
     outc = vec4(vTint, a);
   } else {
-    float core = smoothstep(0.5, 0.08, d);
-    float glow = exp(-4.4 * d * d) * 0.4;
-    float tw = uMotion * vTwinkle * pow(max(sin(uTime * 1.7 + vPhase), 0.0), 28.0);
+    float core = smoothstep(0.48, 0.06, d);
+    float glow = exp(-4.6 * d * d) * 0.34;
+    float tw = uMotion * vTwinkle * pow(max(sin(uTime * ${TWINKLE_HZ} + vPhase), 0.0), 28.0);
     float lit = clamp(vGlow, 0.0, 1.0);
-    vec3 col = mix(vTint, vCore, 0.25 + 0.75 * core);
-    col = mix(col, vec3(1.0), lit * 0.35 + tw);
-    float alpha = max(core * (0.45 + 0.55 * vFade), glow * vFade);
+    vec3 col = mix(vTint, vCore, 0.12 + 0.88 * core);
+    col = mix(col, vec3(1.0), core * 0.22 + lit * 0.35 + tw);
+    float alpha = max(core * (0.7 + 0.3 * vFade), glow * vFade);
     alpha = clamp(alpha * (1.0 + lit) + tw, 0.0, 1.0);
     outc = vec4(col, alpha);
   }
@@ -124,43 +125,22 @@ void main() {
 }
 `;
 
-function CameraRig({ look, reduce, controls }: { look: [number, number, number]; reduce: boolean; controls: React.RefObject<OrbitControlsImpl | null> }) {
-  const { camera } = useThree();
-  const intro = useRef(reduce ? 1 : 0.65);
-  const from = useRef(new Vector3(0.2, 28, 4.2));
-  const to = useRef(new Vector3());
-  const lookV = useRef(new Vector3());
-  useEffect(() => {
-    lookV.current.set(look[0], look[1], look[2]);
-    to.current.set(look[0] * 0.12 + CAMERA_POS.x, look[1] + CAMERA_POS.y, look[2] + CAMERA_POS.z);
-    if (reduce) {
-      camera.position.copy(to.current);
-      if (controls.current) { controls.current.target.copy(lookV.current); controls.current.update(); }
-    }
-  }, [look, reduce, camera, controls]);
-  useFrame((_, dt) => {
-    if (reduce || document.hidden) return;
-    intro.current = Math.min(1, intro.current + dt * 1.15);
-    const k = 1 - Math.exp(-dt * 2.4);
-    const dest = from.current.clone().lerp(to.current, intro.current);
-    camera.position.lerp(dest, k);
-    if (controls.current) {
-      controls.current.target.lerp(lookV.current, k);
-      controls.current.update();
-    }
-  });
-  return null;
-}
-
-function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, onHighlight, onPick }: Props & { reduce: boolean }) {
-  const { camera, gl } = useThree();
+function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onFocus, onHighlight, onPick }: Props & { reduce: boolean; pose: PlexusPose }) {
+  const { camera, gl, size } = useThree();
   const controls = useRef<OrbitControlsImpl>(null);
   const spin = useRef<Group>(null);
   const [hover, setHover] = useState<number | null>(null);
   const time = useRef(0);
   const net = useMemo(() => heroNetwork(catalogue), [catalogue]);
   const nodes = net.nodes;
-  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uMotion: { value: reduce ? 0 : 1 } }), [reduce]);
+  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uMotion: { value: reduce || pose ? 0 : 1 }, uZoom: { value: pose === "in" ? zoomScale(1) : 1 } }), [reduce, pose]);
+  const intro = useRef(reduce || pose ? 1 : 0);
+  const fromV = useRef(new Vector3(0.2, 28, 4.2));
+  const restV = useRef(new Vector3());
+  const posedV = useRef(new Vector3());
+  const lookV = useRef(new Vector3());
+  const offsetV = useRef(new Vector3());
+  const goalV = useRef(new Vector3());
 
   const geo = useMemo(() => {
     const color = new Color();
@@ -268,7 +248,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
       const py = ev.clientY - rect.top;
       spin.current?.updateWorldMatrix(true, false);
       const v = new Vector3();
-      const motion = reduce || document.hidden ? 0 : 1;
+      const motion = reduce || pose || document.hidden ? 0 : 1;
       let best = -1;
       let bestD = 15 * 15;
       nodes.forEach((node, i) => {
@@ -292,8 +272,10 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
       const v = new Vector3();
       let best = -1;
       let bestD = 15 * 15;
+      const motion = reduce || pose || document.hidden ? 0 : 1;
       nodes.forEach((node, i) => {
-        v.set(node.pos[0], node.pos[1], node.pos[2]);
+        const d = plexusDrift(node.phase, time.current, motion);
+        v.set(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2]);
         spin.current?.localToWorld(v);
         v.project(camera);
         const x = (v.x * 0.5 + 0.5) * rect.width;
@@ -314,23 +296,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
       el.removeEventListener("pointerleave", leave);
       el.removeEventListener("click", click);
     };
-  }, [camera, gl, nodes, onFocus, onHighlight, reduce]);
-
-  useFrame((_, dt) => {
-    if (document.hidden) return;
-    time.current += Math.min(dt, 0.05);
-    uniforms.uTime.value = time.current;
-    uniforms.uMotion.value = reduce ? 0 : 1;
-    if (!spin.current) return;
-    if (reduce) {
-      spin.current.rotation.set(0, 0, 0);
-      return;
-    }
-    const t = time.current;
-    spin.current.rotation.y = Math.sin(t * 0.16) * 0.2;
-    spin.current.rotation.x = Math.sin(t * 0.12 + 0.7) * 0.045;
-    spin.current.rotation.z = Math.sin(t * 0.1 + 1.4) * 0.03;
-  });
+  }, [camera, gl, nodes, onFocus, onHighlight, pose, reduce]);
 
   const look = useMemo(() => {
     const picked = highlight && highlight.size ? nodes.filter((n) => highlight.has(n.id)) : [];
@@ -338,6 +304,44 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
     const focused = nodes.find((n) => n.id === focus);
     return focused ? focused.pos : net.hub;
   }, [highlight, focus, nodes, net.hub]);
+
+  useFrame((_, dt) => {
+    if (document.hidden) return;
+    const pinned = pose === "in" ? 1 : pose === "out" ? 0 : null;
+    const still = reduce || pinned != null;
+    const step = Math.min(dt, 0.05);
+    if (!still) time.current += step;
+    const t = time.current;
+    uniforms.uTime.value = t;
+    uniforms.uMotion.value = still ? 0 : 1;
+    const breath = reduce ? 0 : (pinned ?? breathAmount(t));
+    uniforms.uZoom.value = zoomScale(breath);
+    if (spin.current) {
+      const wide = size.width >= WIDE_CANVAS;
+      spin.current.position.x = wide ? REST_SHIFT * (1 - breath) : 0;
+      if (still) spin.current.rotation.set(0, 0, 0);
+      else {
+        spin.current.rotation.y = t * ORBIT_SPEED;
+        spin.current.rotation.x = Math.sin(t * ROCK_X_HZ + 0.7) * 0.045;
+        spin.current.rotation.z = Math.sin(t * ROCK_Z_HZ + 1.4) * 0.03;
+      }
+    }
+    lookV.current.set(look[0], look[1], look[2]);
+    if (!still) intro.current = Math.min(1, intro.current + step * 1.15);
+    restV.current.set(look[0] * 0.12 + CAMERA_POS.x, look[1] + CAMERA_POS.y, look[2] + CAMERA_POS.z);
+    posedV.current.copy(fromV.current).lerp(restV.current, still ? 1 : intro.current);
+    offsetV.current.copy(posedV.current).sub(lookV.current);
+    const restDist = Math.max(1e-4, offsetV.current.length());
+    const dist = restDist / zoomScale(breath);
+    offsetV.current.multiplyScalar(dist / restDist);
+    goalV.current.copy(lookV.current).add(offsetV.current);
+    if (still || intro.current >= 1) camera.position.copy(goalV.current);
+    else camera.position.lerp(goalV.current, 1 - Math.exp(-step * 2.4));
+    if (controls.current) {
+      controls.current.target.copy(lookV.current);
+      controls.current.update();
+    }
+  });
 
   const hovered = hover == null ? null : nodes[hover];
   const tip = hovered?.paper ? hovered : null;
@@ -362,8 +366,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
           </Html>
         )}
       </group>
-      <CameraRig look={look} reduce={reduce} controls={controls} />
-      <OrbitControls ref={controls} enablePan={false} enableZoom minDistance={20} maxDistance={52} />
+      <OrbitControls ref={controls} enablePan={false} enableZoom={false} />
     </>
   );
 }
@@ -382,6 +385,7 @@ interface Props {
   onFocus?: (id: string) => void;
   onHighlight?: (cluster?: string) => void;
   onPick?: (id: string) => void;
+  pose?: PlexusPose;
 }
 
 export default function Galaxy3D(p: Props) {
@@ -395,7 +399,7 @@ export default function Galaxy3D(p: Props) {
       gl={{ antialias: true, toneMapping: NoToneMapping }}
     >
       <color attach="background" args={[ink]} />
-      <Field {...p} reduce={reduce} />
+      <Field {...p} reduce={reduce} pose={p.pose ?? null} />
     </Canvas>
   );
 }
