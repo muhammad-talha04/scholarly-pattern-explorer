@@ -17,11 +17,7 @@ from ml.store import LocalStore
 from pipeline import country_stats as cs
 from pipeline.ingest import merge, normalize
 
-PAPERS_INT = pytest.mark.xfail(
-    reason="CONTRACT MISMATCH: schemas.CountryStats.papers is int (#1) but fractional counting in "
-           "pipeline/country_stats.to_stats (#3) yields non-integer papers (e.g. 2.5); "
-           "papers should become float or be rounded by contract", strict=True)
-COUNTINGS = ["full", pytest.param("fractional", marks=PAPERS_INT)]
+COUNTINGS = ["full", "fractional"]
 
 V2_REQUIRED = {"id": str, "title": str, "year": int, "cited_by": int, "authors": list,
                "countries": list, "topics": list}
@@ -280,11 +276,6 @@ def test_country_api_helpers_validate(country_snapshot, counting):
         Collaboration.model_validate(c)
 
 
-STUB = ("apps/api/app/routers/core.py /countries routes are still stubs (return [] / 404) and "
-        "do not call pipeline/country_api.py")
-
-
-@pytest.mark.xfail(reason=STUB, strict=True)
 @pytest.mark.parametrize("counting", ["fractional", "full"])
 def test_api_countries_by_counting(client, country_snapshot, counting):
     r = client.get("/api/v1/countries", params={"counting": counting})
@@ -300,7 +291,6 @@ def test_api_countries_rejects_unknown_counting(client):
     assert client.get("/api/v1/countries", params={"counting": "bogus"}).status_code == 422
 
 
-@pytest.mark.xfail(reason=STUB, strict=True)
 def test_api_country_detail(client, country_snapshot):
     r = client.get("/api/v1/countries/PK")
     assert r.status_code == 200
@@ -314,17 +304,12 @@ def test_api_collaborations_shape(client):
         Collaboration.model_validate(x)
 
 
-@pytest.mark.xfail(reason=STUB, strict=True)
 def test_api_collaborations_served_from_snapshot(client, country_snapshot):
     r = client.get("/api/v1/countries/collaborations", params={"counting": "full"})
     got = [Collaboration.model_validate(x) for x in r.json()]
     assert got and {(c.source, c.target) for c in got} >= {("CA", "PK"), ("CN", "PK")}
 
 
-@pytest.mark.xfail(reason="pipeline/country_stats.py collaborations are full counts only and "
-                          "pipeline/country_api.collaborations() takes no counting argument, so "
-                          "/countries/collaborations?counting=fractional cannot differ from full",
-                   strict=True)
 def test_collaborations_fractional_counting_supported():
     import inspect
     from pipeline import country_api
@@ -387,9 +372,6 @@ def test_country_snapshot_has_gap_inputs(tmp_path, works_v2):
     assert {t: {int(y): n for y, n in v.items()} for t, v in tyc.items()} == mine
 
 
-@pytest.mark.xfail(reason="STATUS.md asks for topic_top_countries as [[code, fractional_count], ...] "
-                          "sorted desc; pipeline/country_stats.snapshot() writes a plain list of "
-                          "codes ranked by full counts", strict=True)
 def test_topic_top_countries_are_fractional_pairs(tmp_path, works_v2):
     out = tmp_path / "snap.json"
     cs.main(["--new", str(works_v2), "--out", str(out)])
@@ -398,3 +380,70 @@ def test_topic_top_countries_are_fractional_pairs(tmp_path, works_v2):
     for t, pairs in top.items():
         assert all(isinstance(p, list) and len(p) == 2 for p in pairs)
         assert [c for c, _ in pairs] == [c for c, _ in expected[t]][:len(pairs)]
+
+
+# ---------- collaboration pair weights (#3) ----------
+
+def _pair_weights(w):
+    t = cs.tally([w])
+    return ({k: v for k, v in t["pairs_frac"].get("all", {}).items()},
+            {k: v for k, v in t["pairs_1n"].get("all", {}).items()},
+            dict(t["pairs"]))
+
+
+@pytest.mark.parametrize("countries", [["PK"], ["CA", "PK"], ["CA", "PK", "US"],
+                                       ["CA", "CN", "DE", "PK", "US"]])
+def test_pair_weights_per_paper(countries):
+    w = {"id": "W1", "year": 2024, "countries": countries, "topics": ["AI"]}
+    frac, one_n, full = _pair_weights(w)
+    n = len(countries)
+    if n == 1:
+        assert frac == one_n == full == {}
+        return
+    assert len(frac) == len(one_n) == len(full) == n * (n - 1) // 2
+    assert sum(frac.values()) == pytest.approx(1.0)
+    assert sum(one_n.values()) == pytest.approx((n - 1) / 2)
+    assert all(v == 1 for v in full.values())
+
+
+def test_pair_weights_over_corpus(works_v2):
+    works = rows(works_v2)
+    t = cs.tally(works)
+    multi = [w for w in works if len(w["countries"]) > 1]
+    assert sum(t["pairs_frac"]["all"].values()) == pytest.approx(len(multi))
+    assert sum(t["pairs_1n"]["all"].values()) == pytest.approx(
+        sum((len(w["countries"]) - 1) / 2 for w in multi))
+    assert sum(t["pairs"].values()) == sum(len(w["countries"]) * (len(w["countries"]) - 1) // 2
+                                           for w in works)
+
+
+def test_incremental_pair_weights_equal_full(raw_batches, tmp_path):
+    p = tmp_path / "w.jsonl"
+    b1, b2 = raw_batches
+    ingest(p, b1); n = len(rows(p)); ingest(p, b2)
+    prev = json.loads(json.dumps(cs.tally(rows(p)[:n])))
+    inc, full = cs.combine(prev, cs.tally(rows(p)[n:])), cs.tally(rows(p))
+    for k in ("pairs_frac", "pairs_1n"):
+        assert dict(inc[k]["all"]) == pytest.approx(dict(full[k]["all"]))
+    assert dict(inc["pairs"]) == dict(full["pairs"])
+
+
+@pytest.mark.parametrize("counting", ["fractional", "full",
+    pytest.param("per_country", marks=pytest.mark.xfail(
+        reason="GAP: schemas.CountingMethod is Literal['fractional','full'] (#1), so "
+               "/countries/collaborations?counting=per_country is rejected with 422 although "
+               "pipeline/country_api.collaborations supports it (#3). Also core.py collaborations() looks up snapshot key "collaborations_per_country" "
+               "(snapshot writes collaborations_1n) and falls back to country_api.collaborations(limit), "
+               "passing limit as the counting arg, so it would silently serve fractional weights", strict=True))])
+def test_api_collaborations_by_counting(client, country_snapshot, counting):
+    r = client.get("/api/v1/countries/collaborations", params={"counting": counting})
+    assert r.status_code == 200, r.text
+    got = [Collaboration.model_validate(x) for x in r.json()]
+    key = {"full": "collaborations_full", "per_country": "collaborations_1n"}.get(
+        counting, "collaborations")
+    assert [c.model_dump() for c in got] == country_snapshot[key]
+
+
+def test_api_collaborations_limit_respected(client, country_snapshot):
+    r = client.get("/api/v1/countries/collaborations", params={"counting": "fractional", "limit": 2})
+    assert r.status_code == 200 and len(r.json()) == 2
