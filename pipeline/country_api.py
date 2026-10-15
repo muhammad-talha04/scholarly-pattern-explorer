@@ -70,9 +70,24 @@ def collaborations(counting: str = "fractional", limit: int = 200) -> list[dict]
     return snapshot().get(key, [])[:limit]
 
 
+# A globe or streamgraph page is a few thousand cells. 10000 covers a filtered
+# slice of the free OpenAlex corpus without letting one call dump the whole table.
+TOPIC_COUNTRY_YEAR_DEFAULT_LIMIT = 1000
+TOPIC_COUNTRY_YEAR_MAX_LIMIT = 10_000
+
+
+def clamp_topic_country_year_limit(limit: int) -> int:
+    """Same rule as /search and /related: below 1 becomes 1, above the max is capped."""
+    return max(1, min(int(limit), TOPIC_COUNTRY_YEAR_MAX_LIMIT))
+
+
 def topic_country_years(topic_id: str | None = None, country: str | None = None,
-                        year: int | None = None, limit: int = 1000) -> list[dict]:
-    """Rows of topic_id, topic_name, country_code, year, paper_count, fractional_count."""
+                        year: int | None = None,
+                        limit: int = TOPIC_COUNTRY_YEAR_DEFAULT_LIMIT) -> list[dict]:
+    """Rows of topic_id, topic_name, country_code, year, paper_count, fractional_count.
+
+    `limit` defaults to 1000 and is clamped to 1..10000.
+    """
     rows = snapshot().get("topic_country_year") or []
     if topic_id:
         rows = [r for r in rows if r.get("topic_id") == topic_id]
@@ -81,6 +96,4 @@ def topic_country_years(topic_id: str | None = None, country: str | None = None,
         rows = [r for r in rows if r.get("country_code") == code]
     if year is not None:
         rows = [r for r in rows if r.get("year") == year]
-    if limit < 0:
-        limit = 0
-    return rows[:limit]
+    return rows[:clamp_topic_country_year_limit(limit)]

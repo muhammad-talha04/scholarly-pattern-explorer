@@ -1,15 +1,16 @@
 # Feature shortlist
 
 Free literature tools students already use, and features we can add from
-OpenAlex without a paid API. Left out on purpose, because they are already
+OpenAlex on its free tier. Left out on purpose, because they are already
 being built: gap finder, papers-like-this, emerging topics, compare view,
 collections, related-papers map, and the first-run tour. Release 2 already
 covers the citation map, topic and author alerts, collections, side-by-side
 comparison, and influential citations, so those are not listed again.
 
 Limits below are the public free tiers as described in 2026. Vendors change
-them. OpenAlex itself is CC0 and needs no key for polite use (`mailto` is
-enough), which is why every row in the shortlist can stay on the free tier.
+them. OpenAlex itself is CC0. Paginated or bulk access beyond the first page
+requires a free API key (repo secret `OPENALEX_API_KEY`, already set). Every
+feature listed below stays on that free tier.
 
 ## What the free tools do
 

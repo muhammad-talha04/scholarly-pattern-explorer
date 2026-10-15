@@ -22,6 +22,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -31,7 +32,9 @@ from .text import tokens
 
 MIN_UMAP_PAPERS = 25
 MIN_SIM = 0.2
-
+# Nearest-neighbour edges for the front end. Kept small on purpose.
+LINK_NEIGHBOURS = 2
+LINK_CAP = 200
 
 def _optional_available() -> bool:
     return (importlib.util.find_spec("umap") is not None
@@ -307,3 +310,98 @@ class GalaxyMap:
             out.append({"id": wid, "x": paper["x"], "y": paper["y"], "z": paper["z"],
                         "cluster_id": cid, "cluster_label": label, "year": paper.get("year")})
         return out
+
+
+def empty_graph() -> dict:
+    return {"nodes": [], "clusters": [], "links": []}
+
+
+def _slug(value: str) -> str:
+    text = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+    return text or "topic"
+
+
+def _unique_names(points: list[dict], metas: list[dict]) -> list[str]:
+    """Front-end links join on topic_name, so each node needs its own."""
+    seen: dict[str, int] = {}
+    names = []
+    for point, meta in zip(points, metas):
+        title = (meta.get("title") or "").strip() or point["id"]
+        n = seen.get(title, 0)
+        seen[title] = n + 1
+        names.append(title if n == 0 else f"{title} ({point['id']})")
+    return names
+
+
+def knn_links(names: list[str], vectors: np.ndarray, neighbours: int = LINK_NEIGHBOURS,
+              max_edges: int = LINK_CAP) -> list[dict]:
+    """Undirected k-nearest-neighbour edges, capped at ``max_edges`` strongest."""
+    names = list(names)
+    X = np.asarray(vectors, dtype=np.float64)
+    n = len(names)
+    if n < 2 or neighbours < 1 or max_edges < 1 or X.ndim != 2 or len(X) != n:
+        return []
+    norms = np.linalg.norm(X, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    X = X / norms
+    kk = min(int(neighbours), n - 1)
+    edges: dict[tuple[str, str], float] = {}
+    for i in range(n):
+        sims = X @ X[i]
+        sims[i] = -1.0
+        chosen = np.argpartition(-sims, kk - 1)[:kk]
+        for j in chosen:
+            j = int(j)
+            weight = float(sims[j])
+            if j == i or weight <= 0 or names[i] == names[j]:
+                continue
+            key = tuple(sorted((names[i], names[j])))
+            if key not in edges or weight > edges[key]:
+                edges[key] = weight
+    ranked = sorted(edges.items(), key=lambda item: (-item[1], item[0]))[:max_edges]
+    return [{"source": a, "target": b, "weight": round(weight, 4)} for (a, b), weight in ranked]
+
+
+def graph_from_layout(points: list[dict], vectors: np.ndarray, metas: list[dict],
+                      neighbours: int = LINK_NEIGHBOURS, max_edges: int = LINK_CAP) -> dict:
+    """GalaxyGraph: front-end fields plus the per-paper id, label and year."""
+    if not points:
+        return empty_graph()
+    metas = list(metas)
+    names = _unique_names(points, metas)
+    cited = [int(meta.get("cited_by") or 0) for meta in metas]
+    peak = max(cited) or 1
+    nodes = []
+    for point, meta, name, cites in zip(points, metas, names, cited):
+        topics = [t for t in (meta.get("topics") or []) if t]
+        topic_src = topics[0] if topics else point["id"]
+        cid = str(point["cluster_id"])
+        nodes.append({
+            "id": point["id"],
+            "topic_id": _slug(str(topic_src)),
+            "topic_name": name,
+            "x": point["x"], "y": point["y"], "z": point["z"],
+            "cluster_id": cid,
+            "cluster_label": point.get("cluster_label") or "",
+            "year": point.get("year"),
+            "support": round(max(cites, 1) / peak, 4),
+        })
+    groups: dict[str, list[dict]] = {}
+    for node in nodes:
+        groups.setdefault(node["cluster_id"], []).append(node)
+    clusters = []
+    for cid, members in sorted(groups.items(), key=lambda item: (-len(item[1]), item[0])):
+        label = members[0]["cluster_label"] or ("unclustered" if cid == "-1" else f"cluster {cid}")
+        clusters.append({
+            "id": cid,
+            "name": label,
+            "label": label,
+            "centroid": {
+                "x": round(sum(m["x"] for m in members) / len(members), 6),
+                "y": round(sum(m["y"] for m in members) / len(members), 6),
+                "z": round(sum(m["z"] for m in members) / len(members), 6),
+            },
+            "size": len(members),
+        })
+    return {"nodes": nodes, "clusters": clusters,
+            "links": knn_links(names, vectors, neighbours, max_edges)}
