@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { PaperSummary } from "@/lib/api/types";
-import { accent, mist, violet } from "@/lib/palette";
+import { accent, champagne, dusk, mist } from "@/lib/palette";
 
 /** Related papers as a small radial map. Layout is computed here; no extra service. */
 export function CitationMap({ center, related, onOpen }: { center: string; related: PaperSummary[]; onOpen: (id: string) => void }) {
@@ -20,11 +20,11 @@ export function CitationMap({ center, related, onOpen }: { center: string; relat
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-52 w-full" role="img" aria-label="Related papers around this one">
         {nodes.map((n) => <line key={n.id} x1={cx} y1={cy} x2={n.x} y2={n.y} stroke={accent} strokeOpacity={0.45} />)}
-        <circle cx={cx} cy={cy} r={16} fill={violet} />
+        <circle cx={cx} cy={cy} r={16} fill={champagne} />
         <text x={cx} y={cy + 32} textAnchor="middle" fill={mist} fontSize={10}>this paper</text>
         {nodes.map((n) => (
           <g key={n.id} className="cursor-pointer" onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover((h) => (h === n.id ? null : h))} onClick={() => onOpen(n.id)}>
-            <circle cx={n.x} cy={n.y} r={hover === n.id ? 11 : 8} fill={accent} />
+            <circle cx={n.x} cy={n.y} r={hover === n.id ? 11 : 8} fill={dusk} />
             <title>{n.title}</title>
           </g>
         ))}

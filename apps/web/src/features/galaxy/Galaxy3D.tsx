@@ -7,7 +7,7 @@ import { Vector3, type Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink, TopicNode } from "@/lib/graph";
 import { linkPairs, positionNodes, type Positioned } from "./layout";
-import { accent, clusterColor, gapColor, ink, linkColor, violet } from "@/lib/palette";
+import { accent, champagne, clusterColor, gapColor, ink, linkColor } from "@/lib/palette";
 
 function colorFor(n: Positioned, showGaps: boolean) {
   if (showGaps && n.gap) return gapColor;
@@ -102,7 +102,7 @@ export default function Galaxy3D(p: Props) {
       <color attach="background" args={[ink]} />
       <ambientLight intensity={0.35} />
       <pointLight position={[0, 0, 0]} intensity={24} color={accent} />
-      <pointLight position={[8, 6, 4]} intensity={18} color={violet} />
+      <pointLight position={[8, 6, 4]} intensity={18} color={champagne} />
       <Stars radius={70} depth={40} count={2800} factor={3} fade speed={0.4} />
       <Scene {...p} />
       <EffectComposer multisampling={0}>

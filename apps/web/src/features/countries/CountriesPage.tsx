@@ -52,7 +52,7 @@ export function CountriesPage() {
         </div>
       )}
       {!yearlyReady && tcy.source === "mock" && !prefersFixtures() && (
-        <p className="mb-3 text-xs text-amber">The topic × country × year table is not on this API yet, so the year slider stays off. Country bars use the live /countries route.</p>
+        <p className="mb-3 text-xs text-champagne">The topic × country × year table is not on this API yet, so the year slider stays off. Country bars use the live /countries route.</p>
       )}
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="glass relative h-[420px] overflow-hidden sm:h-[560px]">
@@ -98,5 +98,5 @@ function CountryTable({ list, sel, onSelect, fmt }: { list: CountryStats[]; sel:
 
 function Growth({ v }: { v: number | null }) {
   if (v == null) return <span className="text-slate-400">n/a</span>;
-  return <span className={v >= 0 ? "text-teal" : "text-coral"}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>;
+  return <span className={v >= 0 ? "text-teal" : "text-rose"}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>;
 }

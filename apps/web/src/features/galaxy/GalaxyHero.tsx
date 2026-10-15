@@ -77,7 +77,7 @@ export function GalaxyHero() {
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pointer-events-none absolute inset-x-0 top-[4.5rem] z-30 mx-auto w-full max-w-xl px-3 sm:px-4">
         <div className="pointer-events-auto glass px-4 py-4 text-center sm:px-6">
           <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-white sm:text-5xl">
-            Explore research <span className="text-accent">by meaning</span>
+            Explore research <span className="gold-mark">by meaning</span>
           </h1>
           <p className="mx-auto mt-2 max-w-md text-xs text-mist sm:text-sm">Each dot is a paper. Colors are topic clusters. The galaxy groups papers by theme.</p>
           <div className="mt-3"><SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} /></div>
@@ -120,7 +120,7 @@ export function GalaxyHero() {
 
 export function GalaxyLoading() {
   return (
-    <div role="status" className="flex h-full flex-col items-center justify-center gap-4 bg-[radial-gradient(ellipse_at_center,rgba(46,230,199,0.16),transparent_55%)] text-sm text-mist">
+    <div role="status" className="flex h-full flex-col items-center justify-center gap-4 bg-[radial-gradient(ellipse_at_center,rgba(232,200,115,0.16),transparent_55%)] text-sm text-mist">
       <StarMark />
       <div className="flex items-center gap-2"><Spinner /> Placing papers</div>
     </div>

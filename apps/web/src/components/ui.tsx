@@ -17,9 +17,9 @@ export function Spinner() {
 }
 export function ErrorNote({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
   return (
-    <div role="alert" className="glass border-coral/40 p-4 text-sm text-coral">
+    <div role="alert" className="glass border-rose/40 p-4 text-sm text-rose">
       <p className="font-medium">Something went wrong</p>
-      <p className="mt-1 text-coral/80">{msg}</p>
+      <p className="mt-1 text-rose/80">{msg}</p>
       {onRetry && <button className="btn mt-3" onClick={onRetry}>Try again</button>}
     </div>
   );

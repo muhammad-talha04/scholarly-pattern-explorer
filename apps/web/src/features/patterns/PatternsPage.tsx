@@ -43,7 +43,7 @@ export function PatternsPage() {
           <table className="text-sm"><thead className="text-xs text-slate-400"><tr><th className="p-2 text-left">Itemset</th>{life.windows.map((w) => <th key={w} className="p-2">{w}</th>)}<th className="p-2">Born</th><th className="p-2">Died</th></tr></thead>
             <tbody>{life.rows.map((r) => <tr key={r.key} className="border-t border-white/5"><td className="p-2 pr-6">{r.key}</td>
               {r.supports.map((s, i) => <td key={i} className="p-1"><div title={s?.toFixed(3) ?? "absent"} className="mx-auto h-5 w-10 rounded" style={{ background: s == null ? "rgba(255,255,255,.04)" : `rgba(125,211,252,${0.15 + Math.min(1, s * 3)})` }} /></td>)}
-              <td className="p-2 text-teal">{r.born}</td><td className="p-2 text-coral">{r.died ?? "alive"}</td></tr>)}</tbody></table>
+              <td className="p-2 text-teal">{r.born}</td><td className="p-2 text-rose">{r.died ?? "alive"}</td></tr>)}</tbody></table>
         )}
         {tab === "gaps" && (gaps.loading ? <Spinner /> :
           <div className="grid gap-3 md:grid-cols-2">{(gaps.data ?? []).map((g) => (

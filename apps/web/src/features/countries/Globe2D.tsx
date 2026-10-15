@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import type { Collaboration, CountryStats } from "@/lib/api/types";
 import { CENTROIDS } from "@/lib/geo";
 import { bordersPath } from "@/lib/world";
-import { accent, coral, panel, violet } from "@/lib/palette";
+import { accent, dusk, panel, rose } from "@/lib/palette";
 
 /** Equirectangular fallback: country outlines, dots sized by papers, arcs for collaborations. */
 export function Globe2D({ countries, collabs, selected, onSelect }: { countries: CountryStats[]; collabs: Collaboration[]; selected: string | null; onSelect: (c: string) => void }) {
@@ -21,12 +21,12 @@ export function Globe2D({ countries, collabs, selected, onSelect }: { countries:
           const a = CENTROIDS[c.source], b = CENTROIDS[c.target]; if (!a || !b) return null;
           const x1 = X(a[1]), y1 = Y(a[0]), x2 = X(b[1]), y2 = Y(b[0]);
           const hot = selected && (c.source === selected || c.target === selected);
-          return <path key={i} d={`M${x1},${y1} Q${(x1 + x2) / 2},${Math.min(y1, y2) - 50} ${x2},${y2}`} fill="none" stroke={hot ? coral : violet} strokeOpacity={selected && !hot ? 0.15 : 0.7} />;
+          return <path key={i} d={`M${x1},${y1} Q${(x1 + x2) / 2},${Math.min(y1, y2) - 50} ${x2},${y2}`} fill="none" stroke={hot ? rose : dusk} strokeOpacity={selected && !hot ? 0.15 : 0.7} />;
         })}
         {countries.map((c) => {
           const ll = CENTROIDS[c.code]; if (!ll) return null;
           return (
-            <circle key={c.code} cx={X(ll[1])} cy={Y(ll[0])} r={3 + 14 * Math.sqrt(c.papers / max)} fill={selected === c.code ? coral : accent} fillOpacity={0.85}
+            <circle key={c.code} cx={X(ll[1])} cy={Y(ll[0])} r={3 + 14 * Math.sqrt(c.papers / max)} fill={selected === c.code ? rose : accent} fillOpacity={0.85}
               className="cursor-pointer" onMouseEnter={() => setHover(c.code)} onMouseLeave={() => setHover((h) => (h === c.code ? null : h))} onClick={() => onSelect(c.code)}>
               <title>{c.name}: {c.papers}</title>
             </circle>

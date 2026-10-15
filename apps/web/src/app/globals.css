@@ -4,80 +4,88 @@
 
 :root {
   color-scheme: dark;
-  --bg: #0B0720;
-  --text: #f4f1ff;
-  --muted: #D5D0E8;
-  --faint: #B7B0D0;
-  --line: rgba(214, 206, 255, 0.2);
-  --accent: #9AD7FF;
-  --teal: #2EE6C7;
-  --violet: #D58BFF;
-  --amber: #F5C451;
-  --coral: #FF7A62;
-  --gap: #FF4FD8;
+  --bg: #14110E;
+  --text: #F7F3EC;
+  --muted: #D4CBBE;
+  --faint: #B7AA9A;
+  --line: rgba(243, 227, 181, 0.2);
+  --accent: #E8C873;
+  --champagne: #F3E3B5;
+  --ivory: #F8F6F2;
+  --teal: #5FB3A8;
+  --rose: #C4785A;
+  --dusk: #7383C0;
+  --gap: #E04B9A;
 }
 body {
-  @apply bg-ink text-slate-100 antialiased;
+  @apply bg-ink antialiased;
   background-color: var(--bg);
   color: var(--text);
   background-image:
-    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.5), transparent 1.4px),
-    radial-gradient(1px 1px at 28% 68%, rgba(255, 255, 255, 0.32), transparent 1.2px),
-    radial-gradient(1.2px 1.2px at 72% 18%, rgba(255, 255, 255, 0.38), transparent 1.4px),
-    radial-gradient(1px 1px at 84% 74%, rgba(255, 255, 255, 0.26), transparent 1.2px),
-    radial-gradient(1px 1px at 46% 42%, rgba(255, 255, 255, 0.18), transparent 1.2px),
-    radial-gradient(ellipse at 8% -8%, rgba(46, 230, 199, 0.16), transparent 46%),
-    radial-gradient(ellipse at 96% 4%, rgba(213, 139, 255, 0.18), transparent 44%),
-    radial-gradient(ellipse at 82% 108%, rgba(255, 122, 98, 0.1), transparent 46%),
-    radial-gradient(ellipse at 12% 92%, rgba(62, 120, 255, 0.14), transparent 42%),
-    radial-gradient(ellipse at 48% 38%, rgba(245, 196, 81, 0.05), transparent 36%);
+    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 248, 236, 0.5), transparent 1.4px),
+    radial-gradient(1px 1px at 28% 68%, rgba(255, 244, 220, 0.28), transparent 1.2px),
+    radial-gradient(1.2px 1.2px at 72% 18%, rgba(255, 236, 200, 0.34), transparent 1.4px),
+    radial-gradient(1px 1px at 84% 74%, rgba(255, 230, 190, 0.22), transparent 1.2px),
+    radial-gradient(1px 1px at 46% 42%, rgba(255, 236, 210, 0.16), transparent 1.2px),
+    radial-gradient(ellipse at 8% -8%, rgba(176, 112, 58, 0.18), transparent 48%),
+    radial-gradient(ellipse at 96% 6%, rgba(92, 54, 32, 0.28), transparent 46%),
+    radial-gradient(ellipse at 84% 108%, rgba(140, 78, 42, 0.16), transparent 48%),
+    radial-gradient(ellipse at 10% 96%, rgba(120, 74, 40, 0.14), transparent 44%),
+    radial-gradient(ellipse at 50% 40%, rgba(232, 200, 115, 0.05), transparent 38%);
   background-attachment: fixed;
   min-height: 100vh;
 }
-::selection { background: rgba(154, 215, 255, 0.35); color: white; }
+::selection { background: rgba(232, 200, 115, 0.35); color: #14110E; }
 @layer components {
   .glass {
     @apply rounded-2xl border backdrop-blur-xl;
     border-color: var(--line);
-    background: linear-gradient(180deg, rgba(22, 19, 47, 0.72), rgba(11, 7, 32, 0.55));
-    box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, rgba(36, 28, 22, 0.74), rgba(20, 17, 14, 0.58));
+    box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(243, 227, 181, 0.08);
   }
-  .chip { @apply rounded-full border px-2.5 py-0.5 text-xs text-mist; border-color: var(--line); background: rgba(255, 255, 255, 0.05); }
+  .chip { @apply rounded-full border px-2.5 py-0.5 text-xs text-mist; border-color: var(--line); background: rgba(255, 248, 236, 0.05); }
   .btn {
     @apply rounded-xl border px-4 py-2 text-sm font-medium transition hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink;
     border-color: var(--line);
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(232, 200, 115, 0.08);
   }
   .input {
-    @apply rounded-xl border bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent;
+    @apply rounded-xl border bg-black/30 px-3 py-2 text-sm placeholder:text-mist/70 focus:outline-none focus:ring-2 focus:ring-accent;
     border-color: var(--line);
+    color: var(--text);
   }
   .search-hero {
     @apply pointer-events-auto rounded-2xl border;
-    border-color: rgba(154, 215, 255, 0.45);
-    background: rgba(11, 7, 32, 0.78);
+    border-color: rgba(232, 200, 115, 0.45);
+    background: rgba(20, 17, 14, 0.78);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     box-shadow:
       0 22px 48px -18px rgba(0, 0, 0, 0.85),
-      0 0 0 1px rgba(154, 215, 255, 0.14),
-      0 0 36px -6px rgba(46, 230, 199, 0.5);
+      0 0 0 1px rgba(232, 200, 115, 0.16),
+      0 0 36px -6px rgba(232, 200, 115, 0.42);
   }
   .search-hero:focus-within {
     outline: 2px solid var(--accent);
     outline-offset: 3px;
     box-shadow:
       0 22px 48px -18px rgba(0, 0, 0, 0.85),
-      0 0 0 1px rgba(154, 215, 255, 0.4),
-      0 0 42px -4px rgba(154, 215, 255, 0.65);
+      0 0 0 1px rgba(232, 200, 115, 0.45),
+      0 0 42px -4px rgba(232, 200, 115, 0.7);
   }
   .hero-vignette {
-    background: radial-gradient(ellipse 72% 52% at 50% 28%, rgba(11, 7, 32, 0.84) 0%, rgba(11, 7, 32, 0.46) 42%, rgba(11, 7, 32, 0.08) 68%, transparent 78%);
+    background: radial-gradient(ellipse 72% 52% at 50% 28%, rgba(20, 17, 14, 0.84) 0%, rgba(20, 17, 14, 0.46) 42%, rgba(20, 17, 14, 0.08) 68%, transparent 78%);
+  }
+  .gold-mark {
+    background-image: linear-gradient(105deg, #F3E3B5 0%, #E8C873 52%, #C6A15A 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 }
 .skip-link {
   position: absolute; left: 1rem; top: -4rem; z-index: 80;
-  @apply rounded-lg bg-white px-3 py-2 text-sm font-semibold text-ink;
+  @apply rounded-lg bg-champagne px-3 py-2 text-sm font-semibold text-ink;
 }
 .skip-link:focus { top: 0.75rem; }
 @media (prefers-reduced-motion: reduce) {

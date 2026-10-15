@@ -6,7 +6,7 @@ import { BufferGeometry, Float32BufferAttribute, Vector3, type Group } from "thr
 import type { Collaboration, CountryStats } from "@/lib/api/types";
 import { CENTROIDS, latLngToVec } from "@/lib/geo";
 import { borderPositions } from "@/lib/world";
-import { accent, coral, panel, violet } from "@/lib/palette";
+import { accent, dusk, panel, rose } from "@/lib/palette";
 
 const R = 2;
 
@@ -59,7 +59,7 @@ function Globe({ countries, collabs, selected, onSelect }: Props) {
             onPointerOut={() => setHover((hvr) => (hvr === c.code ? null : hvr))}
             onClick={(e) => { e.stopPropagation(); onSelect(c.code); }}>
             <boxGeometry args={[0.055, 0.055, h]} />
-            <meshStandardMaterial color={sel ? coral : accent} emissive={sel ? coral : accent} emissiveIntensity={1.5} toneMapped={false} />
+            <meshStandardMaterial color={sel ? rose : accent} emissive={sel ? rose : accent} emissiveIntensity={1.5} toneMapped={false} />
           </mesh>
         );
       })}
@@ -69,7 +69,7 @@ function Globe({ countries, collabs, selected, onSelect }: Props) {
         </Html>
       )}
       {arcs.map((a, i) => (
-        <QuadraticBezierLine key={i} start={a.va} end={a.vb} mid={a.mid} color={selected && (a.source === selected || a.target === selected) ? coral : violet}
+        <QuadraticBezierLine key={i} start={a.va} end={a.vb} mid={a.mid} color={selected && (a.source === selected || a.target === selected) ? rose : dusk}
           lineWidth={0.6 + 2.4 * (a.papers / maxC)} transparent opacity={selected && a.source !== selected && a.target !== selected ? 0.1 : 0.75} />
       ))}
     </group>
