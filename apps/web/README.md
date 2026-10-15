@@ -44,4 +44,4 @@ A 404 on `/galaxy` or `/topic-country-years` uses fixtures for that call only. T
 - Low-power mode: `prefers-reduced-motion`, no WebGL, or the nav toggle. Galaxy and globe both have an SVG fallback.
 
 ## Design
-Tokens live in `tailwind.config.ts` and `src/app/globals.css` (`ink`, `accent`, `gap`, `glow`, `mist`). Display type is Fraunces, UI type is Space Grotesk, panels use the `glass` class. The audit of the previous UI is `docs/ui/AUDIT.md`.
+Tokens live in `tailwind.config.ts`, `src/app/globals.css`, and `src/lib/palette.ts`: midnight indigo `ink`, sky `accent`, and the aurora cluster set `teal`, `violet`, `amber`, `coral`. `gap` is the research-gap mark. Display type is Fraunces, UI type is Space Grotesk, panels use the `glass` class. The landing search uses `search-hero`. The audit of the previous UI is `docs/ui/AUDIT.md`.

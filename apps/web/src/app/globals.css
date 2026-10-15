@@ -4,34 +4,42 @@
 
 :root {
   color-scheme: dark;
-  --bg: #070814;
-  --text: #eef3ff;
-  --muted: #c5d0e6;
-  --faint: #9aabc8;
-  --line: rgba(190, 214, 255, 0.16);
-  --accent: #7dd3fc;
+  --bg: #0B0720;
+  --text: #f4f1ff;
+  --muted: #D5D0E8;
+  --faint: #B7B0D0;
+  --line: rgba(214, 206, 255, 0.2);
+  --accent: #9AD7FF;
+  --teal: #2EE6C7;
+  --violet: #D58BFF;
+  --amber: #F5C451;
+  --coral: #FF7A62;
+  --gap: #FF4FD8;
 }
 body {
   @apply bg-ink text-slate-100 antialiased;
   background-color: var(--bg);
+  color: var(--text);
   background-image:
-    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.55), transparent 1.4px),
-    radial-gradient(1px 1px at 28% 68%, rgba(255, 255, 255, 0.35), transparent 1.2px),
-    radial-gradient(1.2px 1.2px at 72% 18%, rgba(255, 255, 255, 0.4), transparent 1.4px),
-    radial-gradient(1px 1px at 84% 74%, rgba(255, 255, 255, 0.28), transparent 1.2px),
-    radial-gradient(1px 1px at 46% 42%, rgba(255, 255, 255, 0.22), transparent 1.2px),
-    radial-gradient(ellipse at 12% -10%, rgba(125, 211, 252, 0.18), transparent 46%),
-    radial-gradient(ellipse at 90% 120%, rgba(196, 181, 253, 0.16), transparent 50%),
-    radial-gradient(ellipse at 50% 40%, rgba(249, 168, 212, 0.05), transparent 42%);
+    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.5), transparent 1.4px),
+    radial-gradient(1px 1px at 28% 68%, rgba(255, 255, 255, 0.32), transparent 1.2px),
+    radial-gradient(1.2px 1.2px at 72% 18%, rgba(255, 255, 255, 0.38), transparent 1.4px),
+    radial-gradient(1px 1px at 84% 74%, rgba(255, 255, 255, 0.26), transparent 1.2px),
+    radial-gradient(1px 1px at 46% 42%, rgba(255, 255, 255, 0.18), transparent 1.2px),
+    radial-gradient(ellipse at 8% -8%, rgba(46, 230, 199, 0.16), transparent 46%),
+    radial-gradient(ellipse at 96% 4%, rgba(213, 139, 255, 0.18), transparent 44%),
+    radial-gradient(ellipse at 82% 108%, rgba(255, 122, 98, 0.1), transparent 46%),
+    radial-gradient(ellipse at 12% 92%, rgba(62, 120, 255, 0.14), transparent 42%),
+    radial-gradient(ellipse at 48% 38%, rgba(245, 196, 81, 0.05), transparent 36%);
   background-attachment: fixed;
   min-height: 100vh;
 }
-::selection { background: rgba(125, 211, 252, 0.35); color: white; }
+::selection { background: rgba(154, 215, 255, 0.35); color: white; }
 @layer components {
   .glass {
     @apply rounded-2xl border backdrop-blur-xl;
     border-color: var(--line);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.03));
+    background: linear-gradient(180deg, rgba(22, 19, 47, 0.72), rgba(11, 7, 32, 0.55));
     box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
   .chip { @apply rounded-full border px-2.5 py-0.5 text-xs text-mist; border-color: var(--line); background: rgba(255, 255, 255, 0.05); }
@@ -41,8 +49,30 @@ body {
     background: rgba(255, 255, 255, 0.08);
   }
   .input {
-    @apply rounded-xl border bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent/70;
+    @apply rounded-xl border bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent;
     border-color: var(--line);
+  }
+  .search-hero {
+    @apply pointer-events-auto rounded-2xl border;
+    border-color: rgba(154, 215, 255, 0.45);
+    background: rgba(11, 7, 32, 0.78);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      0 22px 48px -18px rgba(0, 0, 0, 0.85),
+      0 0 0 1px rgba(154, 215, 255, 0.14),
+      0 0 36px -6px rgba(46, 230, 199, 0.5);
+  }
+  .search-hero:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow:
+      0 22px 48px -18px rgba(0, 0, 0, 0.85),
+      0 0 0 1px rgba(154, 215, 255, 0.4),
+      0 0 42px -4px rgba(154, 215, 255, 0.65);
+  }
+  .hero-vignette {
+    background: radial-gradient(ellipse 72% 52% at 50% 28%, rgba(11, 7, 32, 0.84) 0%, rgba(11, 7, 32, 0.46) 42%, rgba(11, 7, 32, 0.08) 68%, transparent 78%);
   }
 }
 .skip-link {

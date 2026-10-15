@@ -7,14 +7,11 @@ import { Vector3, type Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink, TopicNode } from "@/lib/graph";
 import { linkPairs, positionNodes, type Positioned } from "./layout";
+import { accent, clusterColor, gapColor, ink, linkColor, violet } from "@/lib/palette";
 
-const PALETTE = ["#7dd3fc", "#c4b5fd", "#6ee7b7", "#fcd34d", "#fb923c", "#f9a8d4"];
 function colorFor(n: Positioned, showGaps: boolean) {
-  if (showGaps && n.gap) return "#f9a8d4";
-  const key = n.cluster ?? n.id;
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h + key.charCodeAt(i) * 13) % PALETTE.length;
-  return PALETTE[h];
+  if (showGaps && n.gap) return gapColor;
+  return clusterColor(n.cluster ?? n.id);
 }
 
 function CameraRig({ focus, controls }: { focus: [number, number, number] | null; controls: React.RefObject<OrbitControlsImpl | null> }) {
@@ -60,7 +57,7 @@ function Scene({ nodes, links, showGaps, focus, onFocus, onPick }: Props) {
     <>
       <group ref={g}>
         {pairs.map(({ a, b, w }, i) => (
-          <Line key={i} points={[a.pos, b.pos]} color="#9bd7ff" lineWidth={0.6 + w * 5} transparent opacity={0.28} />
+          <Line key={i} points={[a.pos, b.pos]} color={linkColor} lineWidth={0.6 + w * 5} transparent opacity={0.35} />
         ))}
         {placed.map((n) => {
           const s = 0.09 + 0.34 * Math.sqrt(n.support / maxS);
@@ -77,13 +74,13 @@ function Scene({ nodes, links, showGaps, focus, onFocus, onPick }: Props) {
                 <sphereGeometry args={[s, 32, 32]} />
                 <meshStandardMaterial color={color} emissive={color} emissiveIntensity={hot ? 2.6 : 1.7} toneMapped={false} />
               </mesh>
-              {(showGaps && n.gap) && <mesh><sphereGeometry args={[s * 1.85, 24, 24]} /><meshBasicMaterial color="#f9a8d4" transparent opacity={0.14} /></mesh>}
+              {(showGaps && n.gap) && <mesh><sphereGeometry args={[s * 1.85, 24, 24]} /><meshBasicMaterial color={gapColor} transparent opacity={0.16} /></mesh>}
               {hot && (
-                <Html center position={[0, s + 0.45, 0]} zIndexRange={[30, 0]} style={{ pointerEvents: "auto" }}>
+                <Html center position={[0, s + 0.45, 0]} zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
                   <div className="glass w-48 p-2.5 text-left text-xs shadow-glow" onPointerDown={(e) => e.stopPropagation()}>
                     <div className="font-medium text-white">{n.id}</div>
                     <p className="mt-0.5 text-mist">Paper{n.cluster ? ` · topic cluster ${n.cluster}` : ""}</p>
-                    {showGaps && n.gap && <p className="text-pink-200">Research gap{n.gapScore != null ? ` · ${n.gapScore.toFixed(2)}` : ""}</p>}
+                    {showGaps && n.gap && <p className="text-gap">Research gap{n.gapScore != null ? ` · ${n.gapScore.toFixed(2)}` : ""}</p>}
                     <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(n.id)}>Search this paper</button>
                   </div>
                 </Html>
@@ -102,10 +99,10 @@ interface Props { nodes: (TopicNode & { pos?: [number, number, number] })[]; lin
 export default function Galaxy3D(p: Props) {
   return (
     <Canvas camera={{ position: [0, 4.2, 12], fov: 52 }} dpr={[1, 1.7]} gl={{ antialias: true }}>
-      <color attach="background" args={["#070814"]} />
+      <color attach="background" args={[ink]} />
       <ambientLight intensity={0.35} />
-      <pointLight position={[0, 0, 0]} intensity={24} color="#7dd3fc" />
-      <pointLight position={[8, 6, 4]} intensity={18} color="#c4b5fd" />
+      <pointLight position={[0, 0, 0]} intensity={24} color={accent} />
+      <pointLight position={[8, 6, 4]} intensity={18} color={violet} />
       <Stars radius={70} depth={40} count={2800} factor={3} fade speed={0.4} />
       <Scene {...p} />
       <EffectComposer multisampling={0}>

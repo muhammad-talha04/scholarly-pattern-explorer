@@ -2,8 +2,9 @@
 import { useMemo, useState } from "react";
 import type { TopicCountryYear } from "@/lib/api/types";
 import { streamBands, topicSeries } from "@/lib/series";
+import { CLUSTER_COLORS, ink, mist } from "@/lib/palette";
 
-const COLORS = ["#7dd3fc", "#c4b5fd", "#6ee7b7", "#fcd34d", "#fb923c", "#f9a8d4", "#94a3b8"];
+const COLORS = [...CLUSTER_COLORS, mist];
 
 export function Streamgraph({ rows }: { rows: TopicCountryYear[] }) {
   const bands = useMemo(() => streamBands(topicSeries(rows, 7, false)), [rows]);
@@ -27,7 +28,7 @@ export function Streamgraph({ rows }: { rows: TopicCountryYear[] }) {
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-64 w-full" role="img" aria-label="Topic volume by year, stacked as a stream">
         {bands.map((b, i) => (
-          <path key={b.name} d={path(b)} fill={COLORS[i % COLORS.length]} opacity={0.82} stroke="#070814" strokeWidth={0.6}>
+          <path key={b.name} d={path(b)} fill={COLORS[i % COLORS.length]} opacity={0.82} stroke={ink} strokeWidth={0.6}>
             <title>{b.name}</title>
           </path>
         ))}
@@ -37,7 +38,7 @@ export function Streamgraph({ rows }: { rows: TopicCountryYear[] }) {
         ))}
         <line x1={x(active)} x2={x(active)} y1={16} y2={H - 18} stroke="white" strokeOpacity={0.45} />
         {years.map((year, i) => (i % 2 === 0 || i === years.length - 1) && (
-          <text key={year} x={x(i)} y={H - 6} textAnchor="middle" fill="#c5d0e6" fontSize={11}>{year}</text>
+          <text key={year} x={x(i)} y={H - 6} textAnchor="middle" fill={mist} fontSize={11}>{year}</text>
         ))}
       </svg>
       <ul className="mt-2 flex flex-wrap gap-2 text-xs text-mist">

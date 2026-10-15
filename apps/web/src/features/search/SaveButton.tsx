@@ -20,10 +20,10 @@ export function SaveButton({ paperId }: { paperId: string }) {
               {collections.map((c) => <button key={c.id} className="chip hover:text-white" onClick={() => setName(c.name)}>{c.name}</button>)}
             </div>
           )}
-          <button className="btn mt-3 w-full bg-sky-400/20" onClick={() => { saveToCollection(name, paperId); setNote(`Saved to ${name.trim() || "Reading list"}`); setOpen(false); }}>Save on this device</button>
+          <button className="btn mt-3 w-full bg-accent/20" onClick={() => { saveToCollection(name, paperId); setNote(`Saved to ${name.trim() || "Reading list"}`); setOpen(false); }}>Save on this device</button>
         </div>
       )}
-      {note && <p className="mt-1 text-xs text-emerald-300" role="status">{note}</p>}
+      {note && <p className="mt-1 text-xs text-teal" role="status">{note}</p>}
     </div>
   );
 }

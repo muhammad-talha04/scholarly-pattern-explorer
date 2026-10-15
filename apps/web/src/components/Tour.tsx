@@ -53,8 +53,8 @@ export function Tour() {
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <button className="btn" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>Back</button>
           {step < STEPS.length - 1
-            ? <button className="btn bg-sky-400/20" onClick={() => setStep((s) => s + 1)}>Next</button>
-            : <button className="btn bg-sky-400/20" onClick={finish}>Done</button>}
+            ? <button className="btn bg-accent/20" onClick={() => setStep((s) => s + 1)}>Next</button>
+            : <button className="btn bg-accent/20" onClick={finish}>Done</button>}
           <button className="ml-auto text-sm text-mist underline-offset-2 hover:text-white hover:underline" onClick={finish}>Skip</button>
         </div>
       </div>

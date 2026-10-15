@@ -34,15 +34,15 @@ function PaperBody({ id, onOpen }: { id: string; onOpen: (id: string) => void })
       <div>
         <h2 className="pr-16 font-display text-2xl leading-snug text-white">{d.title}</h2>
         <p className="mt-1 text-sm text-mist">{d.authors.join(", ")} · {d.year ?? "n.d."} · {d.cited_by} citations</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">{d.topics.map((t) => <span key={t} className="chip">{t}</span>)}{d.countries.map((c) => <span key={c} className="chip text-sky-200">{c}</span>)}</div>
+        <div className="mt-2 flex flex-wrap gap-1.5">{d.topics.map((t) => <span key={t} className="chip">{t}</span>)}{d.countries.map((c) => <span key={c} className="chip text-accent">{c}</span>)}</div>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {link && (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-400 to-violet-400 px-4 py-3 font-semibold text-ink shadow-glow transition hover:brightness-110">
+          <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal to-violet px-4 py-3 font-semibold text-ink shadow-glow transition hover:brightness-110">
             Read original paper
           </a>
         )}
-        <button className={`btn ${pinned ? "bg-pink-300/20" : ""}`} aria-pressed={pinned} onClick={() => toggleCompare(id)}>{pinned ? "Pinned for compare" : "Pin to compare"}</button>
+        <button className={`btn ${pinned ? "bg-gap/20" : ""}`} aria-pressed={pinned} onClick={() => toggleCompare(id)}>{pinned ? "Pinned for compare" : "Pin to compare"}</button>
         <SaveButton paperId={id} />
       </div>
       <section>
