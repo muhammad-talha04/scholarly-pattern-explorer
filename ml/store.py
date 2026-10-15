@@ -11,6 +11,8 @@ from typing import Protocol
 
 import numpy as np
 
+from .paths import ml_data_dir
+
 
 class VectorStore(Protocol):
     def upsert(self, ids: list[str], vectors: np.ndarray, meta: list[dict]) -> None: ...
@@ -157,4 +159,4 @@ def get_store():
     """ML_VECTOR_BACKEND=pgvector uses DATABASE_URL; otherwise local files in ML_DATA_DIR."""
     if os.getenv("ML_VECTOR_BACKEND", "local").lower() == "pgvector":
         return PgVectorStore()
-    return LocalStore(Path(os.getenv("ML_DATA_DIR", "data/ml")) / "vectors")
+    return LocalStore(ml_data_dir() / "vectors")
