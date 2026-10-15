@@ -73,3 +73,14 @@ class Collaboration(BaseModel):
     source: str   # ISO 3166 alpha-2
     target: str
     papers: float  # fractional or full, per the request's counting method
+
+
+class GalaxyPoint(BaseModel):
+    """One paper in the galaxy. (x, y) is the 2D layout; (x, y, z) is the 3D layout."""
+    id: str
+    x: float
+    y: float
+    z: float
+    cluster_id: int
+    cluster_label: str = ""
+    year: int | None = None

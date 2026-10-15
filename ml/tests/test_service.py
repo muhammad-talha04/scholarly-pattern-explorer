@@ -17,12 +17,21 @@ def test_inverted_index_and_links():
 
 def test_real_embedder_uses_minilm_mocked(monkeypatch):
     class Fake:
+        def __init__(self):
+            self.seen = []
         def encode(self, texts, **kw):
+            self.seen.append(list(texts))
             return np.ones((len(texts), 384))
     e = Embedder()
     assert "all-MiniLM-L6-v2" in e.model_name
     e._model = Fake()
     assert e.encode(["a", "b"]).shape == (2, 384)
+    assert e._model.seen == [["a", "b"]]
+    e5 = Embedder("intfloat/e5-small-v2")
+    e5._model = Fake()
+    e5.encode_queries(["hello"])
+    e5.encode_documents(["hello"])
+    assert e5._model.seen[-2:] == [["query: hello"], ["passage: hello"]]
 
 
 def test_local_store_persist_and_upsert(tmp_path):
@@ -90,3 +99,16 @@ def test_pgvector_store_sql_with_fake_conn():
     assert st.search(np.zeros(384), 5) == [("W1", 0.9, {"title": "x"})]
     assert any("CREATE EXTENSION IF NOT EXISTS vector" in q for q, _ in c.log)
     assert any("<=>" in q for q, _ in c.log)
+
+
+def test_pgvector_rows_parse_embeddings():
+    class Cur:
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def execute(self, sql, params=None): pass
+        def fetchall(self): return [("W1", "[0.0, 1.0]", {"title": "t", "pub_year": 2020})]
+        def fetchone(self): return None
+    class Conn:
+        def cursor(self): return Cur()
+    ids, vecs, metas = PgVectorStore(conn=Conn()).rows()
+    assert ids == ["W1"] and vecs.shape == (1, 2) and metas[0]["pub_year"] == 2020

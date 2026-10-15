@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-15 05:15 PKT by tom (ML row) and ami (integration tests row); earlier by michal, olli.
+Last updated: 2026-10-15 by the embedding benchmark and paper galaxy work; earlier 05:15 PKT by tom (ML row) and ami (integration tests row); earlier by michal, olli.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -44,6 +44,9 @@ Nothing is merged into main yet.
   - Next: ami removes the 9 stale xfail markers in #4. Index the real `works_v2.jsonl` into pgvector, and make the ingest workflow run `python -m ml.cli index/update`.
   - Blockers: the real all-MiniLM-L6-v2 model and pgvector are untested. The tests use a lightweight offline embedder and a fake database connection. A live run needs a Supabase `DATABASE_URL`.
 - [x] Data paths anchored to the repo root (lura, `fix/anchor-data-paths`): `ml/paths.py` resolves `ML_DATA_DIR`, `COUNTRY_SNAPSHOT` and the works JSONL from the repo root, used by `ml/service.py`, `ml/store.py`, `ml/papers.py`, `pipeline/country_api.py` and `apps/api/app/ml_bridge.py`. The API now finds its data whatever directory it is started from. Test: `ml/tests/test_paths.py`.
+- [x] Embedding benchmark and paper galaxy:
+  - Done: the real `all-MiniLM-L6-v2` model indexes, searches and lays out the sample (`ML_RUN_REAL_EMBED=1`, `ml/tests/test_embedder_real.py`). `python -m ml.benchmark` reads a CSV with columns `query_id,query,work_id,relevance` and scores recall@10 and nDCG@10. On `eval/benchmark_queries.csv` (24 papers, 5 queries) MiniLM, `BAAI/bge-small-en-v1.5` and `intfloat/e5-small-v2` all score recall@10 1.0 and nDCG@10 0.9974, so the default stays MiniLM. A switch needs +0.05 on both metrics. `GET /api/v1/galaxy` returns `id, x, y, z, cluster_id, cluster_label, year` (`(x, y)` is the 2D layout). The PCA basis is frozen, so later runs do not move papers already placed. Summaries and chat accept a local OpenAI-compatible server via `ML_LLM_URL` with no API key (Ollama or llama.cpp); see the README. Offline tests: ml 42 pass (1 skipped real-model test), api 19 pass, integration 42 pass.
+  - Next: replace the sample CSV with the hand-labelled query set and re-score. Live pgvector is still untested until a `DATABASE_URL` is available. Install `umap-learn` and `hdbscan` if you want that clusterer once a run has at least 25 papers.
 - [ ] Front end (harry): not started on the shared base (`v2-rebuild` will not be merged); waiting on "start the front end" in 1:1
 - [ ] Ami - integration tests: draft PR #4 "Cross-PR integration tests" (`integration-tests`). Latest `ml-service`, `data-pipeline` (#3) and `platform-skeleton` (#1) are merged in.
   - Done: `tests/integration/`, 42 tests: 41 pass, 1 xfail (strict); merged again after olli added `per_country`. All 9 earlier xfails now pass: `/countries` routes are wired, `papers` is a float, collaborations have counting modes, and `topic_top_countries` is pairs. New: per paper, fractional pair weights sum to 1, `per_country` pair weights sum to (n-1)/2, and a single-country paper has no pairs. Incremental pair weights equal a full rebuild. `/countries/collaborations?counting=` returns what the snapshot holds for that counting mode.

@@ -54,4 +54,5 @@ _fixes_2026_09/
 
 # Search evaluation query set is source, not data.
 !eval/search_queries.jsonl
+!eval/benchmark_queries.csv
 eval/report.json
