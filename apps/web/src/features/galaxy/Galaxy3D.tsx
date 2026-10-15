@@ -3,14 +3,14 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  BufferGeometry, Color, DoubleSide, Float32BufferAttribute, InstancedBufferAttribute, InstancedMesh, Matrix4, NoToneMapping,
+  AdditiveBlending, BufferGeometry, Color, DoubleSide, Float32BufferAttribute, InstancedBufferAttribute, InstancedMesh, Matrix4, NoToneMapping,
   PlaneGeometry, SphereGeometry, Vector3,
 } from "three";
 import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
-import { NODE_BRIGHTNESS, clusterColors, dust as dustColor, gap as gapColor, hub as hubColor, ink, linkAmber } from "@/lib/theme";
-import { heroNetwork, neighborIds, networkLinks, nodeAmber, type Star } from "./stars";
+import { NODE_BRIGHTNESS, clusterColors, dust as dustColor, filamentHot, filamentTip, gap as gapColor, ink, linkAmber } from "@/lib/theme";
+import { heroNetwork, neighborIds, networkLinks, nodeAmber, type Filament, type Star } from "./stars";
 
 /** Resting camera, above the disc so the spiral reads as a cluster rather than an edge-on line. At fov 46 and this distance a unit is ~38px on a 900px-tall pane, so a 0.16–0.30 sphere is about 6–12px. */
 const CAMERA_POS = new Vector3(0.35, 26, 11);
@@ -101,88 +101,76 @@ void main() {
 }
 `;
 
-const HUB_VERT = `
-uniform float uTime;
-uniform float uMotion;
-void main() {
-  float pulse = 1.0 + uMotion * sin(uTime * 1.2) * 0.04;
-  vec4 world = modelMatrix * vec4(position * pulse, 1.0);
-  gl_Position = projectionMatrix * viewMatrix * world;
-}
-`;
-
-const HUB_FRAG = `
-precision highp float;
-uniform vec3 uColor;
-uniform float uTime;
-uniform float uMotion;
-void main() {
-  float pulse = uMotion * (0.5 + 0.5 * sin(uTime * 1.2)) * 0.08;
-  vec3 srgb = pow(max(uColor, vec3(0.0)), vec3(0.454545));
-  vec3 outS = min(vec3(1.0), srgb * (0.96 + pulse));
-  gl_FragColor = vec4(pow(outS, vec3(2.2)), 1.0);
-  #include <colorspace_fragment>
-}
-`;
-
-const HUB_HALO_VERT = `
-varying vec2 vUv;
-uniform float uTime;
-uniform float uMotion;
-uniform float uRadius;
-void main() {
-  float pulse = 1.0 + uMotion * sin(uTime * 1.2) * 0.04;
-  vec4 center = viewMatrix * modelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-  gl_Position = projectionMatrix * (center + vec4(position.xy * uRadius * pulse, 0.0, 0.0));
-  vUv = uv;
-}
-`;
-
-const HUB_HALO_FRAG = `
-precision highp float;
-varying vec2 vUv;
-uniform vec3 uColor;
-void main() {
-  float d = length(vUv * 2.0 - 1.0);
-  if (d > 1.0) discard;
-  float alpha = exp(-3.6 * d * d) * 0.12;
-  if (alpha < 0.012) discard;
-  gl_FragColor = vec4(uColor, alpha);
-  #include <colorspace_fragment>
-}
-`;
-
-const LINK_VERT = `
-attribute float aT;
+const FILAMENT_VERT = `
+attribute float aDepth;
+attribute float aAlong;
 attribute float aPulse;
 attribute float aPhase;
-attribute float aAlpha;
-varying float vT;
+attribute float aSide;
+varying float vDepth;
+varying float vAlong;
 varying float vPulse;
 varying float vPhase;
-varying float vAlpha;
+varying float vSide;
 void main() {
-  vT = aT;
+  vDepth = aDepth;
+  vAlong = aAlong;
   vPulse = aPulse;
   vPhase = aPhase;
-  vAlpha = aAlpha;
+  vSide = aSide;
   gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
 }
 `;
 
-const LINK_FRAG = `
+const FILAMENT_FRAG = `
 precision highp float;
-varying float vT;
+varying float vDepth;
+varying float vAlong;
 varying float vPulse;
 varying float vPhase;
-varying float vAlpha;
-uniform vec3 uColor;
+varying float vSide;
+uniform vec3 uHot;
+uniform vec3 uMid;
+uniform vec3 uTip;
 uniform float uTime;
 uniform float uMotion;
 void main() {
-  float phase = fract(uTime * 0.16 + vPhase);
-  float spark = uMotion * vPulse * exp(-pow((vT - phase) * 7.5, 2.0));
-  gl_FragColor = vec4(uColor, min(0.8, vAlpha + spark * 0.5));
+  float d = clamp(vDepth, 0.0, 1.0);
+  vec3 hot = pow(max(uHot, vec3(0.0)), vec3(0.454545));
+  vec3 mid = pow(max(uMid, vec3(0.0)), vec3(0.454545));
+  vec3 tip = pow(max(uTip, vec3(0.0)), vec3(0.454545));
+  vec3 col = d < 0.5 ? mix(hot, mid, d * 2.0) : mix(mid, tip, (d - 0.5) * 2.0);
+  float phase = fract(uTime * 0.12 + vPhase);
+  float spark = uMotion * vPulse * exp(-pow((vAlong - phase) * 8.0, 2.0));
+  col = mix(col, hot, spark * 0.85);
+  float core = exp(-vSide * vSide * 2.6);
+  float alpha = mix(0.7, 0.14, d) * core + spark * 0.55;
+  if (alpha < 0.015) discard;
+  gl_FragColor = vec4(pow(min(col, vec3(1.0)), vec3(2.2)), min(alpha, 1.0));
+  #include <colorspace_fragment>
+}
+`;
+
+const SPECK_VERT = `
+attribute float aSize;
+attribute vec3 aColor;
+varying vec3 vColor;
+void main() {
+  vec4 mv = viewMatrix * modelMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = aSize;
+  vColor = aColor;
+}
+`;
+
+const SPECK_FRAG = `
+precision highp float;
+varying vec3 vColor;
+void main() {
+  vec2 p = gl_PointCoord * 2.0 - 1.0;
+  float d = dot(p, p);
+  if (d > 1.0) discard;
+  gl_FragColor = vec4(vColor, 0.55 * (1.0 - d * 0.4));
   #include <colorspace_fragment>
 }
 `;
@@ -203,7 +191,7 @@ void main() {
   vec2 p = gl_PointCoord * 2.0 - 1.0;
   float d = dot(p, p);
   if (d > 1.0) discard;
-  gl_FragColor = vec4(uColor, 0.92 * (1.0 - d * 0.35));
+  gl_FragColor = vec4(uColor, 0.4 * (1.0 - d * 0.35));
   #include <colorspace_fragment>
 }
 `;
@@ -242,11 +230,54 @@ function CameraRig({ look, reduce, controls }: { look: [number, number, number];
   return null;
 }
 
-const HUB_RADIUS = 0.4;
+function nodeRadius(node: { support: number; role?: string; hubRank?: number }, maxS: number) {
+  if (node.role === "hub") return node.hubRank === 0 ? 0.5 : 0.34;
+  return 0.13 + 0.08 * Math.sqrt(Math.max(node.support, 0) / maxS);
+}
 
-function nodeRadius(support: number, maxS: number, secondary: boolean) {
-  if (secondary) return 0.3;
-  return 0.15 + 0.1 * Math.sqrt(Math.max(support, 0) / maxS);
+function ribbonGeometry(filaments: Filament[]) {
+  const pos: number[] = [];
+  const depth: number[] = [];
+  const along: number[] = [];
+  const pulse: number[] = [];
+  const phase: number[] = [];
+  const side: number[] = [];
+  const index: number[] = [];
+  for (const filament of filaments) {
+    if (filament.pts.length < 2) continue;
+    const base = pos.length / 3;
+    filament.pts.forEach((point, i) => {
+      const prev = filament.pts[Math.max(0, i - 1)].pos;
+      const next = filament.pts[Math.min(filament.pts.length - 1, i + 1)].pos;
+      const tx = next[0] - prev[0];
+      const tz = next[2] - prev[2];
+      const len = Math.hypot(tx, tz) || 1;
+      const px = -tz / len;
+      const pz = tx / len;
+      const w = 0.155 * (1 - point.depth) + 0.02 * point.depth;
+      for (const s of [-1, 1]) {
+        pos.push(point.pos[0] + px * w * s, point.pos[1], point.pos[2] + pz * w * s);
+        depth.push(point.depth);
+        along.push(point.along);
+        pulse.push(point.pulse);
+        phase.push(point.phase);
+        side.push(s);
+      }
+      if (i < filament.pts.length - 1) {
+        const a = base + i * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    });
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
+  geo.setAttribute("aDepth", new Float32BufferAttribute(depth, 1));
+  geo.setAttribute("aAlong", new Float32BufferAttribute(along, 1));
+  geo.setAttribute("aPulse", new Float32BufferAttribute(pulse, 1));
+  geo.setAttribute("aPhase", new Float32BufferAttribute(phase, 1));
+  geo.setAttribute("aSide", new Float32BufferAttribute(side, 1));
+  geo.setIndex(index);
+  return geo;
 }
 
 function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, onHighlight, onPick }: Props & { reduce: boolean }) {
@@ -273,53 +304,42 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
     uTime: uniforms.uTime,
     uMotion: uniforms.uMotion,
   }), [uniforms]);
-  const hubUniforms = useMemo(() => ({
-    uTime: uniforms.uTime,
-    uMotion: uniforms.uMotion,
-    uColor: { value: new Color(hubColor) },
-  }), [uniforms]);
-  const hubHaloUniforms = useMemo(() => ({
-    uTime: uniforms.uTime,
-    uMotion: uniforms.uMotion,
-    uRadius: { value: HUB_RADIUS * 2.5 },
-    uColor: { value: new Color(hubColor) },
-  }), [uniforms]);
-  const linkUniforms = useMemo(() => ({
-    uColor: { value: new Color(linkAmber) },
+  const filamentUniforms = useMemo(() => ({
+    uHot: { value: new Color(filamentHot) },
+    uMid: { value: new Color(linkAmber) },
+    uTip: { value: new Color(filamentTip) },
     uTime: uniforms.uTime,
     uMotion: uniforms.uMotion,
   }), [uniforms]);
   const dustUniforms = useMemo(() => ({ uColor: { value: new Color(dustColor) } }), []);
 
-  const spokes = useMemo(() => {
-    const pos: number[] = [];
-    const t: number[] = [];
-    const pulse: number[] = [];
-    const phase: number[] = [];
-    const alpha: number[] = [];
-    const opacity = { near: 0.14, spoke: 0.18, hub: 0.22, cross: 0.09 };
-    let sparkN = 0;
-    for (const edge of net.edges) {
-      pos.push(edge.a[0], edge.a[1], edge.a[2], edge.b[0], edge.b[1], edge.b[2]);
-      t.push(0, 1);
-      const fire = edge.kind === "hub" || (edge.kind === "cross" && sparkN % 2 === 0);
-      const offset = fire ? (sparkN * 0.17) % 1 : 0;
-      if (edge.kind === "hub" || edge.kind === "cross") sparkN++;
-      pulse.push(fire ? 1 : 0, fire ? 1 : 0);
-      phase.push(offset, offset);
-      alpha.push(opacity[edge.kind], opacity[edge.kind]);
-    }
+  const ribbon = useMemo(() => ribbonGeometry(net.filaments), [net.filaments]);
+  const speckGeo = useMemo(() => {
+    const pos = new Float32Array(Math.max(net.specks.length, 1) * 3);
+    const colors = new Float32Array(Math.max(net.specks.length, 1) * 3);
+    const sizes = new Float32Array(Math.max(net.specks.length, 1));
+    const hot = new Color(filamentHot);
+    const tip = new Color(filamentTip);
+    const mid = new Color(linkAmber);
+    net.specks.forEach((speck, i) => {
+      pos[i * 3] = speck.pos[0];
+      pos[i * 3 + 1] = speck.pos[1];
+      pos[i * 3 + 2] = speck.pos[2];
+      const color = speck.depth < 0.5 ? hot.clone().lerp(mid, speck.depth * 2) : mid.clone().lerp(tip, (speck.depth - 0.5) * 2);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+      sizes[i] = 1.5 + (1 - speck.depth) * 1.6;
+    });
     const geo = new BufferGeometry();
     geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
-    geo.setAttribute("aT", new Float32BufferAttribute(t, 1));
-    geo.setAttribute("aPulse", new Float32BufferAttribute(pulse, 1));
-    geo.setAttribute("aPhase", new Float32BufferAttribute(phase, 1));
-    geo.setAttribute("aAlpha", new Float32BufferAttribute(alpha, 1));
+    geo.setAttribute("aColor", new Float32BufferAttribute(colors, 3));
+    geo.setAttribute("aSize", new Float32BufferAttribute(sizes, 1));
     return geo;
-  }, [net.edges]);
+  }, [net.specks]);
 
   const dustGeo = useMemo(() => {
-    const count = 720;
+    const count = 380;
     const pos = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
     let seed = 17;
@@ -356,12 +376,12 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
     const glow = new Float32Array(n);
     const m = new Matrix4();
     nodes.forEach((node, i) => {
-      const s = nodeRadius(node.support, maxS, node.role === "secondary");
+      const s = nodeRadius(node, maxS);
       m.makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
       dummy.makeScale(s, s, s);
       m.multiply(dummy);
       mesh.setMatrixAt(i, m);
-      const haloScale = s * 2.5;
+      const haloScale = node.role === "hub" ? s * (node.hubRank === 0 ? 3.5 : 2.9) : s * 2.4;
       const haloM = new Matrix4().makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
       haloM.multiply(new Matrix4().makeScale(haloScale, haloScale, haloScale));
       halo.setMatrixAt(i, haloM);
@@ -403,7 +423,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
       const arr = attr!.array as Float32Array;
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
-        let g = 0;
+        let g = n.role === "hub" ? (n.hubRank === 0 ? 0.8 : 0.4) : 0;
         if (highlight?.has(n.id)) g = 0.62;
         if (near.has(n.id)) g = 0.55;
         if (n.id === hoverId || n.id === focus) g = 1;
@@ -436,9 +456,12 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
         <points geometry={dustGeo} frustumCulled={false} raycast={() => null}>
           <shaderMaterial args={[{ uniforms: dustUniforms, vertexShader: DUST_VERT, fragmentShader: DUST_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </points>
-        <lineSegments geometry={spokes} frustumCulled={false} raycast={() => null}>
-          <shaderMaterial args={[{ uniforms: linkUniforms, vertexShader: LINK_VERT, fragmentShader: LINK_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
-        </lineSegments>
+        <mesh geometry={ribbon} frustumCulled={false} renderOrder={1} raycast={() => null}>
+          <shaderMaterial args={[{ uniforms: filamentUniforms, vertexShader: FILAMENT_VERT, fragmentShader: FILAMENT_FRAG, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide, toneMapped: false }]} />
+        </mesh>
+        <points geometry={speckGeo} frustumCulled={false} renderOrder={1} raycast={() => null}>
+          <shaderMaterial args={[{ vertexShader: SPECK_VERT, fragmentShader: SPECK_FRAG, transparent: true, depthWrite: false, blending: AdditiveBlending, toneMapped: false }]} />
+        </points>
         <instancedMesh
           ref={nodesRef}
           args={[sphere, undefined, Math.max(nodes.length, 1)]}
@@ -459,14 +482,6 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
         <instancedMesh ref={haloRef} args={[haloPlane, undefined, Math.max(nodes.length, 1)]} renderOrder={3} frustumCulled={false} raycast={() => null}>
           <shaderMaterial args={[{ uniforms: haloUniforms, vertexShader: HALO_VERT, fragmentShader: HALO_FRAG, transparent: true, depthWrite: false, depthTest: true, side: DoubleSide, toneMapped: false }]} />
         </instancedMesh>
-        <mesh position={hub} renderOrder={2}>
-          <sphereGeometry args={[HUB_RADIUS, 32, 24]} />
-          <shaderMaterial args={[{ uniforms: hubUniforms, vertexShader: HUB_VERT, fragmentShader: HUB_FRAG, toneMapped: false }]} />
-        </mesh>
-        <mesh position={hub} renderOrder={3} raycast={() => null}>
-          <planeGeometry args={[2, 2]} />
-          <shaderMaterial args={[{ uniforms: hubHaloUniforms, vertexShader: HUB_HALO_VERT, fragmentShader: HUB_HALO_FRAG, transparent: true, depthWrite: false, depthTest: true, side: DoubleSide, toneMapped: false }]} />
-        </mesh>
         {hover != null && nodes[hover] && (
           <Html position={nodes[hover].pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
             <div className="glass w-48 p-2.5 text-left text-xs" onPointerDown={(e) => e.stopPropagation()}>

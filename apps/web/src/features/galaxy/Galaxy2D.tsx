@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { TopicLink } from "@/lib/graph";
-import { NODE_BRIGHTNESS, accent, dust as dustColor, gap as gapColor, hub as hubColor, scaleHex } from "@/lib/theme";
+import { NODE_BRIGHTNESS, dust as dustColor, filamentHot, filamentTip, gap as gapColor, linkAmber, scaleHex } from "@/lib/theme";
 import { heroNetwork, neighborIds, networkLinks, nodeAmber, type Star } from "./stars";
 
 /** Flat drawing for reduced motion, low power, or no WebGL. Same amber palette, no drift. */
@@ -23,12 +23,11 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
     return ids;
   }, [hover, net.edges, links]);
   const project = (pos: [number, number, number]) => [400 + pos[0] * 30, 280 + pos[2] * 30] as [number, number];
-  const hub = project(net.hub);
   const dust = useMemo(() => {
     const specks = [];
     let seed = 11;
     const rand = () => { seed = (seed * 48271) % 2147483647; return (seed % 1000) / 1000; };
-    for (let i = 0; i < 520; i++) {
+    for (let i = 0; i < 280; i++) {
       const a = rand() * Math.PI * 2;
       const r = Math.pow(rand(), 0.65);
       specks.push({ x: 400 + Math.cos(a) * r * 250, y: 280 + Math.sin(a) * r * 175, rad: 1.35 + rand() * 0.85 });
@@ -50,16 +49,25 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
             );
           })}
         </defs>
-        {dust.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.rad} fill={dustColor} opacity={0.9} />)}
-        {net.edges.map((edge, i) => {
-          const [x1, y1] = project(edge.a);
-          const [x2, y2] = project(edge.b);
-          const opacity = edge.kind === "hub" ? 0.24 : edge.kind === "spoke" ? 0.18 : edge.kind === "cross" ? 0.1 : 0.14;
-          return <line key={`link-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={accent} strokeOpacity={opacity} strokeWidth={0.7} />;
+        {dust.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.rad} fill={dustColor} opacity={0.38} />)}
+        {net.filaments.flatMap((filament, fi) => filament.pts.slice(0, -1).map((point, i) => {
+          const next = filament.pts[i + 1];
+          const depth = (point.depth + next.depth) / 2;
+          const [x1, y1] = project(point.pos);
+          const [x2, y2] = project(next.pos);
+          const stroke = depth < 0.4 ? filamentHot : depth < 0.72 ? linkAmber : filamentTip;
+          return (
+            <line key={`fil-${fi}-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke}
+              strokeOpacity={0.55 * (1 - depth) + 0.16} strokeWidth={2.8 * (1 - depth) + 0.45} strokeLinecap="round" />
+          );
+        }))}
+        {net.specks.map((speck, i) => {
+          const [x, y] = project(speck.pos);
+          const fill = speck.depth < 0.55 ? linkAmber : filamentTip;
+          return <circle key={`speck-${i}`} cx={x} cy={y} r={0.7 + (1 - speck.depth) * 0.45} fill={fill} opacity={0.35} />;
         })}
-        <circle cx={hub[0]} cy={hub[1]} r={15} fill={hubColor} opacity={0.95} />
         {drawn.map((n, i) => {
-          const r = n.role === "secondary" ? 11.5 : 7.2 + 3.2 * Math.sqrt(n.support / maxS);
+          const r = n.role === "hub" ? (n.hubRank === 0 ? 16 : 11) : 5.8 + 2.2 * Math.sqrt(n.support / maxS);
           const gap = showGaps && n.gap;
           const hot = n.id === hover || n.id === focus;
           const lit = hot || near.has(n.id) || highlight?.has(n.id);
