@@ -12,8 +12,8 @@ import type { TopicLink } from "@/lib/graph";
 import { NODE_BRIGHTNESS, clusterColors, dust as dustColor, gap as gapColor, galaxyColor, hub as hubColor, ink, linkAmber } from "@/lib/theme";
 import { centroid, heroConstellation, neighborIds, type Star } from "./stars";
 
-/** Resting camera. At fov 46 and z 28 a unit is ~38px on a 900px-tall pane, so a 0.16–0.30 sphere is about 6–12px. */
-const CAMERA_POS = new Vector3(0.4, 1.35, 28);
+/** Resting camera, above the disc so the spiral reads as a cluster rather than an edge-on line. At fov 46 and this distance a unit is ~38px on a 900px-tall pane, so a 0.16–0.30 sphere is about 6–12px. */
+const CAMERA_POS = new Vector3(0.35, 26, 11);
 const CAMERA_FOV = 46;
 
 const NODE_VERT = `
@@ -94,9 +94,8 @@ varying float vGlow;
 void main() {
   float d = length(vUv * 2.0 - 1.0);
   if (d > 1.0) discard;
-  float edge = smoothstep(1.0, 0.0, d);
-  float alpha = edge * edge * (0.26 + vGlow * 0.14);
-  if (alpha < 0.01) discard;
+  float alpha = exp(-3.6 * d * d) * (0.11 + vGlow * 0.08);
+  if (alpha < 0.012) discard;
   gl_FragColor = vec4(vColor, alpha);
   #include <colorspace_fragment>
 }
@@ -146,9 +145,8 @@ uniform vec3 uColor;
 void main() {
   float d = length(vUv * 2.0 - 1.0);
   if (d > 1.0) discard;
-  float edge = smoothstep(1.0, 0.0, d);
-  float alpha = edge * edge * 0.22;
-  if (alpha < 0.01) discard;
+  float alpha = exp(-3.6 * d * d) * 0.12;
+  if (alpha < 0.012) discard;
   gl_FragColor = vec4(uColor, alpha);
   #include <colorspace_fragment>
 }
@@ -179,7 +177,7 @@ void main() {
   vec2 p = gl_PointCoord * 2.0 - 1.0;
   float d = dot(p, p);
   if (d > 1.0) discard;
-  gl_FragColor = vec4(uColor, 0.78 * (1.0 - d));
+  gl_FragColor = vec4(uColor, 0.92 * (1.0 - d * 0.35));
   #include <colorspace_fragment>
 }
 `;
@@ -193,7 +191,7 @@ function phaseOf(id: string) {
 function CameraRig({ look, reduce, controls }: { look: [number, number, number]; reduce: boolean; controls: React.RefObject<OrbitControlsImpl | null> }) {
   const { camera } = useThree();
   const intro = useRef(reduce ? 1 : 0.65);
-  const from = useRef(new Vector3(0.4, 2.4, 34));
+  const from = useRef(new Vector3(0.35, 32, 14));
   const to = useRef(new Vector3());
   const lookV = useRef(new Vector3());
   useEffect(() => {
@@ -272,7 +270,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
   }, [nodes, hub]);
 
   const dustGeo = useMemo(() => {
-    const count = 640;
+    const count = 720;
     const pos = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
     let seed = 17;
@@ -287,7 +285,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
       pos[i * 3] = Math.cos(a) * r;
       pos[i * 3 + 1] = y;
       pos[i * 3 + 2] = Math.sin(a) * r;
-      sizes[i] = 1.8 + rand() * 1.7;
+      sizes[i] = 2.3 + rand() * 2.0;
     }
     const geo = new BufferGeometry();
     geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
@@ -432,7 +430,7 @@ function Field({ nodes: catalogue, links, showGaps, focus, highlight, reduce, on
         )}
       </group>
       <CameraRig look={look} reduce={reduce} controls={controls} />
-      <OrbitControls ref={controls} enablePan={false} enableZoom minDistance={18} maxDistance={48} />
+      <OrbitControls ref={controls} enablePan={false} enableZoom minDistance={20} maxDistance={52} />
     </>
   );
 }

@@ -25,10 +25,10 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
     const specks = [];
     let seed = 11;
     const rand = () => { seed = (seed * 48271) % 2147483647; return (seed % 1000) / 1000; };
-    for (let i = 0; i < 460; i++) {
+    for (let i = 0; i < 520; i++) {
       const a = rand() * Math.PI * 2;
       const r = Math.pow(rand(), 0.65);
-      specks.push({ x: 400 + Math.cos(a) * r * 250, y: 280 + Math.sin(a) * r * 175, rad: 0.7 + rand() * 0.7 });
+      specks.push({ x: 400 + Math.cos(a) * r * 250, y: 280 + Math.sin(a) * r * 175, rad: 1.35 + rand() * 0.85 });
     }
     return specks;
   }, []);
@@ -40,14 +40,14 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
             const hex = showGaps && n.gap ? gapColor : galaxyColor(n.colorIndex, n.clusterId || n.id);
             return (
               <radialGradient id={`node-halo-${i}`} key={n.id}>
-                <stop offset="0%" stopColor={hex} stopOpacity="0.3" />
-                <stop offset="55%" stopColor={hex} stopOpacity="0.08" />
+                <stop offset="0%" stopColor={hex} stopOpacity="0.2" />
+                <stop offset="42%" stopColor={hex} stopOpacity="0.05" />
                 <stop offset="100%" stopColor={hex} stopOpacity="0" />
               </radialGradient>
             );
           })}
         </defs>
-        {dust.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.rad} fill={dustColor} opacity={0.78} />)}
+        {dust.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.rad} fill={dustColor} opacity={0.9} />)}
         {drawn.map((n) => {
           const [x, y] = project(n.pos);
           return <line key={`spoke-${n.id}`} x1={x} y1={y} x2={hub[0]} y2={hub[1]} stroke={accent} strokeOpacity={0.5} strokeWidth={1.1} />;
