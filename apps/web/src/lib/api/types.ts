@@ -76,7 +76,14 @@ export interface TopicCountryYear {
   fractional_count: number;
 }
 
-export interface GalaxyCluster { id: string; name: string }
+export interface GalaxyCluster {
+  id: string;
+  name: string;
+  /** Stable colour from the API. Present when the live galaxy graph sends it. */
+  color_index?: number;
+  /** In [0, 1]. Present when the live galaxy graph sends it. Follows color_index. */
+  emerging_score?: number;
+}
 /** A topic placed in 3D, plus the cluster it belongs to (GET /galaxy). */
 export interface GalaxyPoint {
   topic_id: string;

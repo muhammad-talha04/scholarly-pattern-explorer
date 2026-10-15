@@ -111,13 +111,17 @@ class GalaxyCentroid(BaseModel):
 
 
 class GalaxyCluster(BaseModel):
-    """One topic cluster. ``name`` is the front-end label; ``label`` is the same string."""
+    """One topic cluster. ``name`` is the front-end label; ``label`` is the same string.
+
+    ``emerging_score`` is in ``[0, 1]`` and follows ``color_index`` across rebuilds.
+    """
     id: str
     name: str
     label: str
     centroid: GalaxyCentroid
     size: int
     color_index: int
+    emerging_score: float = 0.0
 
 
 class GalaxyNode(BaseModel):

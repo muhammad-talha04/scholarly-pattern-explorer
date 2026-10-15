@@ -83,10 +83,16 @@ class MLService:
         return len(papers)
 
     def read_galaxy(self) -> dict:
-        """Stored galaxy graph. Does not read embeddings or recompute the layout."""
-        from .galaxy import empty_graph
+        """Stored galaxy graph. Does not read embeddings or recompute the layout.
+
+        ``emerging_score`` on each cluster comes from the latest discoveries
+        snapshot, matched by ``color_index``.
+        """
+        from .discover import load_emerging_scores
+        from .galaxy import empty_graph, with_emerging_scores
         stored = self.store.get_document("galaxy")
-        return stored if stored else empty_graph()
+        graph = stored if stored else empty_graph()
+        return with_emerging_scores(graph, load_emerging_scores())
 
     def rebuild_galaxy(self, refit: bool = False) -> dict:
         """Recompute the layout from the embedding index and store the graph.
