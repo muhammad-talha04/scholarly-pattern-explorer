@@ -28,6 +28,7 @@ harry `/workspace/spe-web`, michal `/workspace/michal-spe`, ami `/workspace/spe-
 - Web app, all free tiers (Vercel, Render or HF Spaces, Supabase, GitHub Actions).
 - Schedule: 1st and 15th of each month, incremental only.
 - Country counts: fractional by default, full counting as a labelled toggle.
+- Collaboration weights: default `fractional` gives each pair 1/(n(n-1)/2), so every paper adds 1; `per_country` gives 1/n per pair; `full` gives 1. `CountryStats.papers` is a float.
 - Merge order: #1, #3, #2, then front end.
 - Release 1 (approved by Prince): search, summaries, ask-about-a-paper,
   countries, progress timeline, research-gap finder.
