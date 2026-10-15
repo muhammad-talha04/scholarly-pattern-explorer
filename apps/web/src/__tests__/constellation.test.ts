@@ -39,17 +39,33 @@ it("grows a curved filament web with hubs, junctions, and specks", () => {
       min = Math.min(min, Math.hypot(net.nodes[i].pos[0] - net.nodes[j].pos[0], net.nodes[i].pos[2] - net.nodes[j].pos[2]));
     }
   }
-  expect(min).toBeGreaterThan(0.5);
-  expect(maxR).toBeLessThan(7.6);
+  expect(min).toBeGreaterThan(0.4);
+  expect(maxR).toBeLessThan(9.2);
+  let hubSpan = 0;
+  for (let i = 0; i < hubs.length; i++) {
+    for (let j = i + 1; j < hubs.length; j++) {
+      hubSpan = Math.max(hubSpan, Math.hypot(hubs[i].pos[0] - hubs[j].pos[0], hubs[i].pos[2] - hubs[j].pos[2]));
+    }
+  }
+  expect(hubSpan).toBeGreaterThan(8);
   const bridges = net.filaments.filter((f) => f.kind === "bridge");
   const branches = net.filaments.filter((f) => f.kind === "branch");
+  const longBranches = branches.filter((f) => {
+    let length = 0;
+    for (let i = 1; i < f.pts.length; i++) {
+      length += Math.hypot(f.pts[i].pos[0] - f.pts[i - 1].pos[0], f.pts[i].pos[2] - f.pts[i - 1].pos[2]);
+    }
+    return length > 3;
+  });
   expect(bridges.length).toBeGreaterThanOrEqual(5);
-  expect(branches.length).toBeGreaterThan(12);
+  expect(branches.length).toBeGreaterThan(40);
+  expect(longBranches.length).toBeGreaterThan(12);
   expect(bridges.filter((f) => bow(f.pts) > 0.2).length).toBeGreaterThan(bridges.length / 2);
   expect(bridges.every((f) => f.pts[0].depth < 0.15 && f.pts[f.pts.length - 1].depth < 0.15)).toBe(true);
   expect(bridges.every((f) => f.pts[Math.floor(f.pts.length / 2)].depth > 0.7)).toBe(true);
-  expect(net.specks.length).toBeGreaterThanOrEqual(200);
-  expect(net.specks.length).toBeLessThanOrEqual(500);
+  expect(net.specks.length).toBeGreaterThanOrEqual(280);
+  expect(net.specks.length).toBeLessThanOrEqual(800);
+  expect(net.specks.filter((s) => s.bright).length).toBeGreaterThan(20);
   expect(net.filaments.some((f) => f.pts.some((p) => p.pulse > 0))).toBe(true);
   expect(heroNetwork(papers(70)).nodes).toHaveLength(56);
   expect(heroNetwork(papers(2)).nodes).toHaveLength(2);

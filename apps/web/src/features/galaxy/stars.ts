@@ -54,7 +54,7 @@ export function centroid(nodes: { pos: [number, number, number] }[]): [number, n
 
 /** Above this, the hero keeps a round-robin sample so the disc stays readable. */
 const NETWORK_CAP = 56;
-const DISC = 6.9;
+const DISC = 8.7;
 
 type Vec = [number, number, number];
 type Placed = { id: string; support: number; clusterId?: string; gap?: boolean; pos?: Vec };
@@ -84,6 +84,7 @@ export interface Filament {
 export interface Speck {
   pos: Vec;
   depth: number;
+  bright?: boolean;
 }
 
 /** Amber shade for one paper. Stays on the cluster ramp, with a small per-paper shift. */
@@ -97,14 +98,14 @@ export function nodeAmber(colorIndex: number | null | undefined, clusterId: stri
 
 type Drawn<T> = T & { pos: Vec; center: Vec; role: NetRole; hubRank?: number };
 
-/** Uneven soma positions. Slot 0 is the largest cell body, near the middle of the disc. */
+/** Irregular soma positions spread across the disc, with open space between them. */
 const HUB_SLOTS: Vec[] = [
-  [-1.45, 0.05, 1.25],
-  [-3.9, 0.08, -1.55],
-  [3.45, -0.05, -2.35],
-  [-2.55, 0.1, 3.55],
-  [3.4, 0.02, 2.45],
-  [0.95, -0.08, -3.85],
+  [-5.9, 0.03, -2.6],
+  [4.7, -0.05, -6.1],
+  [2.5, 0.04, -0.7],
+  [6.5, 0.0, 3.3],
+  [-6.7, 0.06, 4.4],
+  [-0.3, -0.04, 7.0],
 ];
 
 interface RawPoint { pos: Vec; depth: number }
@@ -170,21 +171,25 @@ function growWeb<T extends Placed>(nodes: T[]): {
     role: "hub" as const,
     hubRank: i,
   }));
-  const raw = buildFilaments(drawn);
-  const spots = filamentSpots(raw);
+  const built = buildFilaments(drawn);
+  const raw = built.filaments;
+  const spots = paperSpots(built.junctions, raw);
   const rest = nodes.filter((n) => !hubIds.has(n.id)).sort((a, b) => b.support - a.support || a.id.localeCompare(b.id));
   const occupied: Vec[] = drawn.map((n) => n.pos);
+  const hubPos = drawn.map((n) => n.pos);
   for (const node of rest) {
-    let spot = spots.find((p) => occupied.every((o) => dist2(o, p) > 0.62));
-    if (!spot) spot = farthest(spots, occupied) ?? drawn[0].pos;
-    const pos = clampDisc(spot);
+    const spot = spots.find((p) => hubPos.every((o) => dist2(o, p) > 0.85) && occupied.every((o) => dist2(o, p) > 0.46));
+    const chosen = spot ?? farthest(spots, occupied) ?? drawn[0].pos;
+    const at = spots.indexOf(chosen);
+    if (at >= 0) spots.splice(at, 1);
+    const pos = clampDisc(chosen);
     occupied.push(pos);
     const placed: Drawn<T> = { ...node, pos, center: pos, role: "junction" };
     drawn.push(placed);
   }
   const filaments = decorate(raw);
   const edges = papersAlong(filaments, drawn);
-  const specks = sprinkle(filaments, drawn);
+  const specks = sprinkle(filaments, drawn, built.junctions);
   const primary = drawn.find((n) => n.hubRank === 0) ?? drawn[0];
   return { nodes: drawn, edges, filaments, specks, hub: primary.pos };
 }
@@ -225,44 +230,43 @@ function chooseHubs<T extends Placed>(nodes: T[], want: number): T[] {
   return picked;
 }
 
-function buildFilaments<T extends Drawn<Placed>>(hubs: T[]): RawFilament[] {
+function buildFilaments<T extends Drawn<Placed>>(hubs: T[]): { filaments: RawFilament[]; junctions: Vec[] } {
   const out: RawFilament[] = [];
+  const junctions: Vec[] = [];
   const linked = new Set<string>();
   const pairKey = (a: string, b: string) => [a, b].sort().join("|");
-  hubs.forEach((hub, i) => {
-    const near = hubs
-      .map((other, j) => ({ other, j, d: i === j ? Infinity : dist2(hub.pos, other.pos) }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 2);
-    for (const { other } of near) {
+  const neighboursOf = (hub: T) => hubs
+    .filter((other) => other.id !== hub.id)
+    .map((other) => ({ other, d: dist2(hub.pos, other.pos) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, Math.min(3, Math.max(0, hubs.length - 1)))
+    .map((item) => item.other);
+  hubs.forEach((hub) => {
+    for (const other of neighboursOf(hub)) {
       const key = pairKey(hub.id, other.id);
       if (linked.has(key)) continue;
       linked.add(key);
       out.push(bridge(hub, other, hash(`${hub.id}|${other.id}`)));
     }
   });
-  hubs.forEach((hub, i) => {
-    const dirs = out
-      .filter((f) => f.hubIds.includes(hub.id) && f.kind === "bridge")
-      .map((f) => {
-        const otherId = f.hubIds.find((id) => id !== hub.id);
-        const other = hubs.find((h) => h.id === otherId);
-        if (!other) return null;
-        return norm2(other.pos[0] - hub.pos[0], other.pos[2] - hub.pos[2]);
-      })
-      .filter((d): d is [number, number] => !!d);
+  hubs.forEach((hub) => {
     const rand = mulberry(hash(hub.id) + 19);
-    const sprouts = hubs.length === 1 ? 4 : 5;
-    for (let s = 0; s < sprouts; s++) {
-      const ang = (s / sprouts) * Math.PI * 2 + (rand() - 0.5) * 0.35;
-      const dir: [number, number] = [Math.cos(ang), Math.sin(ang)];
-      if (dirs.some((d) => d[0] * dir[0] + d[1] * dir[1] > 0.78)) continue;
-      const aim = s === 0 ? nearestOther(hub, hubs) : null;
-      const grown = dendrite(hub, hub.pos, 0.04, dir, aim, rand, 0);
-      out.push(...grown);
+    const neighbours = neighboursOf(hub);
+    const angles: number[] = neighbours.map((other) => Math.atan2(other.pos[2] - hub.pos[2], other.pos[0] - hub.pos[0]) + (rand() - 0.5) * 0.45);
+    const count = hubs.length < 3 ? 4 : 8 + Math.floor(rand() * 7);
+    let spins = 0;
+    while (angles.length < count && spins < 80) {
+      spins++;
+      const ang = rand() * Math.PI * 2;
+      if (angles.some((a) => Math.abs(Math.atan2(Math.sin(ang - a), Math.cos(ang - a))) < 0.34)) continue;
+      angles.push(ang);
     }
+    angles.forEach((ang, i) => {
+      const aim = i < neighbours.length ? neighbours[i] : null;
+      out.push(...dendrite(hub, hub.pos, 0.02, [Math.cos(ang), Math.sin(ang)], aim, rand, 0, junctions));
+    });
   });
-  return out;
+  return { filaments: out, junctions };
 }
 
 function bridge<T extends { id: string; pos: Vec }>(a: T, b: T, seed: number): RawFilament {
@@ -277,8 +281,8 @@ function bridge<T extends { id: string; pos: Vec }>(a: T, b: T, seed: number): R
   const n = 6;
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    const bow = Math.sin(t * Math.PI) * (1.35 + rand() * 0.75) * sign;
-    const wave = Math.sin(t * Math.PI * 2.15 + rand() * 4) * 0.55;
+    const bow = Math.sin(t * Math.PI) * Math.min(1.7, Math.max(0.55, len * 0.18)) * sign;
+    const wave = Math.sin(t * Math.PI * 2.15 + rand() * 4) * Math.min(0.55, len * 0.06);
     const y = a.pos[1] * (1 - t) + b.pos[1] * t + Math.sin(t * Math.PI) * (rand() - 0.5) * 0.28;
     ctrl.push(clampDisc([
       a.pos[0] * (1 - t) + b.pos[0] * t + px * (bow + wave),
@@ -304,36 +308,44 @@ function dendrite<T extends { id: string; pos: Vec }>(
   aim: T | null,
   rand: () => number,
   gen: number,
+  splits: Vec[],
 ): RawFilament[] {
   const pts: RawPoint[] = [{ pos: start, depth: startDepth }];
   let p = start;
   let d = dir;
-  let depth = startDepth;
-  const reach = (gen === 0 ? 2.5 + rand() * 1.15 : 1.15 + rand() * 0.7);
-  const step = 0.3;
+  const aimed = aim ? Math.max(dist2(start, aim.pos) * 1.08, 2.4) : 0;
+  const reach = gen === 0
+    ? (aim ? aimed : rand() < 0.4 ? 3.4 + rand() * 1.8 : 6.4 + rand() * 2.2)
+    : gen === 1 ? 2.4 + rand() * 1.8 : 1.3 + rand() * 1.2;
+  const step = 0.42;
+  const splitAt = gen === 0 ? [0.32, 0.62] : gen === 1 ? [0.5] : [];
+  let splitIdx = 0;
   const children: RawFilament[] = [];
   let guard = 0;
   let joined: T | null = null;
-  while (depth < 0.96 && guard * step < reach && guard < 18) {
+  const limit = Math.ceil(reach / step) + 1;
+  while (guard < limit && guard < 28) {
     guard++;
-    const turn = (rand() - 0.5) * (gen === 0 ? 0.95 : 1.15);
-    if (aim && gen === 0 && depth > 0.2) {
+    const turn = (rand() - 0.5) * (gen === 0 ? 0.32 : 0.7);
+    if (aim && gen === 0) {
       const toward = Math.atan2(aim.pos[2] - p[2], aim.pos[0] - p[0]);
       const heading = Math.atan2(d[1], d[0]);
       let delta = toward - heading;
       while (delta > Math.PI) delta -= Math.PI * 2;
       while (delta < -Math.PI) delta += Math.PI * 2;
-      d = rot(d, delta * 0.35 + turn * 0.25);
+      d = rot(d, delta * 0.28 + turn);
     } else d = rot(d, turn);
-    p = clampDisc([p[0] + d[0] * step, p[1] + (rand() - 0.5) * 0.05, p[2] + d[1] * step]);
-    depth = Math.min(0.98, depth + step / reach);
+    p = clampDisc([p[0] + d[0] * step, p[1] + (rand() - 0.5) * 0.04, p[2] + d[1] * step]);
+    const depth = Math.min(0.98, startDepth + (guard * step) / reach);
     pts.push({ pos: p, depth });
-    if (gen < 2 && depth > 0.22 && depth < 0.78 && rand() < 0.62) {
-      const spin = (rand() < 0.5 ? -1 : 1) * (0.55 + rand() * 0.4);
-      children.push(...dendrite(origin, p, depth, rot(d, spin), null, rand, gen + 1));
+    if (splitIdx < splitAt.length && guard * step >= splitAt[splitIdx] * reach) {
+      splitIdx++;
+      splits.push(p);
+      const spin = (rand() < 0.5 ? -1 : 1) * (0.45 + rand() * 0.5);
+      children.push(...dendrite(origin, p, depth, rot(d, spin), null, rand, gen + 1, splits));
     }
-    if (aim && depth > 0.35 && dist2(p, aim.pos) < 1.05) {
-      pts.push({ pos: aim.pos, depth: 0 });
+    if (aim && guard * step > reach * 0.4 && dist2(p, aim.pos) < 0.9) {
+      pts.push({ pos: aim.pos, depth: 0.04 });
       joined = aim;
       break;
     }
@@ -350,22 +362,22 @@ function dendrite<T extends { id: string; pos: Vec }>(
   return [self, ...children];
 }
 
-function nearestOther<T extends { id: string; pos: Vec }>(hub: T, hubs: T[]): T | null {
-  let best: T | null = null;
-  let bestD = Infinity;
-  for (const other of hubs) {
-    if (other.id === hub.id) continue;
-    const d = dist2(hub.pos, other.pos);
-    if (d < bestD) { bestD = d; best = other; }
-  }
-  return best;
-}
-
-function filamentSpots(fils: RawFilament[]): Vec[] {
-  const spots: Vec[] = [];
-  for (const f of fils) {
-    const stride = f.kind === "bridge" ? 3 : 2;
-    for (let i = stride; i < f.pts.length - 1; i += stride) spots.push(f.pts[i].pos);
+function paperSpots(junctions: Vec[], fils: RawFilament[]): Vec[] {
+  const spots = junctions.map((p) => p.slice() as Vec);
+  const rand = mulberry(91);
+  fils.forEach((filament, index) => {
+    if (filament.pts.length < 8) return;
+    const picks = filament.pts.length > 28 ? 2 : 1;
+    for (let n = 0; n < picks; n++) {
+      const i = 3 + Math.floor(mulberry(hash(`s${index}-${n}`))() * (filament.pts.length - 6));
+      spots.push(filament.pts[i].pos);
+    }
+  });
+  for (let i = spots.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    const swap = spots[i];
+    spots[i] = spots[j];
+    spots[j] = swap;
   }
   return spots;
 }
@@ -414,21 +426,21 @@ function closestAlong(f: Filament, pos: Vec) {
   return best;
 }
 
-function sprinkle<T extends { pos: Vec }>(filaments: Filament[], papers: T[]): Speck[] {
+function sprinkle<T extends { pos: Vec }>(filaments: Filament[], papers: T[], junctions: Vec[]): Speck[] {
   const out: Speck[] = [];
+  for (const joint of junctions) {
+    if (papers.some((p) => dist2(p.pos, joint) < 0.28)) continue;
+    out.push({ pos: joint, depth: 0.12, bright: true });
+  }
   for (const f of filaments) {
-    for (let i = 1; i < f.pts.length; i++) {
+    for (let i = 1; i < f.pts.length; i += 2) {
       const a = f.pts[i - 1];
       const b = f.pts[i];
-      const span = dist2(a.pos, b.pos);
-      const steps = Math.max(1, Math.round(span / 0.2));
-      for (let s = 0; s < steps; s++) {
-        const t = (s + 0.5) / steps;
-        const pos = clampDisc(lerp(a.pos, b.pos, t));
-        if (papers.some((p) => dist2(p.pos, pos) < 0.32)) continue;
-        out.push({ pos, depth: a.depth * (1 - t) + b.depth * t });
-        if (out.length >= 420) return out;
-      }
+      const pos = clampDisc(lerp(a.pos, b.pos, 0.5));
+      if (papers.some((p) => dist2(p.pos, pos) < 0.3)) continue;
+      if (out.some((s) => dist2(s.pos, pos) < 0.22)) continue;
+      out.push({ pos, depth: (a.depth + b.depth) / 2, bright: false });
+      if (out.length >= 720) return out;
     }
   }
   return out;
@@ -484,11 +496,6 @@ function rot(d: [number, number], ang: number): [number, number] {
   const s = Math.sin(ang);
   const x = d[0] * c - d[1] * s;
   const z = d[0] * s + d[1] * c;
-  const len = Math.hypot(x, z) || 1;
-  return [x / len, z / len];
-}
-
-function norm2(x: number, z: number): [number, number] {
   const len = Math.hypot(x, z) || 1;
   return [x / len, z / len];
 }

@@ -143,8 +143,8 @@ void main() {
   float phase = fract(uTime * 0.12 + vPhase);
   float spark = uMotion * vPulse * exp(-pow((vAlong - phase) * 8.0, 2.0));
   col = mix(col, hot, spark * 0.85);
-  float core = exp(-vSide * vSide * 2.6);
-  float alpha = mix(0.7, 0.14, d) * core + spark * 0.55;
+  float core = exp(-vSide * vSide * 8.0);
+  float alpha = mix(0.5, 0.32, d) * core + spark * 0.28;
   if (alpha < 0.015) discard;
   gl_FragColor = vec4(pow(min(col, vec3(1.0)), vec3(2.2)), min(alpha, 1.0));
   #include <colorspace_fragment>
@@ -231,8 +231,8 @@ function CameraRig({ look, reduce, controls }: { look: [number, number, number];
 }
 
 function nodeRadius(node: { support: number; role?: string; hubRank?: number }, maxS: number) {
-  if (node.role === "hub") return node.hubRank === 0 ? 0.5 : 0.34;
-  return 0.13 + 0.08 * Math.sqrt(Math.max(node.support, 0) / maxS);
+  if (node.role === "hub") return node.hubRank === 0 ? 0.3 : 0.22;
+  return 0.13 + 0.07 * Math.sqrt(Math.max(node.support, 0) / maxS);
 }
 
 function ribbonGeometry(filaments: Filament[]) {
@@ -254,7 +254,7 @@ function ribbonGeometry(filaments: Filament[]) {
       const len = Math.hypot(tx, tz) || 1;
       const px = -tz / len;
       const pz = tx / len;
-      const w = 0.32 * (1 - point.depth) + 0.028 * point.depth;
+      const w = 0.04 * (1 - point.depth) + 0.016 * point.depth;
       for (const s of [-1, 1]) {
         pos.push(point.pos[0] + px * w * s, point.pos[1], point.pos[2] + pz * w * s);
         depth.push(point.depth);
@@ -329,7 +329,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
       colors[i * 3] = color.r;
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
-      sizes[i] = 1.5 + (1 - speck.depth) * 1.6;
+      sizes[i] = speck.bright ? 2.8 : 1.25 + (1 - speck.depth) * 0.45;
     });
     const geo = new BufferGeometry();
     geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
@@ -381,7 +381,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
       dummy.makeScale(s, s, s);
       m.multiply(dummy);
       mesh.setMatrixAt(i, m);
-      const haloScale = node.role === "hub" ? s * (node.hubRank === 0 ? 3.5 : 2.9) : s * 2.4;
+      const haloScale = node.role === "hub" ? s * 2.15 : s * 2.2;
       const haloM = new Matrix4().makeTranslation(node.pos[0], node.pos[1], node.pos[2]);
       haloM.multiply(new Matrix4().makeScale(haloScale, haloScale, haloScale));
       halo.setMatrixAt(i, haloM);
@@ -423,7 +423,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, onFocus, 
       const arr = attr!.array as Float32Array;
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
-        let g = n.role === "hub" ? (n.hubRank === 0 ? 0.8 : 0.4) : 0;
+        let g = n.role === "hub" ? (n.hubRank === 0 ? 0.35 : 0.2) : 0;
         if (highlight?.has(n.id)) g = 0.62;
         if (near.has(n.id)) g = 0.55;
         if (n.id === hoverId || n.id === focus) g = 1;

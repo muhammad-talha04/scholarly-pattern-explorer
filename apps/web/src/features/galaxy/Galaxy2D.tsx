@@ -22,7 +22,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
     for (const id of neighborIds(hover, links)) ids.add(id);
     return ids;
   }, [hover, net.edges, links]);
-  const project = (pos: [number, number, number]) => [400 + pos[0] * 30, 280 + pos[2] * 30] as [number, number];
+  const project = (pos: [number, number, number]) => [400 + pos[0] * 34, 340 + pos[2] * 34] as [number, number];
   const dust = useMemo(() => {
     const specks = [];
     let seed = 11;
@@ -30,13 +30,13 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
     for (let i = 0; i < 280; i++) {
       const a = rand() * Math.PI * 2;
       const r = Math.pow(rand(), 0.65);
-      specks.push({ x: 400 + Math.cos(a) * r * 250, y: 280 + Math.sin(a) * r * 175, rad: 1.35 + rand() * 0.85 });
+      specks.push({ x: 400 + Math.cos(a) * r * 300, y: 340 + Math.sin(a) * r * 260, rad: 1.15 + rand() * 0.7 });
     }
     return specks;
   }, []);
   return (
     <div className="relative h-full w-full">
-      <svg viewBox="0 0 800 560" className="h-full w-full" role="img" aria-label="Paper galaxy. Each node is a paper, colored by topic cluster.">
+      <svg viewBox="0 0 800 680" className="h-full w-full" role="img" aria-label="Paper galaxy. Each node is a paper, colored by topic cluster.">
         <defs>
           {drawn.map((n, i) => {
             const hex = showGaps && n.gap ? gapColor : nodeAmber(n.colorIndex, n.clusterId || n.id, n.id);
@@ -58,16 +58,16 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, onFocus, on
           const stroke = depth < 0.4 ? filamentHot : depth < 0.72 ? linkAmber : filamentTip;
           return (
             <line key={`fil-${fi}-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke}
-              strokeOpacity={0.62 * (1 - depth) + 0.18} strokeWidth={11 * (1 - depth) + 0.9} strokeLinecap="round" />
+              strokeOpacity={0.72 * (1 - depth * 0.35)} strokeWidth={3.2 * (1 - depth) + 1.05} strokeLinecap="round" />
           );
         }))}
         {net.specks.map((speck, i) => {
           const [x, y] = project(speck.pos);
-          const fill = speck.depth < 0.55 ? linkAmber : filamentTip;
-          return <circle key={`speck-${i}`} cx={x} cy={y} r={0.7 + (1 - speck.depth) * 0.45} fill={fill} opacity={0.35} />;
+          const fill = speck.bright || speck.depth < 0.35 ? filamentHot : filamentTip;
+          return <circle key={`speck-${i}`} cx={x} cy={y} r={speck.bright ? 1.35 : 0.55} fill={fill} opacity={speck.bright ? 0.9 : 0.4} />;
         })}
         {drawn.map((n, i) => {
-          const r = n.role === "hub" ? (n.hubRank === 0 ? 16 : 11) : 5.8 + 2.2 * Math.sqrt(n.support / maxS);
+          const r = n.role === "hub" ? (n.hubRank === 0 ? 8.5 : 6.5) : 4.4 + 1.6 * Math.sqrt(n.support / maxS);
           const gap = showGaps && n.gap;
           const hot = n.id === hover || n.id === focus;
           const lit = hot || near.has(n.id) || highlight?.has(n.id);
