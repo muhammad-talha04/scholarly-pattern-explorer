@@ -274,11 +274,11 @@ A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
 | Feature | How |
 |---|---|
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU). Override with `ML_EMBED_MODEL` or `python -m ml.cli index --model <id>` |
-| Vector storage | `ML_VECTOR_BACKEND=pgvector` (Supabase, `DATABASE_URL`, HNSW cosine index) or local numpy files with optional FAISS (default) |
+| Vector storage | Postgres + pgvector when `DATABASE_URL` is set (Supabase, HNSW cosine index). `ML_VECTOR_BACKEND=local` keeps the numpy files. Documents (galaxy, patterns, country and topic counts) use the same store. See `docs/architecture/STORAGE.md` |
 | Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
 | Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite` |
 | Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences |
-| Galaxy | `GET /api/v1/galaxy` → `{id, x, y, z, cluster_id, cluster_label, year}` per paper. `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout |
+| Galaxy | `GET /api/v1/galaxy` reads the stored graph `{nodes, clusters, links}`. A node is one paper: `id`, `topic_id`, `topic_name`, `x`, `y`, `z`, `cluster_id`, `cluster_label`, `year`, `support`. `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout. `index` and `update` precompute it |
 | Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /api/v1/patterns`, `GET /api/v1/runs` |
 
 **Embedding model.** The default stays `all-MiniLM-L6-v2`. `python -m ml.benchmark`
@@ -302,6 +302,17 @@ placed do not move. Labels are recomputed from the current members, so the
 wording can change. `python -m ml.cli galaxy --refit` recomputes the basis and
 the clusters and can move every point. With fewer than about 25 papers, or
 without `umap-learn` and `hdbscan` installed, clustering is k-means.
+
+The API returns a graph, not a bare list. Each node carries the paper id, year,
+cluster label, and the fields the web client reads (`topic_id`, `topic_name`,
+`cluster_id`, `support`). `topic_name` is the paper title, with the work id
+appended when two titles match, because the client draws links between those
+names. `support` is the paper's citation count divided by the highest count in
+the index (at least 1). Clusters have `id`, `name`, `label`, a 3D `centroid`,
+and `size`. Links are undirected nearest-neighbour edges (2 neighbours, at most
+200 edges) with `source`, `target`, and `weight`. `index` and `update` store
+the graph. `GET /api/v1/galaxy` only reads that stored document, and an empty
+store returns `{nodes: [], clusters: [], links: []}`.
 
 **Local LLM, optional.** Summaries and chat work with no model at all
 (term-frequency sentence ranking and BM25-style evidence, cached per paper).

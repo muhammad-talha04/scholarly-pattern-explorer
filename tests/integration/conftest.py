@@ -13,6 +13,8 @@ for p in (ROOT, ROOT / "apps" / "api"):
 
 os.environ.setdefault("ML_EMBEDDER", "hash")
 os.environ.setdefault("ML_DATA_DIR", tempfile.mkdtemp(prefix="ml-it-"))
+os.environ["ML_VECTOR_BACKEND"] = "local"
+os.environ.pop("DATABASE_URL", None)
 os.environ.pop("ML_LLM_URL", None)
 
 

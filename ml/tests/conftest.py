@@ -1,7 +1,12 @@
+import os
 import sys
 from pathlib import Path
 
 import pytest
+
+# File backend even when the shell has DATABASE_URL, so this suite stays offline.
+os.environ.pop("DATABASE_URL", None)
+os.environ["ML_VECTOR_BACKEND"] = "local"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 

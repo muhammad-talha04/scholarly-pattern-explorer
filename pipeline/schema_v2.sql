@@ -14,7 +14,19 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS paper_embeddings (
     work_id   VARCHAR PRIMARY KEY,
     embedding vector(384),
-    model     TEXT NOT NULL
+    meta      JSONB,
+    model     TEXT
+);
+
+CREATE INDEX IF NOT EXISTS paper_embeddings_hnsw
+    ON paper_embeddings USING hnsw (embedding vector_cosine_ops);
+
+-- JSON documents shared by the ML store: galaxy, galaxy_state, patterns,
+-- countries, topics, topic_country_year. See pipeline/migrations/001_ml_storage.sql.
+CREATE TABLE IF NOT EXISTS documents (
+    kind       TEXT PRIMARY KEY,
+    payload    JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS paper_summaries (
