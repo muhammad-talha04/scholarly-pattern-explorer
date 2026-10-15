@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from countries import COUNTRIES  # noqa: E402  (existing ISO table in repo root)
 
-KEYS = ("by_year", "frac", "topics", "topic_years", "topic_countries", "pairs_frac")
+KEYS = ("by_year", "frac", "topics", "topic_years", "topic_countries", "pairs_frac", "pairs_1n")
 
 
 def tally(works) -> dict:
@@ -33,7 +33,9 @@ def tally(works) -> dict:
         for i, a in enumerate(cs):
             for b in cs[i + 1:]:
                 pairs[f"{a}-{b}"] += 1
-                t["pairs_frac"]["all"][f"{a}-{b}"] += 1 / len(cs)
+                # default: every paper adds exactly 1 across its pairs
+                t["pairs_frac"]["all"][f"{a}-{b}"] += 2 / (len(cs) * (len(cs) - 1))
+                t["pairs_1n"]["all"][f"{a}-{b}"] += 1 / len(cs)
     t["pairs"] = pairs
     return t
 
@@ -68,7 +70,7 @@ def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict
 
 def _collab(pairs) -> list[dict]:
     return [{"source": p.split("-")[0], "target": p.split("-")[1], "papers": round(n, 2)}
-            for p, n in Counter(pairs).most_common(200)]
+            for p, n in Counter(pairs).most_common(200)]  # weights rounded for display only
 
 
 def snapshot(t: dict) -> dict:
@@ -78,6 +80,7 @@ def snapshot(t: dict) -> dict:
         "countries_full": to_stats(t, counting="full"),
         "collaborations": _collab(t["pairs_frac"]["all"]),
         "collaborations_full": _collab(t["pairs"]),
+        "collaborations_1n": _collab(t["pairs_1n"]["all"]),
         # Michal's gap finder: {topic: {year: count}} and top countries per topic
         "topic_year_counts": {tp: dict(ys) for tp, ys in t["topic_years"].items()},
         "topic_top_countries": {tp: [[c, round(n, 2)] for c, n in cs.most_common(5)]

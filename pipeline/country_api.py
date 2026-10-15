@@ -29,5 +29,6 @@ def country(code: str, counting: str = "fractional") -> dict | None:
 
 
 def collaborations(counting: str = "fractional", limit: int = 200) -> list[dict]:
-    key = "collaborations_full" if counting == "full" else "collaborations"
+    """counting: 'fractional' (default, each paper sums to 1), 'per_country' (1/n per pair), or 'full'."""
+    key = {"full": "collaborations_full", "per_country": "collaborations_1n"}.get(counting, "collaborations")
     return snapshot().get(key, [])[:limit]
