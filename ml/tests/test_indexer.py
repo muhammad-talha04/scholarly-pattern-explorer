@@ -2,7 +2,6 @@
 import logging
 
 import numpy as np
-import psycopg
 import pytest
 
 from ml.embeddings import HashEmbedder, model_label
@@ -10,6 +9,15 @@ from ml.indexer import ModelMismatch, index, stored_models
 from ml.papers import Paper
 from ml.store import LocalStore, PgVectorStore
 from ml import timing
+
+
+class OpErr(Exception):
+    """Stands in for psycopg.OperationalError (CI's ml job has no psycopg)."""
+
+
+@pytest.fixture(autouse=True)
+def _op_error(monkeypatch):
+    monkeypatch.setattr("ml.store._operational_error", lambda: OpErr)
 
 
 def _papers(n, start=0):
@@ -87,7 +95,7 @@ class Cur:
     def execute(self, sql, params=None):
         if self.conn.fail_next:
             self.conn.fail_next -= 1
-            raise psycopg.OperationalError("server closed the connection")
+            raise OpErr("server closed the connection")
         self.conn.log.append(sql)
         self.last = sql
 
@@ -167,7 +175,7 @@ def test_pool_retries_once_after_dropped_connection(monkeypatch):
     pool = Pool(c)
     assert len(PgVectorStore(pool=pool)) == 7 and pool.checked == 1
     c.fail_next = 2
-    with pytest.raises(psycopg.OperationalError):
+    with pytest.raises(OpErr):
         len(PgVectorStore(pool=pool))   # only one retry
 
 
