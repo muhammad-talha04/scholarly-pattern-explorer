@@ -217,19 +217,16 @@ def galaxy(limit: int | None = None) -> GalaxyGraph:
     """Stored galaxy graph. The index job precomputes it; this route only reads it.
 
     ``limit`` and ``GALAXY_NODE_LIMIT`` are optional. With neither set, every stored
-    node is returned. There is no fixed page size on this route.
+    node is returned. With a limit, the nodes are a representative sample: a
+    proportional share of every cluster (at least 3 each), most-cited first. There is no fixed page size on this route.
     """
-    graph = ml.get_service().read_galaxy()
     cap = galaxy_node_limit()
     if limit is not None and limit < 0:
         limit = 0
     if cap is not None:
         limit = cap if limit is None else min(limit, cap)
-    if limit is not None:
-        nodes = list(graph.get("nodes") or [])[:limit]
-        names = {n.get("topic_name") for n in nodes} | {n.get("id") for n in nodes}
-        links = [e for e in (graph.get("links") or []) if e.get("source") in names and e.get("target") in names]
-        graph = {**graph, "nodes": nodes, "links": links}
+    # limit -> deterministic stratified sample per cluster (not a prefix); see ml.galaxy.sample_graph
+    graph = ml.get_service().read_galaxy(limit)
     return GalaxyGraph(**graph)
 
 

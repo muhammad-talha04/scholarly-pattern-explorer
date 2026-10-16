@@ -405,3 +405,74 @@ def graph_from_layout(points: list[dict], vectors: np.ndarray, metas: list[dict]
         })
     return {"nodes": nodes, "clusters": clusters,
             "links": knn_links(names, vectors, neighbours, max_edges)}
+
+
+# ---- representative samples for GET /galaxy?limit=N ----
+SAMPLE_SEED = 20261016
+SAMPLE_MIN_PER_CLUSTER = 3
+HERO_SAMPLE_SIZE = 600   # stored as document kind "galaxy_sample" at build time
+
+
+def _tiebreak(node_id: str, seed: int) -> int:
+    import hashlib
+    return int.from_bytes(hashlib.blake2b(f"{seed}:{node_id}".encode(), digest_size=8).digest(), "big")
+
+
+def _quotas(sizes: dict[str, int], limit: int, min_per: int) -> dict[str, int]:
+    """Proportional to cluster size (largest remainder), at least ``min_per`` each.
+
+    When ``limit`` cannot give every cluster its minimum, the biggest clusters get it first.
+    """
+    total = sum(sizes.values())
+    if limit >= total:
+        return dict(sizes)
+    order = sorted(sizes, key=lambda c: (-sizes[c], c))
+    q = {c: 0 for c in sizes}
+    budget = limit
+    for c in order:                                   # floors first
+        take = min(min_per, sizes[c], budget)
+        q[c] = take
+        budget -= take
+        if budget == 0:
+            return q
+    rest = {c: sizes[c] - q[c] for c in sizes}
+    pool = sum(rest.values())
+    shares = {c: budget * rest[c] / pool for c in sizes}
+    for c in sizes:
+        q[c] += int(shares[c])
+    left = limit - sum(q.values())
+    for c in sorted(sizes, key=lambda c: (-(shares[c] - int(shares[c])), -sizes[c], c)):
+        if left <= 0:
+            break
+        if q[c] < sizes[c]:
+            q[c] += 1
+            left -= 1
+    return q
+
+
+def sample_graph(graph: dict, limit: int, min_per_cluster: int = SAMPLE_MIN_PER_CLUSTER,
+                 seed: int = SAMPLE_SEED) -> dict:
+    """Deterministic stratified sample with the same shape as the full graph.
+
+    Per cluster, nodes are kept in order of support (citations), then year (newest),
+    then a seeded hash of the id. Clusters are unchanged (they describe the whole
+    corpus). Links are kept only when both ends survive.
+    """
+    nodes = list(graph.get("nodes") or [])
+    limit = max(0, int(limit))
+    if limit >= len(nodes):
+        return graph
+    groups: dict[str, list[dict]] = {}
+    for n in nodes:
+        groups.setdefault(str(n.get("cluster_id")), []).append(n)
+    quotas = _quotas({c: len(m) for c, m in groups.items()}, limit, min_per_cluster)
+    keep: set[int] = set()
+    for c, members in groups.items():
+        ranked = sorted(members, key=lambda n: (-(n.get("support") or 0), -(n.get("year") or 0),
+                                                _tiebreak(str(n.get("id")), seed)))
+        keep.update(id(n) for n in ranked[:quotas[c]])
+    picked = [n for n in nodes if id(n) in keep]      # original order: stable output
+    names = {n.get("topic_name") for n in picked} | {n.get("id") for n in picked}
+    links = [e for e in (graph.get("links") or [])
+             if e.get("source") in names and e.get("target") in names]
+    return {**graph, "nodes": picked, "links": links}
