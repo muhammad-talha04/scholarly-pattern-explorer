@@ -159,6 +159,7 @@ export function GalaxyHero() {
             Explore AI research <span className="text-accent">by topic</span>
           </h1>
           <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Each dot is a topic or a research gap. Nearby dots share keywords and topics.</p>
+          <p data-testid="hero-caption" className="mt-2 max-w-md text-xs text-slate-400">Dot positions show topic clusters; connecting lines are decorative.</p>
           <div className="mt-6">
             <SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} />
             <ul aria-label="Suggestions" className="mt-3 flex flex-wrap gap-2">
@@ -176,10 +177,12 @@ export function GalaxyHero() {
           <label className="glass inline-flex w-fit cursor-pointer items-center gap-2 px-3 py-2 text-sm text-mist">
             <input type="checkbox" checked={showGaps} onChange={(e) => setShowGaps(e.target.checked)} className="accent-gap" />
             Highlight gaps
-            {gaps.data && <span className="chip">{gaps.data.length}</span>}
+            <span className="chip inline-block min-w-[2.5ch] text-center tabular-nums" aria-hidden={!gaps.data}>{gaps.data ? gaps.data.length : "\u00a0"}</span>
           </label>
+          {/* Fixed-height slot so the controls never jump when clusters arrive. */}
+          <div data-testid="legend-slot" className="h-14 w-[min(36rem,calc(100vw-1.5rem))] max-w-xl">
           {clusterLegend.length > 0 && (
-            <ul aria-label="Topic clusters" className="glass flex max-w-xl flex-wrap gap-x-3 gap-y-1 px-3 py-2 text-xs text-mist">
+            <ul aria-label="Topic clusters" className="glass flex h-full flex-wrap content-start gap-x-3 gap-y-1 overflow-y-auto px-3 py-2 text-xs text-mist">
               {clusterLegend.map((row) => (
                 <li key={row.name}>
                   <button type="button" className="inline-flex items-center gap-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => setClusterQuery(row.name)}>
@@ -190,6 +193,7 @@ export function GalaxyHero() {
               ))}
             </ul>
           )}
+          </div>
         </div>
         <details className="glass max-h-40 overflow-auto px-3 py-2 text-sm text-mist">
           <summary className="cursor-pointer text-white" title="Each point is a research topic; gaps are topic pairs our sample rarely connects">Topics ({stars.length}){stars.some((n) => n.gap) ? <span className="text-mist"> · {stars.filter((n) => !n.gap).length} topics + {stars.filter((n) => n.gap).length} gaps</span> : null}</summary>

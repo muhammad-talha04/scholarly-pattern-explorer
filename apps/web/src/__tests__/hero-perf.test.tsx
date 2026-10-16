@@ -21,3 +21,10 @@ it("placeholder fills the canvas box", async () => {
   render(<GalaxyPlaceholder />);
   expect(screen.getByTestId("galaxy-placeholder").className).toMatch(/absolute inset-0/);
 });
+
+it("hero shows the decorative-lines caption and a fixed legend slot", async () => {
+  const { GalaxyHero } = await import("@/features/galaxy/GalaxyHero");
+  render(<GalaxyHero />);
+  expect(screen.getByTestId("hero-caption")).toHaveTextContent("Dot positions show topic clusters; connecting lines are decorative.");
+  expect(screen.getByTestId("legend-slot").className).toMatch(/h-14/);
+});

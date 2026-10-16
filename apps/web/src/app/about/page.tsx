@@ -34,6 +34,10 @@ export default function AboutPage() {
         <p>A research gap here is a topic pair that rarely appears together <em>in this sample</em>. It is not proof that nobody in the world works on it. Papers outside subfield 1702 or outside the date window can easily fill it.</p>
       </section>
       <section className="space-y-3">
+        <h2 className="text-xl font-semibold text-white">Reading the galaxy</h2>
+        <p>Dot positions show topic clusters; connecting lines are decorative. The lines on the home page are drawn for looks and do not mean two topics are related.</p>
+      </section>
+      <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">Growth figures</h2>
         <p>Growth trends are hidden while we rebalance the paper sample. When they return, growth will compare two periods of equal length. When either period has fewer than 30 papers, it will show &ldquo;Not enough data&rdquo; instead of a percentage, because small counts swing wildly.</p>
       </section>
