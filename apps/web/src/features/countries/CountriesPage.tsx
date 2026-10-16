@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { api, prefersFixtures } from "@/lib/api/client";
-import type { Counting, CountryStats } from "@/lib/api/types";
+import type { Counting, CountryStats, GrowthReason } from "@/lib/api/types";
 import { papersByCountryYear, yearRange } from "@/lib/series";
 import { useApi } from "@/lib/useApi";
 import { useMotionPrefs } from "@/components/MotionProvider";
@@ -67,7 +67,7 @@ export function CountriesPage() {
           {current && (
             <motion.div key={current.code} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="glass p-4">
               <div className="flex items-baseline justify-between"><h2 className="text-lg font-semibold text-white">{current.name}{isRegion(current.code) && <RegionTag />}</h2><button className="chip hover:text-white" onClick={() => setSel(null)}>clear</button></div>
-              <p className="mt-1 text-sm text-mist">{fmt(current.papers)} papers ({counting}{year !== "all" ? `, ${year}` : ""}) · growth <Growth v={current.growth_pct} /></p>
+              <p className="mt-1 text-sm text-mist">{fmt(current.papers)} papers ({counting}{year !== "all" ? `, ${year}` : ""}) · growth <Growth v={current.growth_pct} c={current} /></p>
               <h3 className="mt-3 text-xs uppercase tracking-wide text-mist">Top topics</h3>
               <div className="mt-1 flex flex-wrap gap-1.5">{current.top_topics.map((t) => <span key={t} className="chip">{t}</span>)}</div>
               {partners.length > 0 && <><h3 className="mt-3 text-xs uppercase tracking-wide text-mist">Top collaborators</h3>
@@ -90,10 +90,10 @@ function CountryTable({ list, sel, onSelect, fmt }: { list: CountryStats[]; sel:
           <tr key={c.code} className={sel === c.code ? "bg-gap/10" : ""}>
             <td className="p-0"><button className="w-full px-2 py-2 text-left hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => onSelect(c.code)} aria-pressed={sel === c.code}>{c.name}{isRegion(c.code) && <RegionTag />}<div className="text-xs text-slate-400">{c.top_topics.slice(0, 2).join(" · ")}</div></button></td>
             <td className="p-2 text-right tabular-nums">{fmt(c.papers)}</td>
-            <td className="p-2 text-right"><Growth v={c.growth_pct} /></td>
+            <td className="p-2 text-right"><Growth v={c.growth_pct} c={c} /></td>
           </tr>))}</tbody>
       </table>
-      <p className="px-2 pt-2 text-xs text-slate-400">Growth compares two equal-length periods. It shows &ldquo;Not enough data&rdquo; when either period has fewer than 30 papers. &ldquo;Region&rdquo; marks territories that are not sovereign countries.</p>
+      <p className="px-2 pt-2 text-xs text-slate-400">Growth compares two equal-length periods. It shows &ldquo;Not enough data&rdquo; when either period has fewer than 30 papers or covers a partial year. Hover a value for both counts and the dates. &ldquo;Region&rdquo; marks territories that are not sovereign countries.</p>
     </div>
   );
 }
@@ -102,7 +102,33 @@ function RegionTag() {
   return <span className="chip ml-1.5 px-1.5 py-0 align-middle text-[10px]" title="Territory or special region, not a sovereign country">Region</span>;
 }
 
-export function Growth({ v }: { v: number | null | undefined }) {
-  if (v == null || !Number.isFinite(v)) return <span className="text-slate-400" title="Either equal-length period has fewer than 30 papers">Not enough data</span>;
-  return <span className={v >= 0 ? "text-up" : "text-down"}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>;
+const REASON_TEXT: Record<GrowthReason, string> = {
+  too_few_papers: "Not enough data (fewer than 30 papers)",
+  partial_year: "Not enough data (partial year)",
+};
+
+/** Tooltip text with both counts and the window dates, when the API sends them. */
+export function growthDetail(c: Partial<CountryStats>): string {
+  const parts: string[] = [];
+  const n = (x: number) => x.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  if (c.growth_window_start && c.growth_window_end) parts.push(`Current window ${c.growth_window_start} to ${c.growth_window_end}, vs the same dates one year earlier`);
+  if (c.growth_cur_count != null && c.growth_prev_count != null) parts.push(`${n(c.growth_cur_count)} papers now vs ${n(c.growth_prev_count)} before`);
+  parts.push("Equal-length periods; both need at least 30 papers");
+  return parts.join(". ") + ".";
+}
+
+export function Growth({ v, c }: { v: number | null | undefined; c?: Partial<CountryStats> }) {
+  const detail = growthDetail(c ?? {});
+  const reason = c?.growth_reason;
+  if (v == null || !Number.isFinite(v)) {
+    const text = reason && reason in REASON_TEXT ? REASON_TEXT[reason] : "Not enough data";
+    return <span className="text-slate-400" title={detail}>{text}</span>;
+  }
+  const counts = c?.growth_cur_count != null && c?.growth_prev_count != null;
+  return (
+    <span title={detail} className={v >= 0 ? "text-up" : "text-down"}>
+      {v >= 0 ? "+" : ""}{v.toFixed(1)}%
+      {counts && <span className="block text-[10px] text-slate-400">{Math.round(c!.growth_cur_count!).toLocaleString()} vs {Math.round(c!.growth_prev_count!).toLocaleString()}</span>}
+    </span>
+  );
 }

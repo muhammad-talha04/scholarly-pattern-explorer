@@ -39,7 +39,7 @@ export default function AboutPage() {
       </section>
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">How search works today</h2>
-        <p>Search and the galaxy layout currently use simple 384-dimension hash embeddings. They match shared words and fragments rather than true meaning, so related papers that use different wording can be missed. A move to a proper sentence-embedding model is planned.</p>
+        <p>Search and the galaxy layout currently use simple 384-dimension hash embeddings. They match shared words and fragments rather than true meaning, so related papers that use different wording can be missed. Meaning-based search is being upgraded to a proper sentence-embedding model; until then, treat search as keyword and topic matching.</p>
       </section>
       <p><Link href="/" className="text-accent hover:underline">Back to the galaxy</Link></p>
     </article>

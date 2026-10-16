@@ -126,9 +126,9 @@ export function GalaxyHero() {
         <div className="pointer-events-auto max-w-xl text-left">
           <p className="font-mono text-[11px] font-medium tracking-[0.18em] text-accent">OPENALEX · EMBEDDINGS · COSINE SIMILARITY</p>
           <h1 className="mt-3 font-sans text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
-            Explore research <span className="text-accent">by meaning</span>
+            Explore AI research <span className="text-accent">by topic</span>
           </h1>
-          <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Each dot is a paper. Nearby papers share ideas, linked by meaning.</p>
+          <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Each dot is a topic or a research gap. Nearby dots share keywords and topics.</p>
           <div className="mt-6">
             <SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} />
             <ul aria-label="Suggestions" className="mt-3 flex flex-wrap gap-2">
