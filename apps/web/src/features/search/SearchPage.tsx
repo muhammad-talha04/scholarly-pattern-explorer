@@ -7,6 +7,46 @@ import { EmptyState, ErrorNote, PageHeader, Spinner } from "@/components/ui";
 import { SearchBar } from "./SearchBar";
 import { ResultCard } from "./ResultCard";
 import { PaperPanel } from "./PaperPanel";
+import Link from "next/link";
+
+/** Render's free tier can take a minute or two to wake; give up after this and show the error state. */
+export const SEARCH_TIMEOUT_MS = 120_000;
+
+export function withTimeout<T>(p: Promise<T>, ms = SEARCH_TIMEOUT_MS): Promise<T> {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  const timer = new Promise<never>((_, reject) => { t = setTimeout(() => reject(new Error("Search timed out. The server did not answer in time.")), ms); });
+  return Promise.race([p, timer]).finally(() => clearTimeout(t));
+}
+
+export function SearchLoading() {
+  return (
+    <div role="status" data-testid="search-loading" className="md:col-span-2 flex flex-col gap-1 text-sm text-mist">
+      <span className="flex items-center gap-2"><Spinner /> Searching</span>
+      <span className="text-xs text-slate-400">The search server may take a moment to wake up if nobody has used it recently. First searches can take up to a minute or two.</span>
+    </div>
+  );
+}
+
+export function SearchError({ msg, onRetry }: { msg: string; onRetry: () => void }) {
+  return (
+    <div data-testid="search-error" className="md:col-span-2">
+      <ErrorNote msg={`Search is unavailable right now. ${msg}`} onRetry={onRetry} />
+    </div>
+  );
+}
+
+export function NoCloseMatches({ filtered, onClear }: { filtered: boolean; onClear: () => void }) {
+  return (
+    <div data-testid="search-no-matches" className="md:col-span-2">
+      <EmptyState title="No close matches" body="Nothing in this sample is a close match. Try different or broader words, or browse topics instead."
+        action={<div className="flex flex-wrap justify-center gap-2">
+          <Link href="/patterns" className="btn bg-accent/20">Browse patterns and gaps</Link>
+          <Link href="/timeline" className="btn">See topics over time</Link>
+          {filtered && <button className="btn" onClick={onClear}>Clear filters</button>}
+        </div>} />
+    </div>
+  );
+}
 
 function bounded(raw: string | null, fallback: number, min: number, max: number) {
   if (raw == null || raw.trim() === "") return fallback;
@@ -24,7 +64,7 @@ export function SearchPage() {
   const [open, setOpen] = useState<string | null>(paperQ);
   useEffect(() => { if (paperQ) setOpen(paperQ); }, [paperQ]);
   const countries = useApi(() => api.countries(), []);
-  const res = useApi(() => (q ? api.search({ q, limit, offset, country: country || undefined, year_from: yearFrom ? Number(yearFrom) : undefined }) : Promise.resolve({ data: null, source: "mock" as const })), [q, country, yearFrom, limit, offset]);
+  const res = useApi(() => (q ? withTimeout(api.search({ q, limit, offset, country: country || undefined, year_from: yearFrom ? Number(yearFrom) : undefined })) : Promise.resolve({ data: null, source: "mock" as const })), [q, country, yearFrom, limit, offset]);
   const nav = (patch: Record<string, string>, keepOffset = false) => {
     const p = new URLSearchParams(sp.toString());
     Object.entries(patch).forEach(([k, v]) => (v ? p.set(k, v) : p.delete(k)));
@@ -50,10 +90,10 @@ export function SearchPage() {
       </div>
       <div className="mt-6 grid gap-3 md:grid-cols-2">
         {!q && <div className="md:col-span-2"><EmptyState title="Ask a question" body="Try a topic in plain language, for example “privacy in federated learning”. Filters sit above the results." /></div>}
-        {res.loading && q && <div className="flex items-center gap-2 text-sm text-mist"><Spinner /> Searching</div>}
-        {res.error && <ErrorNote msg={res.error} onRetry={res.reload} />}
-        {res.data && res.data.results.length === 0 && <div className="md:col-span-2"><EmptyState title="No papers match" body="Nothing in the index fits this query and these filters. Clear the country or the year and try a broader phrase." action={<button className="btn" onClick={() => nav({ country: "", year_from: "" })}>Clear filters</button>} /></div>}
-        {res.data?.results.map((p, i) => <ResultCard key={p.id} paper={p} index={i} active={open === p.id} onOpen={setOpen} />)}
+        {res.loading && q && <SearchLoading />}
+        {q && !res.loading && res.error && <SearchError msg={res.error} onRetry={res.reload} />}
+        {q && !res.loading && !res.error && res.data && res.data.results.length === 0 && <NoCloseMatches filtered={!!(country || yearFrom)} onClear={() => nav({ country: "", year_from: "" })} />}
+        {!res.error && res.data?.results.map((p, i) => <ResultCard key={p.id} paper={p} index={i} active={open === p.id} onOpen={setOpen} />)}
       </div>
       {q && res.data && res.data.results.length > 0 && <SearchPager data={res.data} offset={offset} limit={limit} onPage={(next) => nav({ offset: next > 0 ? String(next) : "" }, true)} />}
       <PaperPanel id={open} onClose={() => setOpen(null)} onOpen={setOpen} />
