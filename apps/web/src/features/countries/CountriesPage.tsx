@@ -12,7 +12,8 @@ import { CountingToggle } from "./CountingToggle";
 import { Globe2D } from "./Globe2D";
 import { isRegion } from "@/lib/regions";
 import Link from "next/link";
-import { SHOW_GROWTH } from "@/lib/flags";
+import { SHOW_GROWTH, SHOW_SHARE } from "@/lib/flags";
+import { Share } from "./Share";
 
 const Globe3D = dynamic(() => import("./Globe3D"), { ssr: false, loading: () => <LoadingBlock label="Raising the globe" /> });
 
@@ -88,12 +89,12 @@ function CountryTable({ list, sel, onSelect, fmt }: { list: CountryStats[]; sel:
   return (
     <div className="glass max-h-[440px] overflow-auto p-2">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-ink/90 text-left text-xs uppercase text-mist"><tr><th className="p-2">Country/region</th><th className="p-2 text-right">Papers</th>{SHOW_GROWTH && <th className="p-2 text-right" title="Change between two equal-length periods">Growth</th>}</tr></thead>
+        <thead className="sticky top-0 bg-ink/90 text-left text-xs uppercase text-mist"><tr><th className="p-2">Country/region</th><th className="p-2 text-right">Papers</th>{SHOW_SHARE && <th className="p-2 text-right" title="Share of all papers in the current window; change in percentage points vs the same dates last year">Share of papers</th>}{SHOW_GROWTH && <th className="p-2 text-right" title="Change between two equal-length periods">Growth</th>}</tr></thead>
         <tbody>{list.map((c) => (
           <tr key={c.code} className={sel === c.code ? "bg-gap/10" : ""}>
             <td className="p-0"><button className="w-full px-2 py-2 text-left hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => onSelect(c.code)} aria-pressed={sel === c.code}>{c.name}{isRegion(c.code) && <RegionTag />}<div className="text-xs text-slate-400">{c.top_topics.slice(0, 2).join(" · ")}</div></button></td>
             <td className="p-2 text-right tabular-nums">{fmt(c.papers)}</td>
-            {SHOW_GROWTH && <td className="p-2 text-right"><Growth v={c.growth_pct} c={c} /></td>}
+            {SHOW_SHARE && <td className="p-2 text-right"><Share c={c} /></td>}{SHOW_GROWTH && <td className="p-2 text-right"><Growth v={c.growth_pct} c={c} /></td>}
           </tr>))}</tbody>
       </table>
       {SHOW_GROWTH ? (

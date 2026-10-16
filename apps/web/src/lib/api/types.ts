@@ -64,6 +64,11 @@ export interface CountryStats {
   /** ISO dates (YYYY-MM-DD) for the current window; the previous window is the same span one year earlier. */
   growth_window_start?: string | null;
   growth_window_end?: string | null;
+  /** Optional share-of-papers fields. Same windows and counts as growth; share_reason is separate from growth_reason. */
+  share_pct?: number | null;
+  share_prev_pct?: number | null;
+  share_change_pp?: number | null;
+  share_reason?: GrowthReason | null;
   top_topics: string[];
   /** Present once the live snapshot includes it (PR #6). */
   counting?: Counting;
