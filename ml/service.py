@@ -8,7 +8,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .embeddings import get_embedder
+from .timing import stage
+from .embeddings import get_embedder, model_label
 from .llm import chat_complete
 from .papers import Paper, reader_url
 from .paths import ml_data_dir
@@ -79,7 +80,8 @@ class MLService:
         for i in range(0, len(papers), batch):
             chunk = papers[i:i + batch]
             vecs = encode_docs([p.text for p in chunk])
-            self.store.upsert([p.work_id for p in chunk], vecs, [p.to_dict() for p in chunk])
+            self.store.upsert([p.work_id for p in chunk], vecs, [p.to_dict() for p in chunk],
+                              model=model_label(self.embedder))
         return len(papers)
 
     def read_galaxy(self) -> dict:
@@ -120,9 +122,12 @@ class MLService:
         if len(self.store) == 0:          # nothing indexed: don't load the model
             return []
         encode_q = getattr(self.embedder, "encode_queries", None) or self.embedder.encode
-        q = encode_q([query])[0]
+        with stage("embed"):
+            q = encode_q([query])[0]
         filtered = bool(country or year_from)
-        hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
+        # meta comes back with the vector query, so "vector" covers the meta fetch too
+        with stage("vector"):
+            hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
         return [_hit(w, s, m) for w, s, m in hits if _keep(m, country, year_from)][:k]
 
     def related(self, work_id: str, k: int = 10) -> list[dict] | None:

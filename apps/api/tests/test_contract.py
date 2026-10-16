@@ -20,3 +20,8 @@ def test_all_contract_routes_exist():
               "/papers/{paper_id}/related", "/papers/{paper_id}/similar", "/patterns",
               "/countries", "/countries/{code}", "/topic-country-years", "/runs", "/galaxy", "/stats"]:
         assert "/api/v1" + p in paths
+
+
+def test_search_sends_server_timing():
+    r = client.get("/api/v1/search", params={"q": "graph"})
+    assert "total;dur=" in r.headers["server-timing"]
