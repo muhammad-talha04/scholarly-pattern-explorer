@@ -14,6 +14,7 @@ const LINKS = [
   ["/timeline", "Progress"],
   ["/patterns", "Patterns"],
   ["/collections", "Saved"],
+  ["/about", "About"],
 ] as const;
 
 export function Nav() {

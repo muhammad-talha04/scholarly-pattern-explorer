@@ -34,7 +34,7 @@ export function SearchPage() {
   const thisYear = new Date().getFullYear();
   return (
     <div>
-      <PageHeader title="Search" subtitle="Meaning-based search over the indexed papers. Pin two results to compare them." />
+      <PageHeader title="Search" subtitle="Search AI research papers by keyword and topic. Meaning-based search is being upgraded. Pin two results to compare them." />
       <SearchBar key={q} initial={q} onSubmit={(v) => nav({ q: v })} />
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
         <label className="flex items-center gap-2 text-mist">Country

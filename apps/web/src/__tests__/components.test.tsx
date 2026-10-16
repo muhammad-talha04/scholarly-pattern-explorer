@@ -9,9 +9,9 @@ it("counting toggle shows which method is displayed", () => {
   const on = vi.fn();
   const { rerender } = render(<CountingToggle value="fractional" onChange={on} />);
   expect(screen.getByTestId("counting-label")).toHaveTextContent(/Fractional counting/);
-  fireEvent.click(screen.getByRole("radio", { name: "full" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Full credit" }));
   expect(on).toHaveBeenCalledWith("full");
-  fireEvent.click(screen.getByRole("radio", { name: "per country" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Split per pair" }));
   expect(on).toHaveBeenCalledWith("per_country");
   rerender(<CountingToggle value="full" onChange={on} />);
   expect(screen.getByTestId("counting-label")).toHaveTextContent(/Full counting/);
