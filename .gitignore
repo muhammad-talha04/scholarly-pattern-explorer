@@ -57,3 +57,6 @@ _fixes_2026_09/
 !eval/benchmark_queries.csv
 !eval/search_qrels.jsonl
 eval/report.json
+
+# fastembed ONNX model cache (filled by `python -m ml.prefetch_model`)
+.cache/

@@ -39,7 +39,7 @@ def hash_mode(monkeypatch):
 
 def test_model_label():
     assert model_label(HashEmbedder()) == "hash-v1"
-    assert model_label(Named("BAAI/bge-small-en-v1.5")) == "BAAI/bge-small-en-v1.5@main"
+    assert model_label(Named("BAAI/bge-small-en-v1.5")) == "BAAI/bge-small-en-v1.5@main"   # torch; fastembed is "fastembed:..."
 
 
 def test_resume_embeds_only_new_ids_in_batches(hash_mode, caplog):
