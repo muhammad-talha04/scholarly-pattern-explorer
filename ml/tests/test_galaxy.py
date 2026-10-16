@@ -105,8 +105,11 @@ def test_cli_index_writes_a_galaxy(tmp_path, monkeypatch, capsys):
                       encoding="utf-8")
     from ml.cli import main
     main(["index", "--jsonl", str(papers)])
+    assert not (tmp_path / "ml" / "galaxy" / "state.json").exists()   # galaxy is opt-in now
+    main(["index", "--jsonl", str(papers), "--galaxy"])
     assert (tmp_path / "ml" / "galaxy" / "state.json").exists()
-    assert "indexed 1 papers" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "indexed 1 papers" in out and "skipped 1 existing" in out
     main(["galaxy"])
     assert "galaxy 1 nodes" in capsys.readouterr().out
     main(["update", "--jsonl", str(papers)])

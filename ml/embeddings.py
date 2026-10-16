@@ -110,3 +110,19 @@ def get_embedder(model_name: str | None = None):
     if os.getenv("ML_EMBEDDER", "").lower() == "hash":
         return HashEmbedder()
     return Embedder(model_name)
+
+
+HASH_MODEL_LABEL = "hash-v1"
+
+
+def model_label(embedder) -> str:
+    """Model name + version written to paper_embeddings.model on every upsert.
+
+    hash embedder -> "hash-v1"; sentence-transformers -> "<model id>@<revision>",
+    revision from ML_EMBED_MODEL_REVISION (default "main"). Two labels that differ
+    are treated as incompatible vector spaces by the indexer.
+    """
+    if getattr(embedder, "model_name", None) == "hash":
+        return HASH_MODEL_LABEL
+    name = getattr(embedder, "model_name", None) or type(embedder).__name__
+    return f"{name}@{os.getenv('ML_EMBED_MODEL_REVISION', 'main')}"

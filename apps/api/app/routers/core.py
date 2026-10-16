@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from .. import ml_bridge as ml
 from pipeline import country_api  # repo root is on sys.path via ml_bridge
+from ml.timing import stage  # noqa: E402
 from ..schemas import (AskRequest, AskResponse, Collaboration, CorpusStats, CountingMethod, CountryStats,
                        ExamplePaper, GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchResponse,
                        TopicCountryYear)
@@ -73,7 +74,9 @@ def search(q: str, limit: int = 20, offset: int = 0, country: str | None = None,
     offset = max(0, offset)
     hits = ml.get_service().search(q, k=cap, country=country, year_from=year_from)
     page = hits[offset:offset + limit]
-    return SearchResponse(query=q, results=[_summary_model(h) for h in page],
+    with stage("summaries"):
+        results = [_summary_model(h) for h in page]
+    return SearchResponse(query=q, results=results,
                           total=len(hits), limit=limit, offset=offset)
 
 

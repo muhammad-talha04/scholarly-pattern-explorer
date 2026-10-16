@@ -113,12 +113,14 @@ def test_ask_llm_failure_falls_back(service, monkeypatch):
     assert out["method"] == "extractive" and "percent" in out["answer"]
 
 
-def test_pgvector_store_sql_with_fake_conn():
+def test_pgvector_store_sql_with_fake_conn(monkeypatch):
+    monkeypatch.setenv("SPE_RUN_MIGRATIONS", "1")  # migrations on connect are opt-in now
     class Cur:
         def __init__(s, log): s.log = log
         def __enter__(s): return s
         def __exit__(s, *a): pass
         def execute(s, sql, params=None): s.log.append((sql, params))
+        def executemany(s, sql, rows): s.log.append((sql, rows))
         def fetchall(s): return [("W1", 0.9, {"title": "x"})]
         def fetchone(s): return ({"title": "x"},)
     class Conn:
