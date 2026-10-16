@@ -6,7 +6,10 @@ services:
     name: scholarly-pattern-explorer-api
     runtime: python
     plan: free
-    buildCommand: pip install -r apps/api/requirements.txt
+    # The second step downloads the fastembed ONNX model into <repo>/.cache/fastembed so it
+    # ships with the build (free-tier /tmp is wiped on cold start). While ML_EMBEDDER=hash a
+    # failed download only warns; with ML_EMBEDDER=fastembed it fails the build.
+    buildCommand: pip install -r apps/api/requirements.txt && python -m ml.prefetch_model
     startCommand: uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     envVars:
@@ -18,9 +21,19 @@ services:
         sync: false
       - key: OPENALEX_MAILTO
         sync: false
+      # Query embedder. MUST match paper_embeddings.model in Supabase (today: hash-v1).
+      # Stays hash until the corpus is re-embedded (docs/STATUS.md, 2026-10-16 bob).
+      # Switch values after the bge re-embed:
+      #   ML_EMBEDDER=fastembed
+      #   ML_EMBED_MODEL=BAAI/bge-small-en-v1.5
+      #   (optional) SEARCH_MIN_SCORE=0.68   # per-model default already; 0 turns it off
       - key: ML_EMBEDDER
-        sync: false
+        value: hash
       - key: ML_EMBED_MODEL
+        sync: false
+      - key: ML_EMBED_MODEL_REVISION
+        sync: false
+      - key: SEARCH_MIN_SCORE
         sync: false
       - key: ML_VECTOR_BACKEND
         sync: false
