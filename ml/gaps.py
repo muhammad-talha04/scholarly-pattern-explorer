@@ -15,7 +15,14 @@ Method (per topic, over the last ``years`` complete years, default 3):
   * volume = papers in the window (base year + 3 growth years);
   * eligible: volume >= min_total, last year >= min_last, growth >= min_growth;
   * gap_score = percentile(growth) - percentile(volume) among topics with enough data.
+
+A gap is relative to THIS corpus (AI-subfield papers, Oct 2024 onward), not to research
+as a whole (council C4). Each gap carries ``low_coverage``: True when the topic has fewer
+than ``min_coverage`` papers in the window, or when a window year is thinly sampled
+(corpus total for that year < ``thin_year_ratio`` of the busiest window year). Such a gap
+may be a sampling hole rather than a real gap, and the UI should say so.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,6 +30,12 @@ from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
 from statistics import mean, median
+
+GAP_DEFINITION = (
+    "A research gap here is a topic that grew fast but still has few papers in this corpus "
+    "(AI-subfield papers from Oct 2024 onward). It is relative to this sample, not to all research. "
+    "Gaps marked low coverage rest on few papers or thinly sampled years and may be sampling holes."
+)
 
 
 def counts_from_works(works) -> tuple[dict, dict]:
@@ -77,10 +90,18 @@ def _pct_rank(values: list[float]) -> list[float]:
 def find_gaps(topic_year_counts: dict, topic_top_countries: dict | None = None, *,
               last_year: int | None = None, years: int = 3, smoothing: float = 5.0,
               cap: float = 2.0, min_total: int = 20, min_last: int = 5,
-              min_growth: float = 0.10, top_n_countries: int = 5, limit: int = 20) -> list[dict]:
+              min_growth: float = 0.10, top_n_countries: int = 5, limit: int = 20,
+              min_coverage: int = 50, thin_year_ratio: float = 0.5) -> list[dict]:
     """Rank research gaps. ``last_year`` defaults to the last complete calendar year."""
     last = last_year if last_year is not None else date.today().year - 1
     span = list(range(last - years, last + 1))
+    year_tot = Counter()
+    for by_year in topic_year_counts.values():
+        for y, n in by_year.items():
+            if str(y).lstrip("-").isdigit():
+                year_tot[int(y)] += float(n)
+    peak = max((year_tot[y] for y in span), default=0.0)
+    thin_years = [y for y in span if peak and year_tot[y] < thin_year_ratio * peak]
     rows = []
     for topic, by_year in topic_year_counts.items():
         c = {int(y): float(n) for y, n in by_year.items() if str(y).lstrip("-").isdigit()}
@@ -109,7 +130,9 @@ def find_gaps(topic_year_counts: dict, topic_top_countries: dict | None = None, 
                     "paper_count": int(r["volume"]), "gap_score": round(score, 4),
                     "top_countries": [str(x[0]) if isinstance(x, (list, tuple)) else str(x)
                                       for x in top[:top_n_countries]],
-                    "window_start": span[0], "window_end": span[-1]})
+                    "window_start": span[0], "window_end": span[-1],
+                    "low_coverage": bool(thin_years) or r["volume"] < min_coverage,
+                    "thin_years": thin_years})
     out.sort(key=lambda x: (-x["gap_score"], -x["growth_rate"]))
     return out[:limit]
 
@@ -121,9 +144,11 @@ def explain_growth_gap(gap: dict) -> str:
     pace = f"{rate:.0%} a year" if isinstance(rate, (int, float)) else "year over year"
     text = (
         f"{topic} grew about {pace} from {gap.get('window_start')} to {gap.get('window_end')}. "
-        f"{gap.get('paper_count')} papers were published in that window, so the literature is still small."
+        f"{gap.get('paper_count')} papers in this corpus fall in that window, so it is still small here."
     )
     countries = [c for c in (gap.get("top_countries") or []) if c]
     if countries:
         text += " The countries with the most papers are " + ", ".join(countries[:3]) + "."
+    if gap.get("low_coverage"):
+        text += " Coverage is low, so this may reflect how the corpus was sampled rather than a real gap."
     return text
