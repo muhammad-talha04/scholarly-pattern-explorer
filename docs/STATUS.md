@@ -12,6 +12,11 @@ Last updated: 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a mo
 - **PgVectorStore** uses a `psycopg_pool.ConnectionPool` (`PG_POOL_MIN`/`PG_POOL_MAX`, default 1/4, connections checked before they're handed out). A query that hits `OperationalError` is retried once; without the pool it reconnects once. **Migrations no longer run on connect.** Run `DATABASE_URL=... python -m db.apply`, or set `SPE_RUN_MIGRATIONS=1` for the old behaviour. When `v2-ingest.yml` is re-enabled, add `python -m db.apply` before `ml.cli index` (the workflow wasn't edited in this PR).
 - **Search timings:** the `embed`, `vector` (the vector query, which also returns meta) and `summaries` stages are logged on the `spe.timing` logger and returned in a `Server-Timing` header with `total`.
 
+## 2026-10-16 (olli): galaxy sampling and cache
+- `GET /api/v1/galaxy?limit=N` (and `GALAXY_NODE_LIMIT`) now returns a **deterministic stratified sample** instead of the first N nodes. Each cluster gets a share proportional to its size, with at least 3 nodes. Within a cluster, nodes are ranked by highest support (citations), then newest year, then a seeded hash of the id. Every cluster is still listed, and a link is kept only when both its ends are in the sample. The response shape is unchanged. Measured against the live doc: `limit=600` gives 181 KB and covers 9/9 clusters, compared with 4,425 KB for the whole graph (the old 600-node prefix covered 8/9 clusters). Because the stored links are only the 200 strongest pairs in the whole graph, just 2 of them survive at 600 nodes.
+- `rebuild_galaxy` also stores a 600-node `galaxy_sample` document. Limits up to 600 are served from it without loading the full graph. Larger limits fall back to sampling on the fly.
+- Parsed galaxy documents are cached in-process for `GALAXY_CACHE_TTL` seconds (default 600). A rebuild in the same process clears the cache. The full graph takes about 10 MB once parsed, and the sample about 0.5 MB.
+
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
 meaning, read summaries, ask questions about a paper, open the original, see

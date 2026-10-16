@@ -25,6 +25,7 @@ from .paths import ml_data_dir
 DOCUMENT_KINDS = (
     "galaxy",              # GET /api/v1/galaxy body
     "galaxy_state",        # frozen PCA basis and assignments
+    "galaxy_sample",       # small stratified galaxy for the hero view (GET /galaxy?limit=N)
     "patterns",            # pattern snapshot
     "countries",           # country counts
     "topics",              # topic counts

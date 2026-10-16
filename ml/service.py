@@ -72,6 +72,8 @@ class MLService:
         data_dir = ml_data_dir()
         self.cache = cache or SummaryCache(data_dir / "summaries.sqlite")
         self.galaxy_dir = Path(galaxy_dir) if galaxy_dir is not None else data_dir / "galaxy"
+        self._doc_cache: dict[str, tuple[float, dict | None]] = {}
+        self._sample_cache: dict[int, dict] = {}
 
     # ---- 1. embeddings ----
     def index_papers(self, papers: list[Paper], batch: int = 64) -> int:
@@ -84,10 +86,47 @@ class MLService:
                               model=model_label(self.embedder))
         return len(papers)
 
-    def read_galaxy(self) -> dict:
-        """Stored galaxy graph. Does not read embeddings or recompute the layout."""
-        from .galaxy import empty_graph
-        stored = self.store.get_document("galaxy")
+    def _cached_doc(self, kind: str):
+        """Parsed document, cached in-process for GALAXY_CACHE_TTL seconds (default 600).
+
+        The galaxy only changes when the index job rebuilds it, so re-reading and
+        re-parsing ~4 MB of JSON per request is wasted work. A rebuild in this
+        process clears the cache straight away.
+        """
+        import time
+        ttl = float(os.getenv("GALAXY_CACHE_TTL", "600"))
+        hit = self._doc_cache.get(kind)
+        now = time.monotonic()
+        if hit and now - hit[0] < ttl:
+            return hit[1]
+        doc = self.store.get_document(kind)
+        self._doc_cache[kind] = (now, doc)
+        self._sample_cache.clear()
+        return doc
+
+    def read_galaxy(self, limit: int | None = None) -> dict:
+        """Stored galaxy graph. Does not read embeddings or recompute the layout.
+
+        ``limit`` returns a deterministic stratified sample (``galaxy.sample_graph``).
+        Small limits are served from the precomputed ``galaxy_sample`` document
+        when it exists, so the full graph is not loaded for the hero view.
+        """
+        from .galaxy import empty_graph, sample_graph
+        if limit is not None:
+            key = int(limit)
+            if key in self._sample_cache:
+                return self._sample_cache[key]
+            small = self._cached_doc("galaxy_sample")
+            if small and small.get("nodes") and key <= len(small["nodes"]):
+                out = sample_graph(small, key)
+            else:
+                full = self._cached_doc("galaxy") or empty_graph()
+                out = sample_graph(full, key)
+            if len(self._sample_cache) >= 16:
+                self._sample_cache.clear()
+            self._sample_cache[key] = out
+            return out
+        stored = self._cached_doc("galaxy")
         return stored if stored else empty_graph()
 
     def rebuild_galaxy(self, refit: bool = False) -> dict:
@@ -107,6 +146,10 @@ class MLService:
         graph = graph_from_layout(points, vecs, metas) if points else empty_graph()
         self.store.put_document("galaxy_state", layout.state)
         self.store.put_document("galaxy", graph)
+        from .galaxy import HERO_SAMPLE_SIZE, sample_graph
+        self.store.put_document("galaxy_sample", sample_graph(graph, HERO_SAMPLE_SIZE))
+        self._doc_cache.clear()
+        self._sample_cache.clear()
         return graph
 
     @staticmethod
