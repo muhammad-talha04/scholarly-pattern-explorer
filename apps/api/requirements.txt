@@ -6,3 +6,4 @@ httpx
 numpy
 psycopg[binary]>=3.1
 psycopg_pool>=3.2
+fastembed>=0.3   # ONNX query embedder, used when ML_EMBEDDER=fastembed
