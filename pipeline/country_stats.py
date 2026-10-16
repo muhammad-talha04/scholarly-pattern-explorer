@@ -234,6 +234,31 @@ def share_for(dates: dict | None, totals: dict | None, win: dict | None) -> dict
     return out
 
 
+MIN_SPEC_PAPERS = 10       # a country needs this many papers on a topic before it can rank as a specialty
+
+
+def specialized_topics(t: dict, code: str, top_n: int = 5, min_papers: int = MIN_SPEC_PAPERS) -> list[dict]:
+    """Rank a country's topics by location quotient (council C5).
+
+    LQ = (country's papers on topic / country's papers) / (all papers on topic / all papers).
+    LQ > 1 means the country publishes relatively more on the topic than the corpus does.
+    Only topics with >= min_papers country papers qualify, so tiny counts can't top the list.
+    Denominators use papers with at least one country (fractional sums: one per paper).
+    """
+    n_c = sum((t.get("by_year") or {}).get(code, {}).values())
+    total = sum(v for yrs in (t.get("frac") or {}).values() for v in yrs.values())
+    if not n_c or not total:
+        return []
+    out = []
+    for tp, n in (t.get("topics") or {}).get(code, {}).items():
+        g = sum((t.get("topic_countries") or {}).get(tp, {}).values())
+        if n < min_papers or not g:
+            continue
+        out.append({"name": tp, "lq": round((n / n_c) / (g / total), 2), "papers": n})
+    out.sort(key=lambda x: (-x["lq"], -x["papers"], x["name"]))
+    return out[:top_n]
+
+
 def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict]:
     src = t["frac"] if counting == "fractional" else t["by_year"]
     dsrc = (t.get("frac_date") if counting == "fractional" else t.get("by_date")) or {}
@@ -246,6 +271,7 @@ def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict
                      **growth_for(dsrc.get(code), win),
                      **share_for(dsrc.get(code), totals, win),
                      "top_topics": [n for n, _ in t["topics"][code].most_common(top_n)],
+                     "specialized_topics": specialized_topics(t, code, top_n),
                      "counting": counting})
     return sorted(rows, key=lambda r: -r["papers"])
 

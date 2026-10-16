@@ -75,6 +75,12 @@ class CountryYearCount(BaseModel):
     fractional_count: float
 
 
+class SpecializedTopic(BaseModel):
+    name: str
+    lq: float        # location quotient: country topic share / corpus topic share
+    papers: int      # country papers on this topic (full counting)
+
+
 class CountryStats(BaseModel):
     code: str
     name: str
@@ -92,6 +98,7 @@ class CountryStats(BaseModel):
     share_change_pp: float | None = None
     share_reason: Literal["too_few_papers", "partial_year"] | None = None
     top_topics: list[str] = []
+    specialized_topics: list[SpecializedTopic] = []   # ranked by LQ, >= 10 papers (council C5)
     counting: CountingMethod = "fractional"
     paper_count: int = 0            # whole papers, every country on the paper counted once
     fractional_count: float = 0     # sum of 1/N over distinct countries
