@@ -105,8 +105,47 @@ class HashEmbedder:
         return self.encode(texts, mode="query")
 
 
+class FastEmbedder:
+    """ONNX embedder via fastembed: no torch, ~250 MB RSS, fits Render's 512 MB."""
+
+    def __init__(self, model_name: str | None = None):
+        self.model_name = model_name or os.getenv("ML_EMBED_MODEL", DEFAULT_MODEL)
+        self.dim = _KNOWN_DIM.get(self.model_name, DIM)
+        self._model = None
+
+    def _load(self):
+        if self._model is None:
+            from fastembed import TextEmbedding  # heavy import
+            self._model = TextEmbedding(self.model_name)
+        return self._model
+
+    def encode(self, texts: list[str], mode: str = "document") -> np.ndarray:
+        if len(texts) == 0:
+            return np.zeros((0, self.dim), dtype=np.float32)
+        prefs = text_prefixes(self.model_name)
+        prefix = prefs["query"] if mode == "query" else prefs["passage"]
+        prepared = [prefix + (t or "") for t in texts]
+        vecs = np.asarray(list(self._load().embed(prepared)), dtype=np.float32)
+        norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        return vecs / norms
+
+    def encode_documents(self, texts: list[str]) -> np.ndarray:
+        return self.encode(texts, mode="document")
+
+    def encode_queries(self, texts: list[str]) -> np.ndarray:
+        return self.encode(texts, mode="query")
+
+
 def get_embedder(model_name: str | None = None):
-    """ML_EMBEDDER=hash forces the offline embedder (CI, no model download)."""
-    if os.getenv("ML_EMBEDDER", "").lower() == "hash":
+    """ML_EMBEDDER=hash forces the offline embedder (CI, no model download).
+
+    ML_EMBEDDER=fastembed uses the ONNX backend (recommended on Render);
+    anything else uses sentence-transformers.
+    """
+    kind = os.getenv("ML_EMBEDDER", "").lower()
+    if kind == "hash":
         return HashEmbedder()
+    if kind == "fastembed":
+        return FastEmbedder(model_name)
     return Embedder(model_name)

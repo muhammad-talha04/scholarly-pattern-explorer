@@ -13,3 +13,4 @@ psycopg[binary]>=3.1           # Supabase Postgres + pgvector
 # tests
 pytest
 httpx
+fastembed>=0.3
