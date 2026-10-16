@@ -17,6 +17,20 @@ from .store import get_store
 from .text import best_sentences, extractive_summary
 
 
+def min_search_score(model_name: str) -> float:
+    """Cosine floor below which a search hit counts as "no close match".
+
+    0.38 was calibrated for all-MiniLM-L6-v2 on the 23-query relevance set
+    (best off-topic score 0.34, weakest real best score 0.42). Hash vectors
+    can't separate off-topic queries, so they get no floor.
+    Override with ML_SEARCH_MIN_SCORE.
+    """
+    env = os.getenv("ML_SEARCH_MIN_SCORE")
+    if env:
+        return float(env)
+    return 0.0 if model_name == "hash" else 0.38
+
+
 class SummaryCache:
     """One summary per paper, stored forever (sqlite file; free, no server)."""
 
@@ -171,7 +185,9 @@ class MLService:
         # meta comes back with the vector query, so "vector" covers the meta fetch too
         with stage("vector"):
             hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
-        return [_hit(w, s, m) for w, s, m in hits if _keep(m, country, year_from)][:k]
+        floor = min_search_score(self.embedder)
+        return [_hit(w, s, m) for w, s, m in hits
+                if s >= floor and _keep(m, country, year_from)][:k]
 
     def related(self, work_id: str, k: int = 10) -> list[dict] | None:
         if self.store.get(work_id) is None:
