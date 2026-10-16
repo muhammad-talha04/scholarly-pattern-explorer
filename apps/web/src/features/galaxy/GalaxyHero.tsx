@@ -162,7 +162,7 @@ export function GalaxyHero() {
           )}
         </div>
         <details className="glass max-h-40 overflow-auto px-3 py-2 text-sm text-mist">
-          <summary className="cursor-pointer text-white">Papers ({stars.length})</summary>
+          <summary className="cursor-pointer text-white" title="Each point is a research topic; gaps are topic pairs our sample rarely connects">Topics ({stars.length}){stars.some((n) => n.gap) ? <span className="text-mist"> · {stars.filter((n) => !n.gap).length} topics + {stars.filter((n) => n.gap).length} gaps</span> : null}</summary>
           <ul className="mt-2 max-h-28 space-y-1 overflow-auto">
             {stars.map((n) => (
               <li key={n.id}>
