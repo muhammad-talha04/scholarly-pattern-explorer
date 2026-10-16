@@ -80,3 +80,26 @@ def test_committed_snapshot_median_growth_not_below_minus_50():
     snap = json.loads(SNAP.read_text())
     med = _median_shown(snap["countries"])
     assert med is None or med >= -50
+
+
+def test_share_of_corpus_same_window_and_rules():
+    # 2025 window: PK 40 of 200 papers (20%); 2026 window: PK 60 of 200 (30%)
+    works = (_works("PK", 40, "2025-02-01") + _works("US", 160, "2025-02-01")
+             + _works("PK", 500, "2025-11-01")                     # outside the window
+             + _works("PK", 60, "2026-03-10") + _works("US", 140, "2026-03-10"))
+    snap = snapshot(tally(works))
+    pk, us = _row(snap, "PK"), _row(snap, "US")
+    assert (pk["share_pct"], pk["share_prev_pct"], pk["share_change_pp"]) == (30.0, 20.0, 10.0)
+    assert pk["share_reason"] is None and us["share_change_pp"] == -10.0
+    few = snapshot(tally(_works("IS", 29, "2025-01-05") + _works("IS", 40, "2026-01-05")))
+    assert _row(few, "IS")["share_reason"] == "too_few_papers" and _row(few, "IS")["share_pct"] is None
+    old = snapshot(tally(_works("CN", 100, "2024-11-01") + _works("CN", 100, "2025-06-01")))
+    assert _row(old, "CN")["share_reason"] == "partial_year"
+
+
+def test_share_fractional_shares_sum_to_100():
+    works = []
+    for d in ("2025-03-01", "2026-03-01"):
+        works += _works("PK", 80, d, "US") + _works("US", 40, d) + _works("DE", 60, d)
+    rows = [r for r in snapshot(tally(works))["countries"] if r["share_pct"] is not None]
+    assert abs(sum(r["share_pct"] for r in rows) - 100) < 0.05

@@ -21,12 +21,15 @@ from ml.paths import resolve, topic_country_year_db  # noqa: E402
 
 KEYS = ("by_year", "frac", "topics", "topic_years", "topic_countries",
         "pairs_frac", "pairs_1n", "topic_names", "tcy_papers", "tcy_frac",
-        "by_date", "frac_date")
+        "by_date", "frac_date", "papers_date")
+# papers_date: {"all": {"YYYY-MM-DD": n}} papers with at least one country, the
+# denominator for share of corpus.
 # by_date / frac_date: {country: {"YYYY-MM-DD": count}} (whole / fractional), used for
 # the equal-period growth metric. Papers without a publication date are skipped there.
 
 MIN_PAPERS = 30            # both periods need at least this many (active counting mode)
 PARTIAL_YEARS = {2024}     # corpus starts mid-Oct 2024: any window touching it is hidden
+SHARE_FIELDS = ("share_pct", "share_prev_pct", "share_change_pp", "share_reason")
 GROWTH_FIELDS = ("growth_pct", "growth_reason", "growth_cur_count", "growth_prev_count",
                  "growth_window_start", "growth_window_end")
 
@@ -124,6 +127,8 @@ def tally(works) -> dict:
                 t["pairs_frac"]["all"][f"{a}-{b}"] += 2 / (n * (n - 1))
                 t["pairs_1n"]["all"][f"{a}-{b}"] += 1 / n
         date = _iso_date(w.get("date") or w.get("publication_date"))
+        if date and cs:
+            t["papers_date"]["all"][date] += 1
         if date:
             for c in cs:
                 t["by_date"][c][date] += 1
@@ -198,15 +203,48 @@ def growth_for(dates: dict | None, win: dict | None) -> dict:
     return out
 
 
+def _window_sum(dates: dict | None, start: str, end: str) -> float:
+    return sum(v for d, v in (dates or {}).items() if start <= d <= end)
+
+
+def share_for(dates: dict | None, totals: dict | None, win: dict | None) -> dict:
+    """Share of corpus: this country's papers / all papers in the same window.
+
+    Same window and rules as growth_for. The country count (active counting mode)
+    must be >= 30 in both periods, and windows touching 2024 are hidden.
+    Denominator: papers with at least one country. In fractional mode the shares
+    of all countries add up to 100%; in full mode they can add up to more.
+    """
+    out = dict.fromkeys(SHARE_FIELDS)
+    if not win:
+        out["share_reason"] = "too_few_papers"
+        return out
+    cur = _window_sum(dates, win["cur_start"], win["cur_end"])
+    prev = _window_sum(dates, win["prev_start"], win["prev_end"])
+    tot_cur = _window_sum(totals, win["cur_start"], win["cur_end"])
+    tot_prev = _window_sum(totals, win["prev_start"], win["prev_end"])
+    if PARTIAL_YEARS & set(win["years"]):
+        out["share_reason"] = "partial_year"
+    elif cur < MIN_PAPERS or prev < MIN_PAPERS or not tot_cur or not tot_prev:
+        out["share_reason"] = "too_few_papers"
+    else:
+        sc, sp = cur / tot_cur, prev / tot_prev
+        out.update(share_pct=round(sc * 100, 2), share_prev_pct=round(sp * 100, 2),
+                   share_change_pp=round((sc - sp) * 100, 2))
+    return out
+
+
 def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict]:
     src = t["frac"] if counting == "fractional" else t["by_year"]
     dsrc = (t.get("frac_date") if counting == "fractional" else t.get("by_date")) or {}
     win = growth_window(t)
+    totals = (t.get("papers_date") or {}).get("all") or {}
     rows = []
     for code, years in src.items():
         rows.append({"code": code, "name": COUNTRIES.get(code, (code,))[0],
                      "papers": round(sum(years.values()), 2),
                      **growth_for(dsrc.get(code), win),
+                     **share_for(dsrc.get(code), totals, win),
                      "top_topics": [n for n, _ in t["topics"][code].most_common(top_n)],
                      "counting": counting})
     return sorted(rows, key=lambda r: -r["papers"])
@@ -354,12 +392,12 @@ def main(argv=None):
     if dates_path and dates_path.is_file():
         with open(dates_path, encoding="utf-8") as fh:
             seeded = tally(json.loads(l) for l in fh if l.strip())
-        for key in ("by_date", "frac_date"):
+        for key in ("by_date", "frac_date", "papers_date"):
             combined[key] = seeded[key]
-    elif prev is not None and "by_date" not in prev and corpus_path and corpus_path.is_file():
+    elif prev is not None and "papers_date" not in prev and corpus_path and corpus_path.is_file():
         with open(corpus_path, encoding="utf-8") as fh:
             seeded = tally(json.loads(l) for l in fh if l.strip())
-        for key in ("by_date", "frac_date"):
+        for key in ("by_date", "frac_date", "papers_date"):
             combined[key] = seeded[key]
     snap = snapshot(combined)
     out, table = output_paths(a.out, a.table)
