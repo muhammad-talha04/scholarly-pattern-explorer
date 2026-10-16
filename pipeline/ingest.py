@@ -5,9 +5,16 @@ needs (abstract, DOI, open-access link, countries), and merges them into the
 existing JSONL without duplicates. Free: uses the public OpenAlex API.
 
     python -m pipeline.ingest --out data/works_v2.jsonl --state data/ingest_state.json
+
+Sample mode (even coverage): one seeded OpenAlex `sample` per month, sized by a
+quota CSV (month,from,to,openalex_count,quota) so every month is drawn at the
+same rate. Reruns with the same seed and CSV give the same corpus.
+
+    python -m pipeline.ingest --quota-csv deploy/sampling/monthly_quota.csv \
+        --out data/works_sample.jsonl --manifest data/sample_manifest.json
 """
 from __future__ import annotations
-import argparse, json, os, re, time
+import argparse, csv, json, os, re, time
 from datetime import date, timedelta
 from pathlib import Path
 import requests
@@ -92,28 +99,101 @@ def merge(out: Path, new: list[dict]) -> int:
 
 def fetch(since: str, filters: list[str], max_records: int, session=requests):
     cursor, got = "*", 0
-    params = {"filter": ",".join([f"from_publication_date:{since}", "type:article", *filters]),
-              "per-page": "200", "select": SELECT}
-    if os.environ.get("OPENALEX_MAILTO"):
-        params["mailto"] = os.environ["OPENALEX_MAILTO"]
-    if os.environ.get("OPENALEX_API_KEY"):
-        params["api_key"] = os.environ["OPENALEX_API_KEY"]
+    params = _auth({"filter": ",".join([f"from_publication_date:{since}", "type:article", *filters]),
+                    "per-page": "200", "select": SELECT})
     while cursor and got < max_records:
-        for attempt in range(6):
-            r = session.get(API, params={**params, "cursor": cursor}, timeout=60)
-            if r.status_code == 200:
-                break
-            if r.status_code in (401, 403):
-                raise SystemExit(f"OpenAlex HTTP {r.status_code}: set OPENALEX_API_KEY")
-            time.sleep(2 ** attempt)
-        else:
-            raise SystemExit(f"OpenAlex kept failing: HTTP {r.status_code}")
-        data = r.json()
+        data = _get(session, {**params, "cursor": cursor})
         for w in data.get("results", []):
             got += 1
             yield normalize(w)
         cursor = (data.get("meta") or {}).get("next_cursor")
         time.sleep(0.15)
+
+
+SAMPLE_SEED = 20261016  # fixed: changing it changes the whole corpus
+SAMPLE_MAX = 10000      # OpenAlex caps one sample at 10k; page paging tops out there too
+
+
+def _auth(params: dict) -> dict:
+    if os.environ.get("OPENALEX_MAILTO"):
+        params["mailto"] = os.environ["OPENALEX_MAILTO"]
+    if os.environ.get("OPENALEX_API_KEY"):
+        params["api_key"] = os.environ["OPENALEX_API_KEY"]
+    return params
+
+
+def _get(session, params: dict) -> dict:
+    for attempt in range(6):
+        r = session.get(API, params=params, timeout=60)
+        if r.status_code == 200:
+            return r.json()
+        if r.status_code in (401, 403):
+            raise SystemExit(f"OpenAlex HTTP {r.status_code}: set OPENALEX_API_KEY")
+        time.sleep(2 ** attempt)
+    raise SystemExit(f"OpenAlex kept failing: HTTP {r.status_code}")
+
+
+def read_quotas(path: Path) -> list[dict]:
+    rows = []
+    with path.open(newline="", encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            q = int(r["quota"])
+            if q > SAMPLE_MAX:
+                raise SystemExit(f"{r['month']}: quota {q} exceeds the OpenAlex sample cap {SAMPLE_MAX}")
+            rows.append({"month": r["month"], "from": r["from"], "to": r["to"],
+                         "openalex_count": int(r["openalex_count"]), "quota": q})
+    return rows
+
+
+def fetch_sample(frm: str, to: str, n: int, seed: int, filters: list[str], session=requests):
+    """Seeded random sample of n works published in [frm, to]. Sample results
+    can't be cursor-paged, so this pages by number (200 per page)."""
+    params = _auth({"filter": ",".join([f"from_publication_date:{frm}", f"to_publication_date:{to}",
+                                         "type:article", *filters]),
+                    "sample": str(n), "seed": str(seed), "per-page": "200", "select": SELECT})
+    seen, page = set(), 1
+    while len(seen) < n and (page - 1) * 200 < n:
+        data = _get(session, {**params, "page": str(page)})
+        results = data.get("results", [])
+        if not results:
+            break
+        for w in results:
+            r = normalize(w)
+            if r["id"] not in seen:  # pages of one seeded sample shouldn't overlap; guard anyway
+                seen.add(r["id"])
+                yield r
+        page += 1
+        time.sleep(0.15)
+
+
+def run_sample(a) -> int:
+    out, manifest = Path(a.out), Path(a.manifest)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    done = json.loads(manifest.read_text()) if manifest.exists() else {}
+    if done and (done.get("seed") != a.seed or done.get("filters") != a.filter):
+        raise SystemExit("manifest was built with a different seed or filter; use a fresh --out/--manifest")
+    done.update({"seed": a.seed, "filters": a.filter, "quota_csv": str(a.quota_csv)})
+    months = done.setdefault("months", {})
+    status = 0
+    for q in read_quotas(Path(a.quota_csv)):
+        if months.get(q["month"], {}).get("complete"):
+            continue  # resumable: finished months are skipped
+        batch, got = [], 0
+        try:
+            for r in fetch_sample(q["from"], q["to"], q["quota"], a.seed, a.filter):
+                batch.append(r); got += 1
+        except SystemExit as e:
+            print(f"{q['month']}: stopped ({e}); will retry on next run")
+            status = 1
+            break
+        added = merge(out, batch)
+        months[q["month"]] = {**q, "fetched": got, "added": added, "complete": got >= q["quota"]}
+        manifest.write_text(json.dumps(done, indent=1))
+        print(f"{q['month']}: {got}/{q['quota']} fetched, {added} new")
+        if got < q["quota"]:
+            status = 1
+    manifest.write_text(json.dumps(done, indent=1))
+    return status
 
 
 def main(argv=None):
@@ -124,7 +204,12 @@ def main(argv=None):
     ap.add_argument("--first-lookback-days", type=int, default=365)
     ap.add_argument("--overlap-days", type=int, default=7, help="re-check recent days; duplicates are skipped")
     ap.add_argument("--max-records", type=int, default=50000)
+    ap.add_argument("--quota-csv", help="sample mode: per-month quotas (see module docstring)")
+    ap.add_argument("--seed", type=int, default=SAMPLE_SEED)
+    ap.add_argument("--manifest", default="data/sample_manifest.json")
     a = ap.parse_args(argv)
+    if a.quota_csv:
+        return run_sample(a)
     out, state = Path(a.out), Path(a.state)
     out.parent.mkdir(parents=True, exist_ok=True)
     last = json.loads(state.read_text())["last_run"] if state.exists() else None
