@@ -1,7 +1,7 @@
 """Single source of truth for API types. The web client is generated from these."""
 from datetime import date, datetime
 from typing import Literal
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 CountingMethod = Literal["fractional", "per_country", "full"]
 
@@ -39,7 +39,7 @@ class CorpusStats(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=500)
 
 
 class AskResponse(BaseModel):
