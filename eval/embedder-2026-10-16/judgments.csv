@@ -1,0 +1,601 @@
+embedder,qid,kind,in_corpus,rank,work_id,score,relevant,title
+hash,E01,exact,yes,1,W4405524801,0.6667,1,Securing decentralized federated learning: cryptographic mechanisms for privacy and trust
+hash,E01,exact,yes,2,W4404739159,0.6547,1,"Trustworthy federated learning: privacy, security, and beyond"
+hash,E01,exact,yes,3,W4415220620,0.6405,1,Dynamic privacy budget allocation for enhanced differential privacy in federated learning
+hash,E01,exact,yes,4,W4403456912,0.6124,1,FLAV: Federated Learning for Autonomous Vehicle privacy protection
+hash,E01,exact,yes,5,W4410852248,0.5774,1,Robust and Secure Federated Learning With Verifiable Differential Privacy
+hash,E01,exact,yes,6,W4408167363,0.553,1,Differential Privacy in Federated Learning: An Evolutionary Game Analysis
+hash,E01,exact,yes,7,W4411779221,0.5477,1,BlockFed: Blockchain-based privacy preserving federated learning for 5G-assisted healthcare ecosystems
+hash,E01,exact,yes,8,W4407120730,0.5477,1,Privacy preserving federated learning for proton exchange membrane fuel cell
+hash,E01,exact,yes,9,W4405199688,0.5477,0,PHiFL-TL: Personalized hierarchical federated learning using transfer learning
+hash,E01,exact,yes,10,W4405707066,0.5298,1,Privacy protection in federated learning: a study on the combined strategy of local and global differential privacy
+hash,E02,exact,yes,1,W4406414166,0.6682,1,Exploring deep learning methods for solar photovoltaic power output forecasting: A review
+hash,E02,exact,yes,2,W4406311237,0.5547,1,Deep probabilistic solar power forecasting with Transformer and Gaussian process approximation
+hash,E02,exact,yes,3,W4413167871,0.5303,1,RTI-Net: Physics-informed deep learning for photovoltaic power forecasting
+hash,E02,exact,yes,4,W4405851672,0.4886,1,Short time solar power forecasting using P-ELM approach
+hash,E02,exact,yes,5,W4403973756,0.4743,1,Advancing global solar photovoltaic power forecasting with sub-seasonal climate outlooks
+hash,E02,exact,yes,6,W4415503027,0.4725,0,Physics-constrained deep learning bias correction of CMIP6 solar radiation over Africa and its implications for solar power planning in a changing climate
+hash,E02,exact,yes,7,W4407367946,0.4714,1,Advanced artificial intelligence model for solar irradiance forecasting for solar electric vehicles
+hash,E02,exact,yes,8,W4405859546,0.4523,1,Machine learning insights into forecasting solar power generation with explainable AI
+hash,E02,exact,yes,9,W4408737756,0.4377,1,Forecasting rooftop photovoltaic solar power using machine learning techniques
+hash,E02,exact,yes,10,W4403545034,0.4364,1,A review of the state of the art in solar photovoltaic output power forecasting using data-driven models
+hash,E03,exact,yes,1,W4415198140,0.6547,1,Demonstration of low-overhead quantum error correction codes
+hash,E03,exact,yes,2,W4406678143,0.6405,1,Quantum Error Correction with Surface Code Analysis on Quantum Computing platform
+hash,E03,exact,yes,3,W4410362117,0.4965,1,Quantum error correction of qudits beyond break-even
+hash,E03,exact,yes,4,W4408343564,0.4774,1,Beyond NISQ: The Megaquop Machine
+hash,E03,exact,yes,5,W4403553444,0.4714,1,Error correction using squeezed Fock states
+hash,E03,exact,yes,6,W4404090535,0.4619,1,Comparing Shor and Steane error correction using the Bacon-Shor code
+hash,E03,exact,yes,7,W4408574507,0.4601,1,"Quantum Software Engineering: Algorithm Design, Error Mitigation, and Compiler Optimization for Fault-Tolerant Quantum Computing"
+hash,E03,exact,yes,8,W4404612429,0.4364,1,Machine learning for practical quantum error mitigation
+hash,E03,exact,yes,9,W4406901697,0.4214,1,Adaptive neural network for quantum error mitigation
+hash,E03,exact,yes,10,W4405278229,0.4162,1,Extracting error thresholds through the framework of approximate quantum error correction condition
+hash,E04,exact,no,1,W4407246486,0.4472,0,Cross-modal alignment and contrastive learning for enhanced cancer survival prediction
+hash,E04,exact,no,2,W4410221805,0.4472,0,Self-supervised representation learning for geospatial objects: A survey
+hash,E04,exact,no,3,W4405963778,0.3922,0,Explainable screening of oral cancer via deep learning and case-based reasoning
+hash,E04,exact,no,4,W4405030701,0.378,0,"Joint sparse subspace clustering via fast ℓ 2 , 0 -norm constrained optimization"
+hash,E04,exact,no,5,W4415370831,0.3594,0,Spectral properties versus magic generation in T -doped random Clifford circuits
+hash,E04,exact,no,6,W7135022001,0.3455,0,Non-Convex Transfer Subspace Learning via Embedded Distribution Alignment
+hash,E04,exact,no,7,W4408237663,0.343,0,Integrating local and global attention mechanisms for enhanced oral cancer detection and explainability
+hash,E04,exact,no,8,W4408612646,0.3162,0,Microsatellite-based real-time quantum key distribution
+hash,E04,exact,no,9,W4412079544,0.2887,0,Low-rank kernel consistent multi-view subspace clustering
+hash,E04,exact,no,10,W4407269518,0.2887,0,Scalable tri-factorization guided multi-view subspace clustering
+hash,E05,exact,yes,1,W4406272066,0.7071,1,Large Language Models in Finance (FinLLMs)
+hash,E05,exact,yes,2,W4411108312,0.6667,1,A review on synergizing knowledge graphs and large language models
+hash,E05,exact,yes,3,W7148355944,0.6547,1,Large language models hallucination: A comprehensive survey
+hash,E05,exact,yes,4,W4407661798,0.6547,1,Rethinking machine unlearning for large language models
+hash,E05,exact,yes,5,W4411405893,0.6405,1,Red teaming large language models: A comprehensive review and critical analysis
+hash,E05,exact,yes,6,W4409649497,0.6405,1,Leveraging encoder-only large language models for mobile app review feature extraction
+hash,E05,exact,yes,7,W4417122875,0.6172,1,How is language intelligence evolving? A multi-dimensional survey of large language models
+hash,E05,exact,yes,8,W4409902375,0.6172,1,Enhancing food safety review classification with large language models and label embedding
+hash,E05,exact,yes,9,W4415455764,0.6124,1,Graph neural architecture search with large language models
+hash,E05,exact,yes,10,W4415478691,0.6124,1,Security concerns for Large Language Models: A survey
+hash,E06,exact,yes,1,W4406940051,0.639,1,Improved early detection accuracy for breast cancer using a deep learning framework in medical imaging
+hash,E06,exact,yes,2,W4414114177,0.6124,1,Adaptive deep Q-GAN framework for enhanced breast cancer detection in medical imaging
+hash,E06,exact,yes,3,W4415907121,0.5893,1,FusionNet-ViT: Hybrid Deep Learning Model for Lung Cancer Classification
+hash,E06,exact,yes,4,W4406025165,0.5893,1,Attention-guided CenterNet deep learning approach for lung cancer detection
+hash,E06,exact,yes,5,W4407369112,0.5883,1,Deep transfer learning hybrid techniques for precision in breast cancer tumor histopathology classification
+hash,E06,exact,yes,6,W4408892678,0.5678,1,Automatic colorectal cancer detection using machine learning and deep learning based on feature selection in histopathological images
+hash,E06,exact,yes,7,W4408332488,0.5533,1,MRI-based Deep Learning Algorithm for Assisting Clinically Significant Prostate Cancer Detection: A Bicenter Prospective Study
+hash,E06,exact,yes,8,W4405880220,0.5477,1,GSC-DVIT: A vision transformer based deep learning model for lung cancer classification in CT images
+hash,E06,exact,yes,9,W4409839145,0.5477,1,Hybrid deep learning model for automated colorectal cancer detection using local and global feature extraction
+hash,E06,exact,yes,10,W4416410723,0.5303,1,MammXAI: An XAI integrated adaptive multi-model deep learning approach for breast cancer detection using multi-modality images
+hash,E07,exact,yes,1,W4411866407,0.7071,1,LLM-augmented hierarchical reinforcement learning for human-like decision-making of autonomous driving
+hash,E07,exact,yes,2,W4413916436,0.5976,1,An uncertainty-aware safe-evolving reinforcement learning algorithm for decision-making and control in highway autonomous driving
+hash,E07,exact,yes,3,W4415544664,0.5976,1,From black-box to white-box: Interpretable deep reinforcement learning with Kolmogorov-Arnold networks for autonomous driving
+hash,E07,exact,yes,4,W4413858428,0.5976,1,VLM-RL: A unified vision language models and reinforcement learning framework for safe autonomous driving
+hash,E07,exact,yes,5,W4407772786,0.5423,1,Knowledge transfer from simple to complex: A safe and efficient reinforcement learning framework for autonomous driving decision-making
+hash,E07,exact,yes,6,W4408997755,0.5071,0,LLM-guided decision-making toolkit for multi-agent reinforcement learning
+hash,E07,exact,yes,7,W7123362562,0.4961,1,Large language model guided deep reinforcement learning for safe autonomous vehicle decision making
+hash,E07,exact,yes,8,W4405800136,0.4961,0,Adaptive reward shaping based reinforcement learning for docking control of autonomous underwater vehicles
+hash,E07,exact,yes,9,W4416104292,0.4961,0,Digital twin-enabled real-time control for robot arm-based manufacturing via reinforcement learning
+hash,E07,exact,yes,10,W4407548391,0.4781,0,Autonomous unmanned surface vehicle docking using large language model guide reinforcement learning
+hash,E08,exact,yes,1,W4411383644,0.4804,1,GRAF-IDS: graph-based clustering as aggregation for federated intrusion detection system in IoT network
+hash,E08,exact,yes,2,W4406518089,0.4629,1,NIDS-DA: Detecting functionally preserved adversarial examples for network intrusion detection system using deep autoencoders
+hash,E08,exact,yes,3,W4404851584,0.4364,0,Orthogonal Progressive Network for Few-shot Object Detection
+hash,E08,exact,yes,4,W4406978349,0.4082,1,Explainable artificial intelligence models in intrusion detection systems
+hash,E08,exact,yes,5,W4409601987,0.4082,0,ArmanEmo: a Persian dataset for text-based emotion detection
+hash,E08,exact,yes,6,W7136576230,0.4082,0,A multiscale Transformer-graph attention network for geochemical prospecting
+hash,E08,exact,yes,7,W4406140542,0.4082,0,Decoupled cross-attribute correlation network for multimodal sentiment analysis
+hash,E08,exact,yes,8,W4409412257,0.4082,0,Multi-level feature fusion network for kidney disease detection
+hash,E08,exact,yes,9,W7125496644,0.3849,0,Guardnet: an imbalance-aware graph neural network for fraud detection
+hash,E08,exact,yes,10,W4406408796,0.3849,1,Federated learning-based misbehavior classification system for VANET intrusion detection
+hash,E09,exact,yes,1,W4412022267,0.5605,1,A Study On The Application Of Machine Learning In Adaptive Intelligent Tutoring Systems
+hash,E09,exact,yes,2,W7106123267,0.5388,1,Adaptive learning with human factors and Artificial Intelligence: associations with training effectiveness in programming education
+hash,E09,exact,yes,3,W4413344534,0.5136,1,Adaptive deep reinforcement learning for personalized learning pathways: A multimodal data-driven approach with real-time feedback optimization
+hash,E09,exact,yes,4,W4412190298,0.506,1,Adaptive AI Systems in Education: Real-Time Personalised Learning Pathways for Skill Development
+hash,E09,exact,yes,5,W4416935001,0.5045,1,A Meta‐Analysis of Moderators of the Effects of Technology‐Enhanced Adaptive Learning on Primary and Secondary Students' Learning Outcomes
+hash,E09,exact,yes,6,W4413237657,0.4989,1,AI IN THE CLASSROOM: EVALUATING THE EFFECTIVENESS OF INTELLIGENT TUTORING SYSTEMS FOR MULTILINGUAL LEARNERS IN SECONDARY EDUCATION
+hash,E09,exact,yes,7,W4414498135,0.4951,0,"Knowledge distillation and teacher–student learning in medical imaging: Comprehensive overview, pivotal role, and future directions"
+hash,E09,exact,yes,8,W4409737900,0.4747,0,AI Agents and Agentic Systems: A Multi-Expert Analysis
+hash,E09,exact,yes,9,W4409282333,0.4564,0,Continual and wisdom learning for federated learning: A comprehensive framework for robustness and debiasing
+hash,E09,exact,yes,10,W7125981967,0.4564,1,An Adaptive Multi-Agent Architecture with Reinforcement Learning and Generative AI for Intelligent Tutoring Systems: A Moodle-Based Case Study
+hash,E10,exact,yes,1,W4404907742,0.6155,1,Optimization of machine learning models for sentiment analysis in social media
+hash,E10,exact,yes,2,W4403813955,0.5455,1,From Posts to Perceptions: Sentiment and Psychological Analysis of Aesthetic Enhancements on Social Media
+hash,E10,exact,yes,3,W4403588569,0.5443,0,Multi-granularity visual-textual jointly modeling for aspect-level multimodal sentiment analysis
+hash,E10,exact,yes,4,W4407894278,0.5164,0,Zero-shot detection of LLM-generated text via text reorder
+hash,E10,exact,yes,5,W4409816344,0.4998,1,Improved graph convolutional network for emotion analysis in social media text
+hash,E10,exact,yes,6,W7117118290,0.4951,1,"Traversing the landscape of aspect-based sentiment analysis: Delving deeper into techniques, trends, and future directions"
+hash,E10,exact,yes,7,W4408221477,0.4924,1,Sentiment analysis and emotion recognition in social media: A comprehensive survey
+hash,E10,exact,yes,8,W4404412858,0.4924,0,Modeling inter-modal incongruous sentiment expressions for multi-modal sarcasm detection
+hash,E10,exact,yes,9,W4409854992,0.4811,1,Public sentiment analysis of data center energy consumption using social media data and large language models
+hash,E10,exact,yes,10,W4406113679,0.4747,1,"A review of Chinese sentiment analysis: subjects, methods, and trends"
+hash,P01,paraphrase,yes,1,W4411572534,0.402,0,Gen Z and AI-Generated Fashion Ads: A Qualitative Study to Understanding Female Consumer Perceptions and Reactions
+hash,P01,paraphrase,yes,2,W4406845265,0.3876,0,Short-Medium-Term Solar Irradiance Forecasting with a CEEMDAN-CNN-ATT-LSTM Hybrid Model Using Meteorological Data
+hash,P01,paraphrase,yes,3,W4414984227,0.3708,0,Adversarial prompt and fine-tuning attacks threaten medical large language models
+hash,P01,paraphrase,yes,4,W4407780143,0.3671,0,Analyzing patient perspectives with large language models: a cross-sectional study of sentiment and thematic classification on exception from informed consent
+hash,P01,paraphrase,yes,5,W4412569798,0.3656,0,Algorithm Delegation: How Embedded AI Facilitates Agency Transference in Medical Services
+hash,P01,paraphrase,yes,6,W4411216252,0.3553,0,Leadership in digital transformation: Enhancing customer value through AI-driven innovation in financial services marketing
+hash,P01,paraphrase,yes,7,W4410854136,0.3546,0,Anonymity-Enhanced Sequential Multi-Signer Ring Signature for Secure Medical Data Sharing in IoMT
+hash,P01,paraphrase,yes,8,W4408383817,0.3528,0,Rethinking Hospitality Leadership: Cultivating Human–Robot Co-Working Harmony Through Rapport Leadership
+hash,P01,paraphrase,yes,9,W4405023020,0.3497,0,RTGN: Robust Traditional Chinese Medicine Graph Networks for Patient Similarity Learning
+hash,P01,paraphrase,yes,10,W4417290316,0.3475,0,"Benchmarking real-world medical image classification with noisy labels: Challenges, practice, and outlook"
+hash,P02,paraphrase,yes,1,W4416701904,0.3371,0,One model connects all graphs: Towards training one unified model for multi-domain graph pre-training using adaptive vector quantization
+hash,P02,paraphrase,yes,2,W4410538769,0.3168,0,Graph Neural Network Training Systems: A Performance Comparison of Full-Graph and Mini-Batch
+hash,P02,paraphrase,yes,3,W4409481859,0.3025,1,Federated learning with differential privacy for breast cancer diagnosis enabling secure data sharing and model integrity
+hash,P02,paraphrase,yes,4,W4408760427,0.2884,1,Blockchain-based federated learning with homomorphic encryption for privacy-preserving healthcare data sharing
+hash,P02,paraphrase,yes,5,W7128297869,0.2883,0,Incomplete Data Classification via Distribution Alignment With Evidence Combination
+hash,P02,paraphrase,yes,6,W4403842630,0.286,0,Transformer-enabled weakly supervised abnormal event detection in intelligent video surveillance systems
+hash,P02,paraphrase,yes,7,W4405458587,0.2835,1,Cloud–Edge–End Collaborative Federated Learning: Enhancing Model Accuracy and Privacy in Non-IID Environments
+hash,P02,paraphrase,yes,8,W4409483433,0.2831,1,Federated transfer learning with differential privacy for multi-omics survival analysis
+hash,P02,paraphrase,yes,9,W4404102213,0.283,1,Enhancing Semi-Supervised Federated Learning With Progressive Training in Heterogeneous Edge Computing
+hash,P02,paraphrase,yes,10,W4410491430,0.2827,0,Generative AI mitigates representation bias and improves model fairness through synthetic health data
+hash,P03,paraphrase,yes,1,W4406609218,0.3858,0,An eye for an eye: Exploring how human-robot service attributes affect customers’ negative electronic word-of-mouth
+hash,P03,paraphrase,yes,2,W4405854390,0.356,1,A Second Tutorial Review of the Solar Power Curve: Applications in Energy Meteorology
+hash,P03,paraphrase,yes,3,W4408237741,0.3489,0,Machine Learning-Based Evaluation of Solar Photovoltaic Panel Exergy and Efficiency Under Real Climate Conditions
+hash,P03,paraphrase,yes,4,W7125411668,0.3446,0,Multiparameter estimation with an array of entangled atomic sensors
+hash,P03,paraphrase,yes,5,W4406886067,0.343,0,An amalgamation of deep neural networks optimized with Salp swarm algorithm for cervical cancer detection
+hash,P03,paraphrase,yes,6,W4412489759,0.3402,0,Dynamic geospatial modeling of solar energy expansion potential in China: Implications for national-level optimization of solar photovoltaic plant layouts
+hash,P03,paraphrase,yes,7,W4406015217,0.3351,1,Solar energy prediction through machine learning models: A comparative analysis of regressor algorithms
+hash,P03,paraphrase,yes,8,W4403777967,0.3333,0,"How loneliness leads to the conversational AI usage intention: the roles of anthropomorphic interface, para-social interaction"
+hash,P03,paraphrase,yes,9,W4404694282,0.3255,0,Composite Bayesian Optimization in function spaces using NEON—Neural Epistemic Operator Networks
+hash,P03,paraphrase,yes,10,W4412420231,0.3206,1,"Solar Irradiance Forecasting With Deep Learning and Ensemble Models: LSTM, Random Forest and Extra Trees With Multivariate Meteorological Data"
+hash,P04,paraphrase,yes,1,W4416033259,0.3698,0,A quantum computer controlled by superconducting digital electronics at millikelvin temperature
+hash,P04,paraphrase,yes,2,W4409482194,0.3584,0,Large-scale cluster quantum microcombs
+hash,P04,paraphrase,yes,3,W4405715275,0.3411,0,Combinatorial optimization with quantum computers
+hash,P04,paraphrase,yes,4,W4412883246,0.3293,0,Crosstalk Attacks and Defence in a Shared Quantum Computing Environment
+hash,P04,paraphrase,yes,5,W4409506875,0.3162,1,Diffusion-inspired quantum noise mitigation in parameterized quantum circuits
+hash,P04,paraphrase,yes,6,W4414606656,0.3159,1,A comparative analysis and noise robustness evaluation in quantum neural networks
+hash,P04,paraphrase,yes,7,W4413786089,0.3103,0,Classical-Decisive Quantum Internet by Integrated Photonics
+hash,P04,paraphrase,yes,8,W4414461767,0.3,0,Optimizing resource allocation in precision farming using quantum enhanced algorithms and quantum sensor networks
+hash,P04,paraphrase,yes,9,W4410077466,0.2981,0,Scaling up superconducting quantum computers
+hash,P04,paraphrase,yes,10,W4405357078,0.2942,0,Solving an industrially relevant quantum chemistry problem on quantum hardware
+hash,P05,paraphrase,yes,1,W4407976765,0.3788,0,Joint event extraction model based on dynamic attention matching and graph attention networks
+hash,P05,paraphrase,yes,2,W4404764563,0.3749,1,Large language models surpass human experts in predicting neuroscience results
+hash,P05,paraphrase,yes,3,W4413003510,0.3651,1,"Communication modality, authenticity, and continuance usage intention of GenAI chatbots: A media richness theory perspective"
+hash,P05,paraphrase,yes,4,W7161064197,0.3514,0,"Toward autonomous artificial intelligence agents in sports science: a modular framework for development, validation, and implementation"
+hash,P05,paraphrase,yes,5,W7160773920,0.3405,0,Replication package for: Response Conductance and Decision Distance — A Cross-Domain Theory of Endpoint Loss
+hash,P05,paraphrase,yes,6,W4417358068,0.3386,1,LLM-Assisted Financial Fraud Detection with Reinforcement Learning
+hash,P05,paraphrase,yes,7,W4408687188,0.3354,1,Can attention detect AI-generated text? A novel Benford's law-based approach
+hash,P05,paraphrase,yes,8,W4411504061,0.3354,0,PQBFL: A Post-Quantum Blockchain-based protocol for Federated Learning
+hash,P05,paraphrase,yes,9,W4409445909,0.3348,0,Deep Learning-Based Short Text Summarization: An Integrated BERT and Transformer Encoder–Decoder Approach
+hash,P05,paraphrase,yes,10,W4415482248,0.3342,0,Toward Seamless Hierarchical Federated Learning Under Intermittent Client Participation: A Stagewise Decision-Making Methodology
+hash,P06,paraphrase,yes,1,W4417113689,0.4071,0,Explainable AI-driven precision clinical trial enrichment: demonstration of the NetraAI platform with a phase II depression trial
+hash,P06,paraphrase,yes,2,W7118945547,0.3994,0,The Role of Artificial Intelligence in Achieving the UN Sustainable Development Goals (SDGs) in Low Income Nations
+hash,P06,paraphrase,yes,3,W4412438081,0.3972,0,RAFT: Robust Adversarial Fusion Transformer for multimodal sentiment analysis
+hash,P06,paraphrase,yes,4,W4416540953,0.3956,0,Real-world validation of a multimodal LLM-powered pipeline for high-accuracy clinical trial patient matching
+hash,P06,paraphrase,yes,5,W4407565793,0.3951,0,Improving medical machine learning models with generative balancing for equity and excellence
+hash,P06,paraphrase,yes,6,W4410429670,0.3903,0,Integrating Multimodal EHR Data for Mortality Prediction in ICU Sepsis Patients
+hash,P06,paraphrase,yes,7,W7116846202,0.3849,0,A Unified Fuzzy–Explainable AI Framework (FAS-XAI) for Customer Service Value Prediction and Strategic Decision-Making
+hash,P06,paraphrase,yes,8,W4405710342,0.383,0,Learning to Model and Plan for Wheeled Mobility on Vertically Challenging Terrain
+hash,P06,paraphrase,yes,9,W4408203052,0.3822,0,Enhancing intellectual experiences for users: a multidimensional model of humanoid service robots in hospitality and tourism
+hash,P06,paraphrase,yes,10,W4415822491,0.3818,0,"Time-Frequency-Based Separation of Earthquake and Noise Signals on Real Seismic Data: EMD, DWT and Ensemble Classifier Approaches"
+hash,P07,paraphrase,yes,1,W4411227701,0.4193,0,A stochastic configuration network based on an improved sampling strategy and Bayesian optimization
+hash,P07,paraphrase,yes,2,W4404644841,0.4009,0,A Survey of Artificial Neural Network Computing Systems
+hash,P07,paraphrase,yes,3,W4410050916,0.3586,0,Universal distributed blind quantum computing with solid-state qubits
+hash,P07,paraphrase,yes,4,W4410735971,0.3381,0,Deep learning model for malignancy prediction of TI-RADS 4 thyroid nodules with high-risk characteristics using multimodal ultrasound: A multicentre study
+hash,P07,paraphrase,yes,5,W4404507082,0.3273,0,Distributed computing in multi-agent systems: a survey of decentralized machine learning approaches
+hash,P07,paraphrase,yes,6,W7166368462,0.3251,0,"The Verification Benchmarking Standard (Verification Intelligence series, Paper 11 of 12)"
+hash,P07,paraphrase,yes,7,W4410718704,0.3169,0,The perceived reliability and adoption intention towards human-generated content vs. AI-generated content for travel planning: a moderating role of travel persona
+hash,P07,paraphrase,yes,8,W4407736618,0.3147,0,Quantum Communication Network Routing With Circuit and Packet Switching Strategies
+hash,P07,paraphrase,yes,9,W4403922368,0.3145,0,A synthetic magnetic vector potential in a 2D superconducting qubit array
+hash,P07,paraphrase,yes,10,W4403457986,0.3145,0,Photonic reservoir computing for parallel task processing based on a feedback-free spin-polarized VCSEL
+hash,P08,paraphrase,yes,1,W4413331071,0.4094,0,CurriculumPT: LLM-Based Multi-Agent Autonomous Penetration Testing with Curriculum-Guided Task Scheduling
+hash,P08,paraphrase,yes,2,W4408145475,0.4071,0,Measuring the Validity of Clustering Validation Datasets
+hash,P08,paraphrase,yes,3,W4409581441,0.4026,0,Neurodegenerative disorders: A Holistic study of the explainable artificial intelligence applications
+hash,P08,paraphrase,yes,4,W4408196294,0.4005,0,A multi-modal deep clustering method for day-ahead solar irradiance forecasting using ground-based cloud imagery and time series data
+hash,P08,paraphrase,yes,5,W4416713515,0.4,0,Feed-O-Meter: Investigating AI-generated mentee personas as interactive agents for scaffolding design feedback practice
+hash,P08,paraphrase,yes,6,W4407938035,0.397,0,"PDPilot: Exploring Partial Dependence Plots Through Ranking, Filtering, and Clustering"
+hash,P08,paraphrase,yes,7,W7128813993,0.3963,0,Threats and vulnerabilities in artificial intelligence and agentic AI models
+hash,P08,paraphrase,yes,8,W4406171170,0.3959,0,Bilateral Pricing for Dynamic Association in Federated Edge Learning
+hash,P08,paraphrase,yes,9,W4410291923,0.3949,0,"Foundation models and intelligent decision-making: Progress, challenges, and perspectives"
+hash,P08,paraphrase,yes,10,W7139951491,0.3927,0,Generative AI and the Foundation Model Era: A Comprehensive Review
+hash,P09,paraphrase,yes,1,W4411048637,0.3062,0,GPPT: Graph pyramid pooling transformer for visual scene
+hash,P09,paraphrase,yes,2,W4405386671,0.2969,0,A review on multi-view learning
+hash,P09,paraphrase,yes,3,W4405754868,0.2934,0,GCCNet: A Novel Network Leveraging Gated Cross-Correlation for Multi-View Classification
+hash,P09,paraphrase,yes,4,W4409696764,0.2849,0,FastFlow: Early Yet Robust Network Flow Classification using the Minimal Number of Time-Series Packets
+hash,P09,paraphrase,yes,5,W4414850269,0.2781,0,Coexistence of Continuous-Variable Quantum Key Distribution and Classical Data over 120 km Fiber
+hash,P09,paraphrase,yes,6,W4404914287,0.2751,0,Learnable Graph Guided Deep Multi-View Representation Learning via Information Bottleneck
+hash,P09,paraphrase,yes,7,W4408732566,0.2739,0,Frequency-enhanced and decomposed transformer for multivariate time series anomaly detection
+hash,P09,paraphrase,yes,8,W4415925455,0.2677,0,Benchmarking Large Language Models for MIMIC-IV Clinical Note Summarization
+hash,P09,paraphrase,yes,9,W4406253539,0.2611,0,EST transformer: enhanced spatiotemporal representation learning for time series anomaly detection
+hash,P09,paraphrase,yes,10,W4408869297,0.2606,0,Do LLMs Dream of Ontologies?
+hash,P10,paraphrase,no,1,W4412711186,0.3897,0,When customers know it’s AI: Experimental comparison of human and LLM-Based Communication in service recovery
+hash,P10,paraphrase,no,2,W4407632163,0.3873,0,Surrogate-assisted differential evolution: A survey
+hash,P10,paraphrase,no,3,W4407355756,0.3797,0,SNAILS: Schema Naming Assessments for Improved LLM-Based SQL Inference
+hash,P10,paraphrase,no,4,W4408070635,0.3651,0,A Comprehensive Survey on Seagull Optimization Algorithm and Its Variants
+hash,P10,paraphrase,no,5,W4412505633,0.359,0,Darwin Gödel Machine: Open-Ended Evolution of Self-Improving Agents
+hash,P10,paraphrase,no,6,W4408644434,0.3562,0,Evolution of service robots in marketing: A relational framework and future research agenda
+hash,P10,paraphrase,no,7,W4416945248,0.3544,0,A multi-technique ensemble model leveraging attention mechanism and image processing for enhanced colorectal tumor detection
+hash,P10,paraphrase,no,8,W4408101578,0.3501,0,"A survey of Beluga whale optimization and its variants: Statistical analysis, advances, and structural reviewing"
+hash,P10,paraphrase,no,9,W4410118431,0.3452,0,Vision-Based Learning for Drones: A Survey
+hash,P10,paraphrase,no,10,W4405800698,0.3444,0,Fast Quantum Control of Cavities Using an Improved Protocol without Coherent Errors
+bge,E01,exact,yes,1,W4410062040,0.91,1,Exploring privacy mechanisms and metrics in federated learning
+bge,E01,exact,yes,2,W4408688738,0.9032,1,"The Federation Strikes Back: A Survey of Federated Learning Privacy Attacks, Defenses, Applications, and Policy Landscape"
+bge,E01,exact,yes,3,W4405657059,0.8937,1,Federated Learning and Data Privacy: A Review of Challenges and Opportunities
+bge,E01,exact,yes,4,W4404201157,0.8891,1,Federated Learning for Privacy-Preserving Machine Learning: Decentralized Model Training with Enhanced Data Security
+bge,E01,exact,yes,5,W4404934688,0.8882,1,Issues in federated learning: some experiments and preliminary results
+bge,E01,exact,yes,6,W7124450903,0.8869,1,"On the security and privacy of federated learning: A survey with attacks, defenses, frameworks, applications, and future directions"
+bge,E01,exact,yes,7,W4403734429,0.8856,1,Balancing Privacy and Performance: A Differential Privacy Approach in Federated Learning
+bge,E01,exact,yes,8,W4404739159,0.8817,1,"Trustworthy federated learning: privacy, security, and beyond"
+bge,E01,exact,yes,9,W4406469935,0.878,1,Federated Learning: An Approach for Managing Data Privacy and Security in Collaborative Learning
+bge,E01,exact,yes,10,W4410393759,0.8766,1,Threats and Defenses in the Federated Learning Life Cycle: A Comprehensive Survey and Challenges
+bge,E02,exact,yes,1,W4404503464,0.8423,1,Photovoltaic power forecasting: A Transformer based framework
+bge,E02,exact,yes,2,W4413149824,0.839,1,A review on data-driven methods for solar energy forecasting
+bge,E02,exact,yes,3,W4407837505,0.839,1,Using Machine Learning Algorithms to Forecast Solar Energy Power Output
+bge,E02,exact,yes,4,W4403545034,0.834,1,A review of the state of the art in solar photovoltaic output power forecasting using data-driven models
+bge,E02,exact,yes,5,W4406015217,0.825,1,Solar energy prediction through machine learning models: A comparative analysis of regressor algorithms
+bge,E02,exact,yes,6,W7126172907,0.8233,1,"Comparative analysis of AI-based regression models for solar power forecasting: Techniques, preprocessing, and evaluation"
+bge,E02,exact,yes,7,W4403471789,0.8228,1,The added value of combining solar irradiance data and forecasts: A probabilistic benchmarking exercise
+bge,E02,exact,yes,8,W4412778588,0.8206,1,A comprehensive review of machine learning applications in forecasting solar PV and wind turbine power output
+bge,E02,exact,yes,9,W4403971710,0.8204,1,A tiered NARX model for forecasting day-ahead energy production in distributed solar PV systems
+bge,E02,exact,yes,10,W4407112438,0.8198,1,Photovoltaic solar energy prediction using the seasonal-trend decomposition layer and ASOA optimized LSTM neural network model
+bge,E03,exact,yes,1,W4410362117,0.8476,1,Quantum error correction of qudits beyond break-even
+bge,E03,exact,yes,2,W4404829411,0.8252,1,Mitigating errors in logical qubits
+bge,E03,exact,yes,3,W4404090535,0.8232,1,Comparing Shor and Steane error correction using the Bacon-Shor code
+bge,E03,exact,yes,4,W4405236635,0.8217,1,Optimized measurement-free and fault-tolerant quantum error correction for neutral atoms
+bge,E03,exact,yes,5,W4410078066,0.8189,1,Improving the efficiency of learning-based error mitigation
+bge,E03,exact,yes,6,W4406242105,0.8142,1,Quasiprobabilistic Readout Correction of Midcircuit Measurements for Adaptive Feedback via Measurement Randomized Compiling
+bge,E03,exact,yes,7,W4415104221,0.8111,1,Quantum Error Correction resilient against Atom Loss
+bge,E03,exact,yes,8,W7116702366,0.8111,1,Experimental Quantum Error Correction below the Surface Code Threshold via All-Microwave Leakage Suppression
+bge,E03,exact,yes,9,W4411267083,0.81,1,Efficient Formal Verification of Quantum Error Correcting Programs
+bge,E03,exact,yes,10,W4406438537,0.8082,1,Non-Markovian Feedback for Optimized Quantum Error Correction
+bge,E04,exact,no,1,W4410291869,0.7622,1,Enhancing protein structure predictions: DeepSHAP as a tool for understanding AlphaFold2
+bge,E04,exact,no,2,W7160866869,0.7553,0,Towards the explainability of protein language models
+bge,E04,exact,no,3,W4405046997,0.7409,0,Interpretable and explainable predictive machine learning models for data-driven protein engineering
+bge,E04,exact,no,4,W4413312092,0.7323,0,Sparse autoencoders uncover biologically interpretable features in protein language model representations
+bge,E04,exact,no,5,W4407716159,0.7227,0,"Quantum natural language processing and its applications in bioinformatics: a comprehensive review of methodologies, concepts, and future directions"
+bge,E04,exact,no,6,W4414938270,0.7218,0,Efficient and accurate search in petabase-scale sequence repositories
+bge,E04,exact,no,7,W4416808605,0.72,1,A Quantum Framework for Protein Binding‐Site Structure Prediction on Utility‐Level Quantum Processors
+bge,E04,exact,no,8,W7168173940,0.7056,0,The limits of sequence-based biosecurity screening tools in the age of AI-assisted protein design
+bge,E04,exact,no,9,W4404814486,0.7049,0,BWT construction and search at the terabase scale
+bge,E04,exact,no,10,W7125397926,0.7026,0,"Without safeguards, AI-Biology integration risks accelerating future pandemics"
+bge,E05,exact,yes,1,W4405706082,0.8913,1,"A Review of Large Language Models: Fundamental Architectures, Key Technological Evolutions, Interdisciplinary Technologies Integration, Optimization and Compression Techniques, Applications, and Challenges"
+bge,E05,exact,yes,2,W4411403346,0.8852,1,A Comprehensive Overview of Large Language Models
+bge,E05,exact,yes,3,W4410737867,0.8803,1,A Comprehensive Overview and Analysis of Large Language Models: Trends and Challenges
+bge,E05,exact,yes,4,W4408403279,0.8789,1,"Road of Large Language Model: Source, Challenge, and Future Perspectives"
+bge,E05,exact,yes,5,W4413933064,0.864,1,"Large language models: an overview of foundational architectures, recent trends, and a new taxonomy"
+bge,E05,exact,yes,6,W4362515116,0.8626,1,A Survey of Large Language Models
+bge,E05,exact,yes,7,W4405925082,0.8616,1,"Large language models: a survey of their development, capabilities, and applications"
+bge,E05,exact,yes,8,W7150881103,0.8612,1,Fine-tuning Large Language Models with Limited Data: A Survey and Practical Guide
+bge,E05,exact,yes,9,W4406241919,0.8591,1,A survey of multilingual large language models
+bge,E05,exact,yes,10,W4415725257,0.8575,1,Datasets for large language models: a comprehensive survey
+bge,E06,exact,yes,1,W4403425478,0.907,1,Early cancer detection using deep learning and medical imaging: A survey
+bge,E06,exact,yes,2,W4412879346,0.903,1,Deep Learning Applications in Clinical Cancer Detection: A Review of Implementation Challenges and Solutions
+bge,E06,exact,yes,3,W4403693618,0.9007,1,Automating cancer diagnosis using advanced deep learning techniques for multi-cancer image classification
+bge,E06,exact,yes,4,W4410052319,0.8982,1,Breast Cancer Detection Using Convolutional Neural Networks: A Deep Learning-Based Approach
+bge,E06,exact,yes,5,W4406488766,0.8902,1,Breast cancer detection using deep learning techniques: challenges and future directions
+bge,E06,exact,yes,6,W4408785507,0.8884,1,Advanced deep learning and large language models: Comprehensive insights for cancer detection
+bge,E06,exact,yes,7,W4410512137,0.8872,1,An explainable AI-driven deep neural network for accurate breast cancer detection from histopathological and ultrasound images
+bge,E06,exact,yes,8,W4412699270,0.886,1,Deep Learning Techniques for Prostate Cancer Analysis and Detection: Survey of the State of the Art
+bge,E06,exact,yes,9,W4408019052,0.8822,1,Deep learning-driven prediction in healthcare systems: Applying advanced CNNs for enhanced breast cancer detection
+bge,E06,exact,yes,10,W4407664122,0.8811,1,"Deep Learning Innovations in the Detection of Lung Cancer: Advances, Trends, and Open Challenges"
+bge,E07,exact,yes,1,W4413380967,0.903,1,Deep Reinforcement and IL for Autonomous Driving: A Review in the CARLA Simulation Environment
+bge,E07,exact,yes,2,W4407772786,0.8836,1,Knowledge transfer from simple to complex: A safe and efficient reinforcement learning framework for autonomous driving decision-making
+bge,E07,exact,yes,3,W4411429779,0.8778,1,A Comparative Study of Deep Reinforcement Learning Algorithms for Urban Autonomous Driving: Addressing the Geographic and Regulatory Challenges in CARLA
+bge,E07,exact,yes,4,W4415544664,0.8748,1,From black-box to white-box: Interpretable deep reinforcement learning with Kolmogorov-Arnold networks for autonomous driving
+bge,E07,exact,yes,5,W4403510866,0.8656,1,A platform-agnostic deep reinforcement learning framework for effective Sim2Real transfer towards autonomous driving
+bge,E07,exact,yes,6,W4406983036,0.8653,1,Reinforcement Learning-Based Oscillation Dampening: Scaling Up Single-Agent Reinforcement Learning Algorithms to a 100-Autonomous-Vehicle Highway Field Operational Test
+bge,E07,exact,yes,7,W4408578880,0.8599,1,The investigation of reinforcement learning-based end-to-end decision-making algorithms for autonomous driving on the road with consecutive sharp turns
+bge,E07,exact,yes,8,W4410204294,0.8591,1,"A Survey on Deep Reinforcement Learning Applications in Autonomous Systems: Applications, Open Challenges, and Future Directions"
+bge,E07,exact,yes,9,W4411866407,0.8572,1,LLM-augmented hierarchical reinforcement learning for human-like decision-making of autonomous driving
+bge,E07,exact,yes,10,W4407780603,0.8526,1,Deep imitative reinforcement learning with gradient conflict-free for decision-making in autonomous vehicles
+bge,E08,exact,yes,1,W4413349856,0.8312,1,Adversarial Challenges in Network Intrusion Detection Systems: Research Insights and Future Prospects
+bge,E08,exact,yes,2,W4409774239,0.8207,1,A comparative analysis of DNN-based white-box explainable AI methods in network security
+bge,E08,exact,yes,3,W4409837136,0.8102,0,Graph neural network approach with spatial structure to anomaly detection of network data
+bge,E08,exact,yes,4,W4404627583,0.8049,1,"A Survey on Explainable Artificial Intelligence for Internet Traffic Classification and Prediction, and Intrusion Detection"
+bge,E08,exact,yes,5,W4407842019,0.8012,1,Comparative Analysis of Perturbation Techniques in LIME for Intrusion Detection Enhancement
+bge,E08,exact,yes,6,W4406978349,0.8006,1,Explainable artificial intelligence models in intrusion detection systems
+bge,E08,exact,yes,7,W4417168908,0.799,0,Attention-Based Anomaly Detection in Dynamic Network
+bge,E08,exact,yes,8,W4404563539,0.7882,0,NNG-Mix: Improving Semi-Supervised Anomaly Detection With Pseudo-Anomaly Generation
+bge,E08,exact,yes,9,W4403473739,0.785,1,The survey on the dual nature of xAI challenges in intrusion detection and their potential for AI innovation
+bge,E08,exact,yes,10,W4406529390,0.7844,1,Explainable AI for Cyber Security: Interpretable Models for Malware Analysis and Network Intrusion Detection
+bge,E09,exact,yes,1,W4412022267,0.8923,1,A Study On The Application Of Machine Learning In Adaptive Intelligent Tutoring Systems
+bge,E09,exact,yes,2,W4411842899,0.8776,1,Adaptive intelligent tutoring systems for STEM education: analysis of the learning impact and effectiveness of personalized feedback
+bge,E09,exact,yes,3,W4413237657,0.873,1,AI IN THE CLASSROOM: EVALUATING THE EFFECTIVENESS OF INTELLIGENT TUTORING SYSTEMS FOR MULTILINGUAL LEARNERS IN SECONDARY EDUCATION
+bge,E09,exact,yes,4,W4412190298,0.8716,1,Adaptive AI Systems in Education: Real-Time Personalised Learning Pathways for Skill Development
+bge,E09,exact,yes,5,W4411019632,0.8661,1,Dynamic Adaptation in an Intelligent Multi-Tutoring System: A Multi-Agent Approach
+bge,E09,exact,yes,6,W4407077949,0.8639,1,A framework for adapting conversational intelligent tutoring systems to enable collaborative learning
+bge,E09,exact,yes,7,W4412752126,0.859,1,Explainable educational assistant integrated in Moodle: automated semantic assessment and adaptive tutoring based on NLP and XAI
+bge,E09,exact,yes,8,W7130646267,0.8546,1,Agentic artificial intelligence in education: A review on personalized adaptive learning through autonomous tutoring systems
+bge,E09,exact,yes,9,W4404223861,0.8511,1,Adaptive Learning Systems: Harnessing AI to Personalize Educational Outcomes
+bge,E09,exact,yes,10,W4415560266,0.8505,1,Leveraging RAG with ACP & MCP for Adaptive Intelligent Tutoring
+bge,E10,exact,yes,1,W4408955757,0.9013,1,SENTIMENT ANALYSIS IN SOCIAL MEDIA: HOW DATA SCIENCE IMPACTS PUBLIC OPINION KNOWLEDGE INTEGRATES NATURAL LANGUAGE PROCESSING (NLP) WITH ARTIFICIAL INTELLIGENCE (AI)
+bge,E10,exact,yes,2,W4408221477,0.8999,1,Sentiment analysis and emotion recognition in social media: A comprehensive survey
+bge,E10,exact,yes,3,W4407449493,0.8981,1,Sentiment Analysis of Twitter Data Using NLP Models: A Comprehensive Review
+bge,E10,exact,yes,4,W4407230522,0.8939,1,Sentiment analysis: A machine learning utilisation for analyzing the sentiments of facebook and twitter posts
+bge,E10,exact,yes,5,W4404907742,0.8884,1,Optimization of machine learning models for sentiment analysis in social media
+bge,E10,exact,yes,6,W4409856846,0.8834,1,"Generalizing sentiment analysis: a review of progress, challenges, and emerging directions"
+bge,E10,exact,yes,7,W4406919742,0.8804,1,Evolving techniques in sentiment analysis: a comprehensive review
+bge,E10,exact,yes,8,W4416421675,0.8799,1,"Bridging techniques and applications in sentiment analysis: Approaches, challenges, and emerging trends"
+bge,E10,exact,yes,9,W4405809083,0.8787,1,A Review: Text Sentiment Analysis Methods
+bge,E10,exact,yes,10,W4406113679,0.8734,1,"A review of Chinese sentiment analysis: subjects, methods, and trends"
+bge,P01,paraphrase,yes,1,W4406186782,0.7991,1,Clinical Application of Artificial Intelligence in Ultrasound Imaging for Oncology
+bge,P01,paraphrase,yes,2,W4411920326,0.7955,1,"Artificial Intelligence–Driven Cancer Diagnostics: Enhancing Radiology and Pathology through Reproducibility, Explainability, and Multimodality"
+bge,P01,paraphrase,yes,3,W4415360543,0.7929,1,Use of AI Histopathology in Breast Cancer Diagnosis
+bge,P01,paraphrase,yes,4,W4406456076,0.7916,1,Physical Color Calibration of Digital Pathology Scanners for Robust Artificial Intelligence–Assisted Cancer Diagnosis
+bge,P01,paraphrase,yes,5,W4412712627,0.7908,0,Attribution-Based Explainability in Medical Imaging: A Critical Review on Explainable Computer Vision (X-CV) Techniques and Their Applications in Medical AI
+bge,P01,paraphrase,yes,6,W4403570272,0.7894,0,Transforming Diagnostics: A Comprehensive Review of Advances in Digital Pathology
+bge,P01,paraphrase,yes,7,W4404697892,0.7892,1,Effect of Artificial Intelligence as a Second Reader on the Lung Nodule Detection and Localization Accuracy of Radiologists and Non-radiology Physicians in Chest Radiographs: A Multicenter Reader Study
+bge,P01,paraphrase,yes,8,W4404623301,0.7886,1,Artificial intelligence for breast cancer detection and its health technology assessment: A scoping review
+bge,P01,paraphrase,yes,9,W4405730259,0.7885,1,"Toward Robust Lung Cancer Diagnosis: Integrating Multiple CT Datasets, Curriculum Learning, and Explainable AI"
+bge,P01,paraphrase,yes,10,W4413258373,0.7881,1,AI as an independent second reader in detection of clinically relevant breast cancers within a population-based screening programme in the Netherlands: a retrospective cohort study
+bge,P02,paraphrase,yes,1,W4407152314,0.8096,1,Distributed cross-learning for equitable federated models - privacy-preserving prediction on data from five California hospitals
+bge,P02,paraphrase,yes,2,W4412654518,0.807,1,Towards practical federated learning and evaluation for medical prediction models
+bge,P02,paraphrase,yes,3,W4403468860,0.7851,1,Knowledge abstraction and filtering based federated learning over heterogeneous data views in healthcare
+bge,P02,paraphrase,yes,4,W4406064967,0.7844,1,Open challenges and opportunities in federated foundation models towards biomedical healthcare
+bge,P02,paraphrase,yes,5,W4408256269,0.7796,0,Large language models are less effective at clinical prediction tasks than locally trained machine learning models
+bge,P02,paraphrase,yes,6,W4413824881,0.779,0,Personalized health monitoring using explainable AI: bridging trust in predictive healthcare
+bge,P02,paraphrase,yes,7,W4403876720,0.778,0,Forecasting Patient Early Readmission from Irish Hospital Discharge Records Using Conventional Machine Learning Models
+bge,P02,paraphrase,yes,8,W4404463516,0.7777,0,Predicting individual patient and hospital-level discharge using machine learning
+bge,P02,paraphrase,yes,9,W4406628237,0.7754,0,A roadmap to implementing machine learning in healthcare: from concept to practice
+bge,P02,paraphrase,yes,10,W4411184942,0.7731,0,Evaluating the Reasoning Capabilities of Large Language Models for Medical Coding and Hospital Readmission Risk Stratification: Zero-Shot Prompting Approach
+bge,P03,paraphrase,yes,1,W4406015217,0.807,1,Solar energy prediction through machine learning models: A comparative analysis of regressor algorithms
+bge,P03,paraphrase,yes,2,W4407837505,0.7936,1,Using Machine Learning Algorithms to Forecast Solar Energy Power Output
+bge,P03,paraphrase,yes,3,W4409327150,0.7908,1,Enhancing the Efficacy of Short-Term Prediction Models for Solar Photovoltaic Systems: An Influence Examination of Chronological and Meteorological Factors
+bge,P03,paraphrase,yes,4,W4413149824,0.7898,1,A review on data-driven methods for solar energy forecasting
+bge,P03,paraphrase,yes,5,W4410015934,0.7831,1,Machine learning models for solar forecasting and impact on green hydrogen production costs
+bge,P03,paraphrase,yes,6,W4406680212,0.7679,1,Forecasting Solar Energy: Leveraging Artificial Intelligence and Machine Learning for Sustainable Energy Solutions
+bge,P03,paraphrase,yes,7,W4415962865,0.7673,1,An interpretable statistical approach to photovoltaic power forecasting using factor analysis and ridge regression
+bge,P03,paraphrase,yes,8,W7126172907,0.7669,1,"Comparative analysis of AI-based regression models for solar power forecasting: Techniques, preprocessing, and evaluation"
+bge,P03,paraphrase,yes,9,W4410055233,0.7656,1,A review of solar and wind energy forecasting: From single-site to multi-site paradigm
+bge,P03,paraphrase,yes,10,W4407635408,0.7655,1,Time Series Analysis of Solar Power Generation Based on Machine Learning for Efficient Monitoring
+bge,P04,paraphrase,yes,1,W4408343564,0.8351,1,Beyond NISQ: The Megaquop Machine
+bge,P04,paraphrase,yes,2,W4404567745,0.8196,1,On proving the robustness of algorithms for early fault-tolerant quantum computers
+bge,P04,paraphrase,yes,3,W4414533470,0.8182,1,Error mitigation with stabilized noise in superconducting quantum processors
+bge,P04,paraphrase,yes,4,W4403984119,0.8179,1,Provable bounds for noise-free expectation values computed from noisy samples
+bge,P04,paraphrase,yes,5,W4406512253,0.8172,1,Demonstrating quantum error mitigation on logical qubits
+bge,P04,paraphrase,yes,6,W4405278229,0.8105,1,Extracting error thresholds through the framework of approximate quantum error correction condition
+bge,P04,paraphrase,yes,7,W4411267083,0.8095,1,Efficient Formal Verification of Quantum Error Correcting Programs
+bge,P04,paraphrase,yes,8,W7116702366,0.8043,1,Experimental Quantum Error Correction below the Surface Code Threshold via All-Microwave Leakage Suppression
+bge,P04,paraphrase,yes,9,W4408853294,0.8025,0,Certified randomness using a trapped-ion quantum processor
+bge,P04,paraphrase,yes,10,W4407910963,0.7992,1,Scalable Noise Characterization of Syndrome-Extraction Circuits with Averaged Circuit Eigenvalue Sampling
+bge,P05,paraphrase,yes,1,W4406821730,0.7978,1,A survey on chatbots and large language models: Testing and evaluation techniques
+bge,P05,paraphrase,yes,2,W4400433915,0.7958,1,Differentiating Between Human-Written and AI-Generated Texts Using Automatically Extracted Linguistic Features
+bge,P05,paraphrase,yes,3,W4404996504,0.794,1,Classification of human- and AI-generated texts for different languages and domains
+bge,P05,paraphrase,yes,4,W4406562391,0.786,1,Explainable AI chatbots towards XAI ChatGPT: A review
+bge,P05,paraphrase,yes,5,W4411282913,0.7858,1,From scripted replies to intelligent assistance: A study on artificial intelligence chatbots in user support
+bge,P05,paraphrase,yes,6,W4414812353,0.7844,1,The quasi-domestication of social chatbots: The case of Replika
+bge,P05,paraphrase,yes,7,W4403605341,0.783,1,Toward the Adoption of Explainable Pre-Trained Large Language Models for Classifying Human-Written and AI-Generated Sentences
+bge,P05,paraphrase,yes,8,W4408740572,0.7776,1,Assessing the Capability of Large Language Model Chatbots in Generating Plain Language Summaries
+bge,P05,paraphrase,yes,9,W4405580523,0.7748,1,Human vs. Machine: A Comparative Study on the Detection of AI-Generated Content
+bge,P05,paraphrase,yes,10,W4407781890,0.7708,1,AI-Generated Versus Human Text: Introducing a New Dataset for Benchmarking and Analysis
+bge,P06,paraphrase,yes,1,W4413380967,0.7392,1,Deep Reinforcement and IL for Autonomous Driving: A Review in the CARLA Simulation Environment
+bge,P06,paraphrase,yes,2,W4411171960,0.7108,0,Safety Implications of Explainable Artificial Intelligence in End-to-End Autonomous Driving
+bge,P06,paraphrase,yes,3,W4411232161,0.6989,0,Few-Shot Learning With Manifold-Enhanced LLM for Handling Anomalous Perception Inputs in Autonomous Driving
+bge,P06,paraphrase,yes,4,W4411429779,0.6968,1,A Comparative Study of Deep Reinforcement Learning Algorithms for Urban Autonomous Driving: Addressing the Geographic and Regulatory Challenges in CARLA
+bge,P06,paraphrase,yes,5,W4408578880,0.6916,1,The investigation of reinforcement learning-based end-to-end decision-making algorithms for autonomous driving on the road with consecutive sharp turns
+bge,P06,paraphrase,yes,6,W4408120209,0.6883,1,A Novel Approach to Autonomous Driving Using Double Deep Q-Network-Bsed Deep Reinforcement Learning
+bge,P06,paraphrase,yes,7,W4403510866,0.6868,1,A platform-agnostic deep reinforcement learning framework for effective Sim2Real transfer towards autonomous driving
+bge,P06,paraphrase,yes,8,W4415544664,0.6867,1,From black-box to white-box: Interpretable deep reinforcement learning with Kolmogorov-Arnold networks for autonomous driving
+bge,P06,paraphrase,yes,9,W7124157084,0.686,1,Long- and Short-Term Constraint-Driven Safe Reinforcement Learning for Autonomous Driving
+bge,P06,paraphrase,yes,10,W4407754757,0.6852,0,Explainable reinforcement learning for powertrain control engineering
+bge,P07,paraphrase,yes,1,W4413349856,0.7222,1,Adversarial Challenges in Network Intrusion Detection Systems: Research Insights and Future Prospects
+bge,P07,paraphrase,yes,2,W4404627583,0.7174,1,"A Survey on Explainable Artificial Intelligence for Internet Traffic Classification and Prediction, and Intrusion Detection"
+bge,P07,paraphrase,yes,3,W4403420454,0.7169,1,Input and Output Matter: Malicious Traffic Detection With Explainability
+bge,P07,paraphrase,yes,4,W4403794752,0.7117,1,A Review on Network Covert Channel Construction and Attack Detection
+bge,P07,paraphrase,yes,5,W4416470703,0.7115,0,"Machine Learning for Cybersecurity: A Survey of Applications, Adversarial Challenges, and Future Research Directions"
+bge,P07,paraphrase,yes,6,W4407842019,0.7051,1,Comparative Analysis of Perturbation Techniques in LIME for Intrusion Detection Enhancement
+bge,P07,paraphrase,yes,7,W4409473631,0.7051,1,Explainable and Transferable Adversarial Attack for ML-Based Network Intrusion Detectors
+bge,P07,paraphrase,yes,8,W4416226700,0.7015,0,A Study on Improving the Automatic Classification Performance of Cybersecurity MITRE ATT&CK Tactics Using NLP-Based ModernBERT and BERTopic Models
+bge,P07,paraphrase,yes,9,W4407946292,0.7012,0,Unmasking the Internet: A Survey of Fine-Grained Network Traffic Analysis
+bge,P07,paraphrase,yes,10,W4406529390,0.701,1,Explainable AI for Cyber Security: Interpretable Models for Malware Analysis and Network Intrusion Detection
+bge,P08,paraphrase,yes,1,W4412022267,0.7766,1,A Study On The Application Of Machine Learning In Adaptive Intelligent Tutoring Systems
+bge,P08,paraphrase,yes,2,W4417180657,0.7679,1,AI-Powered Tutoring Systems for Personalised Learning Feedback in Developing Secondary Education Contexts
+bge,P08,paraphrase,yes,3,W4407077949,0.7663,1,A framework for adapting conversational intelligent tutoring systems to enable collaborative learning
+bge,P08,paraphrase,yes,4,W4411019632,0.7661,1,Dynamic Adaptation in an Intelligent Multi-Tutoring System: A Multi-Agent Approach
+bge,P08,paraphrase,yes,5,W4405677701,0.7644,1,Developing an AI-Powered Interactive Virtual Tutor for Enhanced Learning Experiences
+bge,P08,paraphrase,yes,6,W4411842899,0.7614,1,Adaptive intelligent tutoring systems for STEM education: analysis of the learning impact and effectiveness of personalized feedback
+bge,P08,paraphrase,yes,7,W4407405826,0.7597,1,Analysis of Learning Behaviors and Outcomes for Students with Different Knowledge Levels: A Case Study of Intelligent Tutoring System for Coding and Learning (ITS-CAL)
+bge,P08,paraphrase,yes,8,W4412752126,0.758,1,Explainable educational assistant integrated in Moodle: automated semantic assessment and adaptive tutoring based on NLP and XAI
+bge,P08,paraphrase,yes,9,W4413237657,0.7562,1,AI IN THE CLASSROOM: EVALUATING THE EFFECTIVENESS OF INTELLIGENT TUTORING SYSTEMS FOR MULTILINGUAL LEARNERS IN SECONDARY EDUCATION
+bge,P08,paraphrase,yes,10,W4409955995,0.7553,1,AI-driven autonomous interactive English learning language tutoring system
+bge,P09,paraphrase,yes,1,W4407410784,0.7442,0,Citizen preferences for online hate speech regulation
+bge,P09,paraphrase,yes,2,W4404231237,0.7319,1,Detecting and regulating sentiment reversal and polarization in online communities
+bge,P09,paraphrase,yes,3,W4410781656,0.7274,1,Sentiment Diffusion in Online Social Networks: A Survey from the Computational Perspective
+bge,P09,paraphrase,yes,4,W4407721413,0.7245,1,Research on Sentiment Analysis of Online Public Opinion Based on RoBERTa–BiLSTM–Attention Model
+bge,P09,paraphrase,yes,5,W4406457613,0.719,1,From ChatGPT to Sora: Analyzing Public Opinions and Attitudes on Generative Artificial Intelligence in Social Media
+bge,P09,paraphrase,yes,6,W4405308733,0.7189,0,To Explain or Not To Explain: An Empirical Investigation of AI-based Recommendations on Social Media Platforms
+bge,P09,paraphrase,yes,7,W4407171721,0.7179,0,"Exploring hate speech dynamics: The emotional, linguistic, and thematic impact on social media users"
+bge,P09,paraphrase,yes,8,W4407735544,0.7171,1,A computational analysis of aspect-based sentiment analysis research through bibliometric mapping and topic modeling
+bge,P09,paraphrase,yes,9,W4415257622,0.7166,0,HateBuffer: Safeguarding Content Moderators' Mental Well-Being through Hate Speech Content Modification
+bge,P09,paraphrase,yes,10,W4406847739,0.7164,1,Consumer perceptions of AI chatbots on Twitter (X) and Reddit: an analysis of social media sentiment and interactive marketing strategies
+bge,P10,paraphrase,no,1,W4410291869,0.691,1,Enhancing protein structure predictions: DeepSHAP as a tool for understanding AlphaFold2
+bge,P10,paraphrase,no,2,W4407374186,0.6742,0,Symmetry-invariant quantum machine learning force fields
+bge,P10,paraphrase,no,3,W4416808605,0.6735,1,A Quantum Framework for Protein Binding‐Site Structure Prediction on Utility‐Level Quantum Processors
+bge,P10,paraphrase,no,4,W4409225786,0.6686,0,habtools : An R package to calculate 3D metrics for surfaces and objects
+bge,P10,paraphrase,no,5,W4411989135,0.6536,0,rcssci: An R Package for Visualization of Restricted Cubic Spline
+bge,P10,paraphrase,no,6,W4409458423,0.6458,0,An Evaluation of Large Language Models for Supplementing a Food Extrusion Dataset
+bge,P10,paraphrase,no,7,W4409643800,0.6449,0,A metaheuristic optimization framework inspired by virus mutations and its ability to optimize the structural design of 2D and 3D steel frames compared to other methods
+bge,P10,paraphrase,no,8,W4408102480,0.6448,0,Waveguide Quantum Electrodynamics: Tryptophans Entangled with Water as Data Qubits in a Microtubule
+bge,P10,paraphrase,no,9,W7140320372,0.6431,0,Reframing natural organic matter research through compositional data analysis
+bge,P10,paraphrase,no,10,W4417534219,0.6422,0,Designing a novel radial basis neural structure for solving the dynamical hepatitis C virus model
+minilm,E01,exact,yes,1,W4404739159,0.9122,1,"Trustworthy federated learning: privacy, security, and beyond"
+minilm,E01,exact,yes,2,W4405707066,0.8899,1,Privacy protection in federated learning: a study on the combined strategy of local and global differential privacy
+minilm,E01,exact,yes,3,W4410852248,0.8705,1,Robust and Secure Federated Learning With Verifiable Differential Privacy
+minilm,E01,exact,yes,4,W4405524801,0.8577,1,Securing decentralized federated learning: cryptographic mechanisms for privacy and trust
+minilm,E01,exact,yes,5,W4415220620,0.8407,1,Dynamic privacy budget allocation for enhanced differential privacy in federated learning
+minilm,E01,exact,yes,6,W7121318593,0.836,1,A comprehensive survey on federated learning for privacy preservation in digital healthcare applications
+minilm,E01,exact,yes,7,W4404934688,0.8322,1,Issues in federated learning: some experiments and preliminary results
+minilm,E01,exact,yes,8,W4408552825,0.8242,1,Privacy-Preserving Federated Learning with Differentially Private Hyperdimensional Computing
+minilm,E01,exact,yes,9,W4410062040,0.821,1,Exploring privacy mechanisms and metrics in federated learning
+minilm,E01,exact,yes,10,W7121414187,0.819,1,Secure aggregation with verifiability and robustness for privacy-preserving federated learning
+minilm,E02,exact,yes,1,W4403545034,0.8145,1,A review of the state of the art in solar photovoltaic output power forecasting using data-driven models
+minilm,E02,exact,yes,2,W4403973756,0.8021,1,Advancing global solar photovoltaic power forecasting with sub-seasonal climate outlooks
+minilm,E02,exact,yes,3,W4406414166,0.7307,1,Exploring deep learning methods for solar photovoltaic power output forecasting: A review
+minilm,E02,exact,yes,4,W4405847152,0.7258,1,The short-term forecasting of distributed photovoltaic power considering the sensitivity of meteorological data
+minilm,E02,exact,yes,5,W4415186620,0.7072,1,Photovoltaic system modeling and forecasting techniques: A survey
+minilm,E02,exact,yes,6,W4415928768,0.6991,1,Review of Data-Driven Approaches Applied to Time-Series Solar Irradiance Forecasting for Future Energy Networks
+minilm,E02,exact,yes,7,W4406311237,0.6963,1,Deep probabilistic solar power forecasting with Transformer and Gaussian process approximation
+minilm,E02,exact,yes,8,W4403510186,0.695,1,Innovative approaches to solar energy forecasting: unveiling the power of hybrid models and machine learning algorithms for photovoltaic power optimization
+minilm,E02,exact,yes,9,W4405929239,0.6932,1,Day-ahead photovoltaic power forecasting based on corrected numeric weather prediction and domain generalization
+minilm,E02,exact,yes,10,W4405404844,0.6858,1,A simple non-parametric model for photovoltaic output power prediction
+minilm,E03,exact,yes,1,W4415198140,0.7552,1,Demonstration of low-overhead quantum error correction codes
+minilm,E03,exact,yes,2,W4406678143,0.6981,1,Quantum Error Correction with Surface Code Analysis on Quantum Computing platform
+minilm,E03,exact,yes,3,W4416009895,0.6834,1,Estimating decoding graphs and hypergraphs of memory quantum error-correction experiments
+minilm,E03,exact,yes,4,W4404612429,0.6548,1,Machine learning for practical quantum error mitigation
+minilm,E03,exact,yes,5,W4410362117,0.6498,1,Quantum error correction of qudits beyond break-even
+minilm,E03,exact,yes,6,W4406512253,0.6134,1,Demonstrating quantum error mitigation on logical qubits
+minilm,E03,exact,yes,7,W4403553444,0.6131,1,Error correction using squeezed Fock states
+minilm,E03,exact,yes,8,W4410078066,0.6114,1,Improving the efficiency of learning-based error mitigation
+minilm,E03,exact,yes,9,W4416531047,0.6106,1,Variational quantum machine learning with quantum error detection
+minilm,E03,exact,yes,10,W4405278229,0.609,1,Extracting error thresholds through the framework of approximate quantum error correction condition
+minilm,E04,exact,no,1,W4416808605,0.4593,1,A Quantum Framework for Protein Binding‐Site Structure Prediction on Utility‐Level Quantum Processors
+minilm,E04,exact,no,2,W4410291869,0.4382,1,Enhancing protein structure predictions: DeepSHAP as a tool for understanding AlphaFold2
+minilm,E04,exact,no,3,W7160866869,0.3857,0,Towards the explainability of protein language models
+minilm,E04,exact,no,4,W4413312092,0.3617,0,Sparse autoencoders uncover biologically interpretable features in protein language model representations
+minilm,E04,exact,no,5,W4405046997,0.3432,0,Interpretable and explainable predictive machine learning models for data-driven protein engineering
+minilm,E04,exact,no,6,W7168173940,0.3046,0,The limits of sequence-based biosecurity screening tools in the age of AI-assisted protein design
+minilm,E04,exact,no,7,W4405517058,0.3013,0,Designing microplastic-binding peptides with a variational quantum circuit–based hybrid quantum-classical approach
+minilm,E04,exact,no,8,W4407716159,0.2938,0,"Quantum natural language processing and its applications in bioinformatics: a comprehensive review of methodologies, concepts, and future directions"
+minilm,E04,exact,no,9,W4414760252,0.2856,0,Strengthening nucleic acid biosecurity screening against generative protein design tools
+minilm,E04,exact,no,10,W7125397926,0.2813,0,"Without safeguards, AI-Biology integration risks accelerating future pandemics"
+minilm,E05,exact,yes,1,W4405925082,0.8836,1,"Large language models: a survey of their development, capabilities, and applications"
+minilm,E05,exact,yes,2,W4407048461,0.8026,1,A Critical Review of Methods and Challenges in Large Language Models
+minilm,E05,exact,yes,3,W4411507372,0.7646,1,Large language models for conceptual modeling: Assessment and application potential
+minilm,E05,exact,yes,4,W4407661798,0.7622,1,Rethinking machine unlearning for large language models
+minilm,E05,exact,yes,5,W4410225737,0.7299,1,"Development, Evaluation, and Assessment of Large Language Models (DEAL) Checklist: A Technical Report"
+minilm,E05,exact,yes,6,W4406272066,0.7255,1,Large Language Models in Finance (FinLLMs)
+minilm,E05,exact,yes,7,W4406800520,0.7242,1,The rise and potential of large language model based agents: a survey
+minilm,E05,exact,yes,8,W4405706082,0.7103,1,"A Review of Large Language Models: Fundamental Architectures, Key Technological Evolutions, Interdisciplinary Technologies Integration, Optimization and Compression Techniques, Applications, and Challenges"
+minilm,E05,exact,yes,9,W4407695828,0.7004,1,The shrinking landscape of linguistic diversity in the age of large language models
+minilm,E05,exact,yes,10,W4415691382,0.6871,1,Towards multimodal graph large language model
+minilm,E06,exact,yes,1,W4406488766,0.7719,1,Breast cancer detection using deep learning techniques: challenges and future directions
+minilm,E06,exact,yes,2,W4406940051,0.7706,1,Improved early detection accuracy for breast cancer using a deep learning framework in medical imaging
+minilm,E06,exact,yes,3,W4407664122,0.7557,1,"Deep Learning Innovations in the Detection of Lung Cancer: Advances, Trends, and Open Challenges"
+minilm,E06,exact,yes,4,W4407405563,0.7304,0,The Diagnostic Classification of the Pathological Image Using Computer Vision
+minilm,E06,exact,yes,5,W4407390581,0.7246,1,"Deep learning paradigms in lung cancer diagnosis: A methodological review, open challenges, and future directions"
+minilm,E06,exact,yes,6,W4408684485,0.7185,1,Transfer Learning for Cancer Diagnosis in Medical Images: A Compendious Study
+minilm,E06,exact,yes,7,W7160277443,0.7177,1,Towards an improved deep learning algorithm-based diagnostic model for the classification of breast cancer
+minilm,E06,exact,yes,8,W4403425478,0.7155,1,Early cancer detection using deep learning and medical imaging: A survey
+minilm,E06,exact,yes,9,W4403693618,0.7129,1,Automating cancer diagnosis using advanced deep learning techniques for multi-cancer image classification
+minilm,E06,exact,yes,10,W4411747277,0.7081,1,Advances in Deep Learning Techniques for Breast Cancer Classification: A Comprehensive Review
+minilm,E07,exact,yes,1,W4411866407,0.7121,1,LLM-augmented hierarchical reinforcement learning for human-like decision-making of autonomous driving
+minilm,E07,exact,yes,2,W4406983036,0.6996,1,Reinforcement Learning-Based Oscillation Dampening: Scaling Up Single-Agent Reinforcement Learning Algorithms to a 100-Autonomous-Vehicle Highway Field Operational Test
+minilm,E07,exact,yes,3,W4413916436,0.6965,1,An uncertainty-aware safe-evolving reinforcement learning algorithm for decision-making and control in highway autonomous driving
+minilm,E07,exact,yes,4,W4413380967,0.6954,1,Deep Reinforcement and IL for Autonomous Driving: A Review in the CARLA Simulation Environment
+minilm,E07,exact,yes,5,W4413858428,0.6834,1,VLM-RL: A unified vision language models and reinforcement learning framework for safe autonomous driving
+minilm,E07,exact,yes,6,W4415980297,0.6813,1,A Survey on Reinforcement Learning for Optimal Decision‐Making and Control of Intelligent Vehicles
+minilm,E07,exact,yes,7,W4411429779,0.6735,1,A Comparative Study of Deep Reinforcement Learning Algorithms for Urban Autonomous Driving: Addressing the Geographic and Regulatory Challenges in CARLA
+minilm,E07,exact,yes,8,W4407772786,0.6716,1,Knowledge transfer from simple to complex: A safe and efficient reinforcement learning framework for autonomous driving decision-making
+minilm,E07,exact,yes,9,W4407155075,0.6611,1,Safe Reinforcement Learning for Event-Triggered Control of Automated Vehicles With Uncertainty
+minilm,E07,exact,yes,10,W4415544664,0.6608,1,From black-box to white-box: Interpretable deep reinforcement learning with Kolmogorov-Arnold networks for autonomous driving
+minilm,E08,exact,yes,1,W4406978349,0.5777,1,Explainable artificial intelligence models in intrusion detection systems
+minilm,E08,exact,yes,2,W4411383644,0.4976,1,GRAF-IDS: graph-based clustering as aggregation for federated intrusion detection system in IoT network
+minilm,E08,exact,yes,3,W4410088070,0.4974,1,Adversarial Attack Detection in Industrial Control Systems Using LSTM-Based Intrusion Detection and Black-Box Defense Strategies
+minilm,E08,exact,yes,4,W4406069845,0.4955,1,A Review of Federated Learning Applications in Intrusion Detection Systems
+minilm,E08,exact,yes,5,W4404627583,0.4946,1,"A Survey on Explainable Artificial Intelligence for Internet Traffic Classification and Prediction, and Intrusion Detection"
+minilm,E08,exact,yes,6,W4408866448,0.4761,1,Evaluation of Information Security through Networks traffic traces for machine learning classification
+minilm,E08,exact,yes,7,W4409774239,0.4757,1,A comparative analysis of DNN-based white-box explainable AI methods in network security
+minilm,E08,exact,yes,8,W4410237477,0.4744,1,Lightweight federated learning-based intrusion detection system for industrial internet of things
+minilm,E08,exact,yes,9,W4403473739,0.4682,1,The survey on the dual nature of xAI challenges in intrusion detection and their potential for AI innovation
+minilm,E08,exact,yes,10,W4406518089,0.4667,1,NIDS-DA: Detecting functionally preserved adversarial examples for network intrusion detection system using deep autoencoders
+minilm,E09,exact,yes,1,W4407077949,0.7225,1,A framework for adapting conversational intelligent tutoring systems to enable collaborative learning
+minilm,E09,exact,yes,2,W4412022267,0.7215,1,A Study On The Application Of Machine Learning In Adaptive Intelligent Tutoring Systems
+minilm,E09,exact,yes,3,W4411019632,0.6968,1,Dynamic Adaptation in an Intelligent Multi-Tutoring System: A Multi-Agent Approach
+minilm,E09,exact,yes,4,W4409955995,0.6852,1,AI-driven autonomous interactive English learning language tutoring system
+minilm,E09,exact,yes,5,W4411842899,0.6682,1,Adaptive intelligent tutoring systems for STEM education: analysis of the learning impact and effectiveness of personalized feedback
+minilm,E09,exact,yes,6,W7125981967,0.6666,1,An Adaptive Multi-Agent Architecture with Reinforcement Learning and Generative AI for Intelligent Tutoring Systems: A Moodle-Based Case Study
+minilm,E09,exact,yes,7,W7130646267,0.6661,1,Agentic artificial intelligence in education: A review on personalized adaptive learning through autonomous tutoring systems
+minilm,E09,exact,yes,8,W4405931350,0.6526,1,Assessing the Efficacy of Intelligent Tutoring Systems in Language Teacher Education: A Quantitative Study
+minilm,E09,exact,yes,9,W4405107771,0.6506,1,PerFuSIT: Personalized Fuzzy Logic Strategies for Intelligent Tutoring of Programming
+minilm,E09,exact,yes,10,W4413252982,0.6499,1,LPITutor: an LLM based personalized intelligent tutoring system using RAG and prompt engineering
+minilm,E10,exact,yes,1,W4408221477,0.71,1,Sentiment analysis and emotion recognition in social media: A comprehensive survey
+minilm,E10,exact,yes,2,W4404907742,0.7041,1,Optimization of machine learning models for sentiment analysis in social media
+minilm,E10,exact,yes,3,W4407449493,0.6265,1,Sentiment Analysis of Twitter Data Using NLP Models: A Comprehensive Review
+minilm,E10,exact,yes,4,W4416180741,0.6254,1,Multi stage sentiment analysis for product reviews on Twitter using optimized machine learning algorithm
+minilm,E10,exact,yes,5,W4403944346,0.614,1,A Stacking Ensemble Based on Lexicon and Machine Learning Methods for the Sentiment Analysis of Tweets
+minilm,E10,exact,yes,6,W4405809083,0.6083,1,A Review: Text Sentiment Analysis Methods
+minilm,E10,exact,yes,7,W4416421675,0.6078,1,"Bridging techniques and applications in sentiment analysis: Approaches, challenges, and emerging trends"
+minilm,E10,exact,yes,8,W4409854992,0.6048,1,Public sentiment analysis of data center energy consumption using social media data and large language models
+minilm,E10,exact,yes,9,W4407721413,0.6035,1,Research on Sentiment Analysis of Online Public Opinion Based on RoBERTa–BiLSTM–Attention Model
+minilm,E10,exact,yes,10,W4408941361,0.6001,1,Aspect-Based Sentiment Analysis: A Comprehensive Review and Open Research Challenges
+minilm,P01,paraphrase,yes,1,W4404592198,0.5427,1,Integrating artificial intelligence with smartphone-based imaging for cancer detection in vivo
+minilm,P01,paraphrase,yes,2,W7131403784,0.5244,1,Impact of tissue staining and scanner variation on the performance of pathology foundation models: a study of sarcomas and their mimics
+minilm,P01,paraphrase,yes,3,W4412451635,0.5236,0,"Whole Slide Imaging (WSI) in Pathology: Emerging Trends and Future Applications in Clinical Diagnostics, Medical Education, and Pathology"
+minilm,P01,paraphrase,yes,4,W4403570272,0.5174,0,Transforming Diagnostics: A Comprehensive Review of Advances in Digital Pathology
+minilm,P01,paraphrase,yes,5,W4409253797,0.5138,0,"Toward Optimizing the Impact of Digital Pathology and Augmented Intelligence on Issues of Diagnosis, Grading, Staging, and Classification"
+minilm,P01,paraphrase,yes,6,W4410734748,0.5091,0,Generating dermatopathology reports from gigapixel whole slide images with HistoGPT
+minilm,P01,paraphrase,yes,7,W4406190036,0.5085,1,Cancer Detection Using Artificial Intelligence: A Paradigm in Early Diagnosis
+minilm,P01,paraphrase,yes,8,W4403828973,0.5075,1,An Artificial Intelligent System for Prostate Cancer Diagnosis in Whole Slide Images
+minilm,P01,paraphrase,yes,9,W4405826939,0.5044,1,The application of artificial intelligence in upper gastrointestinal cancers
+minilm,P01,paraphrase,yes,10,W4415360543,0.5033,1,Use of AI Histopathology in Breast Cancer Diagnosis
+minilm,P02,paraphrase,yes,1,W4412654518,0.6186,1,Towards practical federated learning and evaluation for medical prediction models
+minilm,P02,paraphrase,yes,2,W4407152314,0.588,1,Distributed cross-learning for equitable federated models - privacy-preserving prediction on data from five California hospitals
+minilm,P02,paraphrase,yes,3,W4409813021,0.566,1,"Federated Learning in Smart Healthcare: A Survey of Applications, Challenges, and Future Directions"
+minilm,P02,paraphrase,yes,4,W4417170905,0.5608,1,Federation Opacity and the Promise of Federated Learning in Healthcare
+minilm,P02,paraphrase,yes,5,W4411249241,0.5591,1,Advances in Application of Federated Machine Learning for Oncology and Cancer Diagnosis
+minilm,P02,paraphrase,yes,6,W4409129975,0.5585,1,Healthcare Industry 5.0: Pareto-Optimal IoT-Based Health Monitoring With Federated Learning
+minilm,P02,paraphrase,yes,7,W4403468860,0.5486,1,Knowledge abstraction and filtering based federated learning over heterogeneous data views in healthcare
+minilm,P02,paraphrase,yes,8,W4405350707,0.5458,1,Enabling end-to-end secure federated learning in biomedical research on heterogeneous computing environments with APPFLx
+minilm,P02,paraphrase,yes,9,W4403914197,0.5447,1,A review on federated learning in computational pathology
+minilm,P02,paraphrase,yes,10,W4412150104,0.5356,1,"Foundational models and federated learning: survey, taxonomy, challenges and practical insights"
+minilm,P03,paraphrase,yes,1,W4403545034,0.6214,1,A review of the state of the art in solar photovoltaic output power forecasting using data-driven models
+minilm,P03,paraphrase,yes,2,W4408936068,0.6087,0,Prediction of photovoltaic panel cell temperatures: Application of empirical and machine learning models
+minilm,P03,paraphrase,yes,3,W4408960186,0.597,1,Techno-economic implications and cost of forecasting errors in solar PV power production using optimized deep learning models
+minilm,P03,paraphrase,yes,4,W4406414166,0.596,1,Exploring deep learning methods for solar photovoltaic power output forecasting: A review
+minilm,P03,paraphrase,yes,5,W4409327150,0.5954,1,Enhancing the Efficacy of Short-Term Prediction Models for Solar Photovoltaic Systems: An Influence Examination of Chronological and Meteorological Factors
+minilm,P03,paraphrase,yes,6,W4403973756,0.587,1,Advancing global solar photovoltaic power forecasting with sub-seasonal climate outlooks
+minilm,P03,paraphrase,yes,7,W4405404844,0.5815,1,A simple non-parametric model for photovoltaic output power prediction
+minilm,P03,paraphrase,yes,8,W4415928768,0.5794,1,Review of Data-Driven Approaches Applied to Time-Series Solar Irradiance Forecasting for Future Energy Networks
+minilm,P03,paraphrase,yes,9,W4408237741,0.5745,0,Machine Learning-Based Evaluation of Solar Photovoltaic Panel Exergy and Efficiency Under Real Climate Conditions
+minilm,P03,paraphrase,yes,10,W4407712245,0.5733,0,Assessment of solar energy generation potential in Western Bhutan – A case study of 12 kWp grid-tied rooftop solar photovoltaic system
+minilm,P04,paraphrase,yes,1,W4406512253,0.6973,1,Demonstrating quantum error mitigation on logical qubits
+minilm,P04,paraphrase,yes,2,W4414533470,0.6864,1,Error mitigation with stabilized noise in superconducting quantum processors
+minilm,P04,paraphrase,yes,3,W4404567745,0.6832,1,On proving the robustness of algorithms for early fault-tolerant quantum computers
+minilm,P04,paraphrase,yes,4,W4403714964,0.6513,1,Noise-adapted recovery circuits for quantum error correction
+minilm,P04,paraphrase,yes,5,W4407910963,0.6511,1,Scalable Noise Characterization of Syndrome-Extraction Circuits with Averaged Circuit Eigenvalue Sampling
+minilm,P04,paraphrase,yes,6,W4393114813,0.6508,0,Noise-induced shallow circuits and the absence of barren plateaus
+minilm,P04,paraphrase,yes,7,W4410120682,0.6479,1,Virtual Channel Purification
+minilm,P04,paraphrase,yes,8,W4404829411,0.6453,1,Mitigating errors in logical qubits
+minilm,P04,paraphrase,yes,9,W4408343564,0.6453,1,Beyond NISQ: The Megaquop Machine
+minilm,P04,paraphrase,yes,10,W4408188551,0.6385,1,Fault-tolerant quantum architectures based on erasure qubits
+minilm,P05,paraphrase,yes,1,W4405564391,0.708,1,"A review on polyadic chatbots: trends, challenges, and future research directions"
+minilm,P05,paraphrase,yes,2,W4406821730,0.6821,1,A survey on chatbots and large language models: Testing and evaluation techniques
+minilm,P05,paraphrase,yes,3,W4404056744,0.6458,1,Investigating the capabilities of large language model-based task-oriented dialogue chatbots from a learner’s perspective
+minilm,P05,paraphrase,yes,4,W4414812353,0.6279,1,The quasi-domestication of social chatbots: The case of Replika
+minilm,P05,paraphrase,yes,5,W4405417134,0.604,1,The Three Social Dimensions of Chatbot Technology
+minilm,P05,paraphrase,yes,6,W4404996504,0.5951,1,Classification of human- and AI-generated texts for different languages and domains
+minilm,P05,paraphrase,yes,7,W4408740572,0.5894,1,Assessing the Capability of Large Language Model Chatbots in Generating Plain Language Summaries
+minilm,P05,paraphrase,yes,8,W4408296650,0.5867,1,Tasks Over Traits: User Perception of Humanlike Features in Goal-Oriented Chatbots
+minilm,P05,paraphrase,yes,9,W4414837698,0.5845,1,AI companionship or digital entrapment? investigating the impact of anthropomorphic AI-based chatbots
+minilm,P05,paraphrase,yes,10,W4406814994,0.5812,1,Personalization capabilities of current technology chatbots in a learning environment: An analysis of student-tutor bot interactions
+minilm,P06,paraphrase,yes,1,W4411171960,0.482,0,Safety Implications of Explainable Artificial Intelligence in End-to-End Autonomous Driving
+minilm,P06,paraphrase,yes,2,W4415980297,0.4737,1,A Survey on Reinforcement Learning for Optimal Decision‐Making and Control of Intelligent Vehicles
+minilm,P06,paraphrase,yes,3,W4413916436,0.4729,1,An uncertainty-aware safe-evolving reinforcement learning algorithm for decision-making and control in highway autonomous driving
+minilm,P06,paraphrase,yes,4,W4403510866,0.4657,1,A platform-agnostic deep reinforcement learning framework for effective Sim2Real transfer towards autonomous driving
+minilm,P06,paraphrase,yes,5,W4408578880,0.4597,1,The investigation of reinforcement learning-based end-to-end decision-making algorithms for autonomous driving on the road with consecutive sharp turns
+minilm,P06,paraphrase,yes,6,W4407772786,0.4563,1,Knowledge transfer from simple to complex: A safe and efficient reinforcement learning framework for autonomous driving decision-making
+minilm,P06,paraphrase,yes,7,W4406983036,0.4507,1,Reinforcement Learning-Based Oscillation Dampening: Scaling Up Single-Agent Reinforcement Learning Algorithms to a 100-Autonomous-Vehicle Highway Field Operational Test
+minilm,P06,paraphrase,yes,8,W4413380967,0.424,1,Deep Reinforcement and IL for Autonomous Driving: A Review in the CARLA Simulation Environment
+minilm,P06,paraphrase,yes,9,W4408120209,0.4123,1,A Novel Approach to Autonomous Driving Using Double Deep Q-Network-Bsed Deep Reinforcement Learning
+minilm,P06,paraphrase,yes,10,W4404580175,0.4117,1,A velocity adaptive steering control strategy of autonomous vehicle based on double deep Q-learning network with varied agents
+minilm,P07,paraphrase,yes,1,W4414091921,0.4806,0,Can LLMs Hack Enterprise Networks? Autonomous Assumed Breach Penetration-Testing Active Directory Networks
+minilm,P07,paraphrase,yes,2,W4404725664,0.4414,0,Framework to analyze and exploit the smart home IoT firmware
+minilm,P07,paraphrase,yes,3,W7147528103,0.4265,1,Intrusion Detection in the Structure of Signal-Code Design in Cyber-Physical Systems of Swarm Small Aerial Vehicles Group Interaction
+minilm,P07,paraphrase,yes,4,W4404056938,0.4048,1,Poisoning the Well: Adversarial Poisoning on ML-Based Software-Defined Network Intrusion Detection Systems
+minilm,P07,paraphrase,yes,5,W4410088070,0.3991,1,Adversarial Attack Detection in Industrial Control Systems Using LSTM-Based Intrusion Detection and Black-Box Defense Strategies
+minilm,P07,paraphrase,yes,6,W4403794752,0.3982,1,A Review on Network Covert Channel Construction and Attack Detection
+minilm,P07,paraphrase,yes,7,W4409891025,0.3981,0,Weirdnodes: centrality based anomaly detection on temporal networks for the anti-financial crime domain
+minilm,P07,paraphrase,yes,8,W4407168340,0.3979,0,Resilient Distributed Kalman Filtering Against Malicious Cyber Attacks
+minilm,P07,paraphrase,yes,9,W4404437806,0.3966,1,Fed-LSAE: Thwarting poisoning attacks against federated cyber threat detection system via Autoencoder-based latent space inspection
+minilm,P07,paraphrase,yes,10,W4406978349,0.3951,1,Explainable artificial intelligence models in intrusion detection systems
+minilm,P08,paraphrase,yes,1,W4407077949,0.6491,1,A framework for adapting conversational intelligent tutoring systems to enable collaborative learning
+minilm,P08,paraphrase,yes,2,W4412022267,0.5888,1,A Study On The Application Of Machine Learning In Adaptive Intelligent Tutoring Systems
+minilm,P08,paraphrase,yes,3,W4411842899,0.5785,1,Adaptive intelligent tutoring systems for STEM education: analysis of the learning impact and effectiveness of personalized feedback
+minilm,P08,paraphrase,yes,4,W4411019632,0.5677,1,Dynamic Adaptation in an Intelligent Multi-Tutoring System: A Multi-Agent Approach
+minilm,P08,paraphrase,yes,5,W4411505840,0.5587,1,AI tutoring outperforms in-class active learning: an RCT introducing a novel research-based design in an authentic educational setting
+minilm,P08,paraphrase,yes,6,W4405107771,0.5552,1,PerFuSIT: Personalized Fuzzy Logic Strategies for Intelligent Tutoring of Programming
+minilm,P08,paraphrase,yes,7,W4405514786,0.5527,1,The effectiveness of intelligent tutoring systems in supporting students with varying levels of programming experience
+minilm,P08,paraphrase,yes,8,W4409955995,0.5463,1,AI-driven autonomous interactive English learning language tutoring system
+minilm,P08,paraphrase,yes,9,W4407405826,0.5391,1,Analysis of Learning Behaviors and Outcomes for Students with Different Knowledge Levels: A Case Study of Intelligent Tutoring System for Coding and Learning (ITS-CAL)
+minilm,P08,paraphrase,yes,10,W4416848201,0.5271,1,SP-TeachLLM: An LLM-Driven Framework for Personalized and Adaptive Programming Education
+minilm,P09,paraphrase,yes,1,W4407410784,0.5354,0,Citizen preferences for online hate speech regulation
+minilm,P09,paraphrase,yes,2,W4407171721,0.5199,0,"Exploring hate speech dynamics: The emotional, linguistic, and thematic impact on social media users"
+minilm,P09,paraphrase,yes,3,W4408420763,0.5045,0,Too much of what? Two-wave panel evidence for selective (de-)sensitization through frequent exposure to different kinds of digital hate
+minilm,P09,paraphrase,yes,4,W4404231237,0.5008,1,Detecting and regulating sentiment reversal and polarization in online communities
+minilm,P09,paraphrase,yes,5,W7123432711,0.486,1,Audience Trends on Facebook Regarding the Gaza War: A Sentiment Analysis Study Using Big Data
+minilm,P09,paraphrase,yes,6,W4406180923,0.4774,0,"Hate Speech Detection Research in South Asian Languages: A Survey of Tasks, Datasets and Methods"
+minilm,P09,paraphrase,yes,7,W4405907401,0.4731,0,Perceptions in 3.6 Million Web-Based Posts of Online Communities on the Use of Cancer Immunotherapy: Data Mining Using BERTopic
+minilm,P09,paraphrase,yes,8,W7127267982,0.4717,0,Hate Speech on Social Media: Unpacking How Toxic Language Fuels Anti-Immigrant Hostility
+minilm,P09,paraphrase,yes,9,W4415257622,0.4695,0,HateBuffer: Safeguarding Content Moderators' Mental Well-Being through Hate Speech Content Modification
+minilm,P09,paraphrase,yes,10,W7155004074,0.4677,0,Biased or credible? Investigating perceived persuasiveness of AI-generated review summaries in online travel platforms
+minilm,P10,paraphrase,no,1,W4410291869,0.3478,1,Enhancing protein structure predictions: DeepSHAP as a tool for understanding AlphaFold2
+minilm,P10,paraphrase,no,2,W4416808605,0.3443,1,A Quantum Framework for Protein Binding‐Site Structure Prediction on Utility‐Level Quantum Processors
+minilm,P10,paraphrase,no,3,W4407884158,0.3192,0,Generation of three-dimensional cluster entangled state
+minilm,P10,paraphrase,no,4,W7160866869,0.3125,0,Towards the explainability of protein language models
+minilm,P10,paraphrase,no,5,W4407374186,0.3033,0,Symmetry-invariant quantum machine learning force fields
+minilm,P10,paraphrase,no,6,W4409225786,0.2994,0,habtools : An R package to calculate 3D metrics for surfaces and objects
+minilm,P10,paraphrase,no,7,W4414932387,0.2826,0,Accurate quantum-centric simulations of intermolecular interactions
+minilm,P10,paraphrase,no,8,W4405046997,0.2826,0,Interpretable and explainable predictive machine learning models for data-driven protein engineering
+minilm,P10,paraphrase,no,9,W4414080851,0.2706,0,Hamiltonian simulation-based quantum-selected configuration interaction for large-scale electronic structure calculations with a quantum computer
+minilm,P10,paraphrase,no,10,W4409870600,0.2682,0,Efficient State Preparation for the Quantum Simulation of Molecules in First Quantization

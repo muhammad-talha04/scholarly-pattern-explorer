@@ -1,6 +1,18 @@
 # Project status (read this first)
 
-Last updated: 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a month)` workflow and fixed country growth (see below). Earlier, 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md` (handover report for the next team). Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+Last updated: 2026-10-16 ~17:00 PKT by bob: embedding evaluation and fastembed bge backend (see below). Earlier, 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a month)` workflow and fixed country growth (see below). Earlier, 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md` (handover report for the next team). Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+
+## 2026-10-16 (bob): embedding evaluation (council roadmap 6) and fastembed bge backend
+- **Evaluation** (`eval/embedder-2026-10-16/REPORT.md`). Run on the exact live corpus: all 14,159 papers, titles and abstracts read from Supabase `paper_embeddings.meta` with SELECT only. 20 queries (10 exact-term, 10 paraphrases, including the council's six) plus 5 off-topic calibration queries; 600 strict top-10 judgments. In-corpus queries with top-5 mostly relevant (≥3/5), of 18: **hash 9** (0/9 paraphrases), **bge-small-en-v1.5 (fastembed) 18**, **MiniLM (fastembed) 16**. Council tumour query, top 5: 0/5, 4/5, 2/5. Mean P@10: 0.48 / 0.88 / 0.88.
+- **Decision: fastembed `BAAI/bge-small-en-v1.5`.** Peak RSS inside the API is 294 MB (MiniLM 242 MB, hash 63 MB), and warm query embedding takes ~5 ms on one core. Re-embedding on the shared 8-vCPU box runs at 18 papers/s: ~13 min for 14k, ~64 min for 70k (MiniLM is 6× faster).
+- **No-match floor per model:** hash off, MiniLM 0.38, bge 0.68. `SEARCH_MIN_SCORE` (or `ML_SEARCH_MIN_SCORE`) overrides it, and 0 turns it off. Uncalibrated models have no floor. The bge margin is thin (off-topic max 0.649, weakest relevant hit 0.673), so recheck after the re-embed.
+- **fastembed backend fixes (supersedes #30):**
+  - `FastEmbedder` passes `batch_size` (default 32, `ML_EMBED_BATCH_SIZE`). fastembed's default of 256 hit 8.6 GB RSS in the indexer.
+  - Labels are `fastembed:<model>@fastembed-<version>` (or `@$ML_EMBED_MODEL_REVISION`), so the indexer's mixed-model guard keeps fastembed (Qdrant's quantized ONNX export) apart from torch vectors.
+  - The model cache is `<repo>/.cache/fastembed` (`FASTEMBED_CACHE_PATH`), and the Render build now runs `python -m ml.prefetch_model`.
+  - `fastembed==0.9.0` is pinned.
+- **Production is unchanged.** `render.yaml` pins `ML_EMBEDDER=hash` until the bge re-embed. `v2-ingest.yml` was not edited and must set `ML_EMBEDDER=fastembed` and `ML_EMBED_MODEL=BAAI/bge-small-en-v1.5` before it is re-enabled.
+- **Release `data-store/works_v2.jsonl` is not the live corpus.** It holds 50,000 works, all published 2025-10 or later, and only 2,999 of the live 14,159.
 
 ## 2026-10-16 (olli)
 - **Ingest paused.** The `v2 ingest (twice a month)` GitHub Actions workflow is disabled (state `disabled_manually`), so the 1 Nov 08:00 PKT run will not mix a new embedding model into the hash-embedded corpus. Re-enable only after the embedding model is chosen and set in the workflow config. Workflow files were not edited.
@@ -120,7 +132,10 @@ Set these in the Render dashboard. `render.yaml` lists them as `sync: false`.
 |---|---|---|
 | `DATABASE_URL` | No | Postgres connection string (pgvector). Unset uses files under `ML_DATA_DIR`. Required for an index that survives a free-tier restart. |
 | `ML_VECTOR_BACKEND` | No | `local` forces files even when `DATABASE_URL` is set. `pgvector` forces Postgres and then `DATABASE_URL` is required. Unset follows `DATABASE_URL`. |
-| `ML_EMBEDDER` | No | `hash` boots without a model download. Unset loads `sentence-transformers` on the first encode. That package is not in `apps/api/requirements.txt`, so set `hash` on the free tier unless you install it. |
+| `ML_EMBEDDER` | No | `hash` boots without a model download (production today; `render.yaml` pins it). `fastembed` uses the ONNX backend with `ML_EMBED_MODEL` (chosen: `BAAI/bge-small-en-v1.5`); switch only after the corpus is re-embedded with it. Unset loads `sentence-transformers` on the first encode, which isn't in `apps/api/requirements.txt`. |
+| `SEARCH_MIN_SCORE` | No | Overrides the per-model "no close matches" cosine floor (hash off, MiniLM 0.38, bge 0.68). `0` turns it off. |
+| `ML_EMBED_MODEL_REVISION` | No | Overrides the version part of `paper_embeddings.model` (default `main`, or `fastembed-<version>` for fastembed). |
+| `ML_EMBED_BATCH_SIZE` / `FASTEMBED_CACHE_PATH` | No | fastembed batch (default 32) and model cache (default `<repo>/.cache/fastembed`, filled by `python -m ml.prefetch_model` at build). |
 | `ML_EMBED_MODEL` | No | Sentence-transformer id. Default `sentence-transformers/all-MiniLM-L6-v2`. |
 | `ML_DATA_DIR` | No | File-backend directory. Default `data/ml`. |
 | `ML_WORKS_PATH` | No | Corpus JSONL. Default `data/works_v2.jsonl` when that file exists. |
