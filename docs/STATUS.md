@@ -1,6 +1,6 @@
 # Project status (read this first)
 
-Last updated: 2026-10-16: added `docs/HANDOVER.md` (handover report for the next team). Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+Last updated: 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md` (handover report for the next team). Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
@@ -73,6 +73,9 @@ Merged into main, in order: #1 platform skeleton, #3 OpenAlex ingestion, #2 ML s
   - Offline tests use the hash embedder and the file backend: ml 73 pass (1 skipped real-model test), api 26 pass, integration 42 pass, pipeline 12 pass.
 
 - [x] Handover report (2026-10-16): `docs/HANDOVER.md` covers architecture, file map, env key names (no values), the Vercel/Render/Supabase runbook, the data pipeline, the PR #1–#26 timeline, errors and fixes, known limitations, a 75k-paper scaling plan (~5.6 KB/paper ≈ 420 MB against the 500 MB free limit; recommends stopping at ~70k or a paid tier), and a do/don't list. Measured 2026-10-16: Supabase 89 MB, `/galaxy` 4.4 MB with 14,159 nodes and 200 links. New risk recorded there: `v2-ingest.yml` runs `ml.cli index` without `ML_EMBEDDER=hash`, so do not add `DATABASE_URL` as a repo secret until that is fixed.
+
+- [ ] External review (council), 2026-10-16. Documentation only, no code change. `docs/HANDOVER.md` §11 records the council's score of 67/100 (revised from 65; data trust 13/25) and its issues: country growth compares a partial 2026 with a full 2025, which gives −80% to −98% for ~90% of countries; growth on tiny bases; the corpus scope is not labelled; gaps may be sampling holes; top topics are not specialised; no SSR or OG; hash search fails on paraphrases; there is no relevance cutoff; 200 s timeouts. §11 also has the 8-step remediation roadmap and the kill criteria.
+  - Next, item 1: **pause `v2 ingest (twice a month)`**. It is still enabled (state `active`), and the next run, 1 Nov 2026 08:00 PKT, would mix embeddings. No commits or PRs landed after #27 (a fix task was started and cancelled without commits).
 
 ## Deploy
 
