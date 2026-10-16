@@ -1,6 +1,11 @@
 # Project status (read this first)
 
-Last updated: 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md` (handover report for the next team). Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+Last updated: 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a month)` workflow and fixed country growth (see below). Earlier, 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md` (handover report for the next team). Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+
+## 2026-10-16 (olli)
+- **Ingest paused.** The `v2 ingest (twice a month)` GitHub Actions workflow is disabled (state `disabled_manually`), so the 1 Nov 08:00 PKT run will not mix a new embedding model into the hash-embedded corpus. Re-enable only after the embedding model is chosen and set in the workflow config. Workflow files were not edited.
+- **Country growth fixed** (`pipeline/country_stats.py`, spec `docs/growth_spec.md`). Growth is now Jan 1..newest publication date vs the same dates a year earlier, in the active counting mode. It is null with `growth_reason` `too_few_papers` (either period < 30) or `partial_year` (window touches 2024). New per-country fields: `growth_pct`, `growth_reason`, `growth_cur_count`, `growth_prev_count`, `growth_window_start`, `growth_window_end`. `deploy/data/country_snapshot.json` was regenerated with date counters rebuilt from the papers' publication dates in Supabase.
+- **Open data problem.** Even with equal periods, the 9 countries that still show growth all sit at about −80 to −90%. That's because the corpus is front-loaded: monthly volume falls from ~2,000 papers (Jan 2025) to under 30 (mid-2026). The council's median check (`pipeline/tests/test_growth.py`) is xfail until ingest is re-sampled evenly over time.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
