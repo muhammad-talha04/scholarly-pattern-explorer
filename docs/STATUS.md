@@ -20,6 +20,10 @@ Last updated: 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a mo
 ## 2026-10-16 (olli): share of corpus per country
 - New per-country fields: `share_pct`, `share_prev_pct`, `share_change_pp` and `share_reason` (null, `too_few_papers` or `partial_year`). They use the same window and rules as growth: the counts and window come from `growth_cur_count`, `growth_prev_count` and `growth_window_*`, and the active counting mode is used. The denominator is all papers in the window that have at least one country (new `papers_date` counter). Unlike growth, share isn't distorted by the front-loaded corpus. Snapshot regenerated: in fractional mode 9/135 countries are shown, median +0.5 pp, range −5.54 (CN) to +2.62 (US). In full counting it's 16/135, median +1.42 pp, range −3.53 to +4.86.
 
+## 2026-10-16 (evan): share card and country permalinks (council step 10, issue 6)
+- `app/opengraph-image.tsx` renders one 1200×630 share card. `pageMeta` lists it in `openGraph.images` and `twitter.images` on every route, because a page's own `openGraph` replaces the inherited one.
+- `/countries` keeps the selection in the URL: `?country=CN&counting=full` (fractional is the default and isn't written). The URL is read after mount with `window.location` rather than `useSearchParams`, so the server-rendered rows from the SSR PR stay in the HTML.
+
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
 meaning, read summaries, ask questions about a paper, open the original, see
