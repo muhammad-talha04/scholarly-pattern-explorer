@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import type { Result, Source } from "./api/client";
 
-export function useApi<T>(fn: () => Promise<Result<T>>, deps: unknown[]) {
+/** `initial` is server-fetched data: it renders on first paint (and in the HTML crawlers see) and stays on screen while the client refetches. */
+export function useApi<T>(fn: () => Promise<Result<T>>, deps: unknown[], initial?: T) {
   const [nonce, setNonce] = useState(0);
-  const [state, set] = useState<{ data?: T; source?: Source; error?: string; loading: boolean }>({ loading: true });
+  const [state, set] = useState<{ data?: T; source?: Source; error?: string; loading: boolean }>(initial === undefined ? { loading: true } : { data: initial, source: "live", loading: true });
   useEffect(() => {
     let live = true;
     set((s) => ({ ...s, loading: true, error: undefined }));
