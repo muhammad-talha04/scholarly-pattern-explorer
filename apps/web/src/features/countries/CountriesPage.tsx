@@ -17,12 +17,12 @@ import { Share } from "./Share";
 
 const Globe3D = dynamic(() => import("./Globe3D"), { ssr: false, loading: () => <LoadingBlock label="Raising the globe" /> });
 
-export function CountriesPage() {
+export function CountriesPage({ initialCountries }: { initialCountries?: CountryStats[] } = {}) {
   const { lowPower } = useMotionPrefs();
   const [counting, setCounting] = useState<Counting>("fractional");
   const [sel, setSel] = useState<string | null>(null);
   const [year, setYear] = useState<number | "all">("all");
-  const cs = useApi(() => api.countries(counting), [counting]);
+  const cs = useApi(() => api.countries(counting), [counting], counting === "fractional" ? initialCountries : undefined);
   const col = useApi(() => api.collaborations(counting), [counting]);
   const tcy = useApi(() => api.topicCountryYears({ limit: 5000 }), []);
   const yearlyReady = tcy.source === "live" || prefersFixtures();
