@@ -18,7 +18,36 @@ import { galaxyColor } from "@/lib/palette";
 const SUGGESTIONS = ["Protein folding", "Climate modelling", "Large language models"];
 import { centroid, freshPaperIds, type PlexusPose, type Star } from "./stars";
 
-const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () => <GalaxyLoading /> });
+const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () => <GalaxyPlaceholder /> });
+
+/** The hero only needs a sample of the graph; full-graph views keep asking for everything. */
+export const HERO_GALAXY_LIMIT = 600;
+
+/** True once the browser has painted and gone idle, so the WebGL bundle never competes with the hero text. */
+export function useAfterIdle(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let idle: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const raf = requestAnimationFrame(() => {
+      const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+      if (w.requestIdleCallback) idle = w.requestIdleCallback(() => setReady(true), { timeout: 2000 });
+      else timer = setTimeout(() => setReady(true), 200);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      const w = window as Window & { cancelIdleCallback?: (id: number) => void };
+      if (idle !== undefined) w.cancelIdleCallback?.(idle);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+  return ready;
+}
+
+/** Static stand-in that fills the same absolute box as the canvas, so swapping it in causes no layout shift. */
+export function GalaxyPlaceholder() {
+  return <div data-testid="galaxy-placeholder" aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_45%,rgba(255,190,120,0.10),transparent_60%)]" />;
+}
 
 function withCenters(nodes: Star[]): Star[] {
   const groups = new Map<string, Star[]>();
@@ -83,7 +112,8 @@ export function GalaxyHero() {
   }, []);
   const pats = useApi(() => api.patterns(), []);
   const gaps = useApi(() => api.patterns({ trend: "gap" }), []);
-  const galaxy = useApi(() => api.galaxy(), []);
+  const galaxy = useApi(() => api.galaxy(HERO_GALAXY_LIMIT), []);
+  const canvasReady = useAfterIdle();
   const graph = useMemo(() => buildTopicGraph(pats.data ?? [], gaps.data ?? []), [pats.data, gaps.data]);
   const useCoords = galaxy.source === "live" || (galaxy.source === "mock" && (prefersFixtures() || pats.source !== "live"));
   const view = useMemo(() => project(graph, galaxy.data, !!useCoords), [graph, galaxy.data, useCoords]);
@@ -114,7 +144,7 @@ export function GalaxyHero() {
     </div>
   ) : lowPower ? (
     <Galaxy2D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} pose={pose} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
-  ) : (
+  ) : !canvasReady ? <GalaxyPlaceholder /> : (
     <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} pose={pose} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
   );
   return (
@@ -122,13 +152,14 @@ export function GalaxyHero() {
       <div className="absolute inset-0 z-0">{sky}</div>
       <div aria-hidden className="hero-scrim pointer-events-none absolute inset-0 z-10" />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-gradient-to-b from-ink to-transparent" />
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="pointer-events-none relative z-30 flex h-full flex-col justify-start px-4 pb-8 pt-28 sm:px-8 lg:w-[54%] lg:justify-center lg:pb-16 lg:pt-24">
+      <motion.div initial={false} className="pointer-events-none relative z-30 flex h-full flex-col justify-start px-4 pb-8 pt-28 sm:px-8 lg:w-[54%] lg:justify-center lg:pb-16 lg:pt-24">
         <div className="pointer-events-auto max-w-xl text-left">
           <p className="font-mono text-[11px] font-medium tracking-[0.18em] text-accent">OPENALEX · EMBEDDINGS · COSINE SIMILARITY</p>
           <h1 className="mt-3 font-sans text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
             Explore AI research <span className="text-accent">by topic</span>
           </h1>
           <p className="mt-4 max-w-md text-sm text-mist sm:text-base">Each dot is a topic or a research gap. Nearby dots share keywords and topics.</p>
+          <p data-testid="hero-caption" className="mt-2 max-w-md text-xs text-slate-400">Dot positions show topic clusters; connecting lines are decorative.</p>
           <div className="mt-6">
             <SearchBar big onSubmit={(q) => router.push(`/search?q=${encodeURIComponent(q)}`)} />
             <ul aria-label="Suggestions" className="mt-3 flex flex-wrap gap-2">
@@ -146,10 +177,12 @@ export function GalaxyHero() {
           <label className="glass inline-flex w-fit cursor-pointer items-center gap-2 px-3 py-2 text-sm text-mist">
             <input type="checkbox" checked={showGaps} onChange={(e) => setShowGaps(e.target.checked)} className="accent-gap" />
             Highlight gaps
-            {gaps.data && <span className="chip">{gaps.data.length}</span>}
+            <span className="chip inline-block min-w-[2.5ch] text-center tabular-nums" aria-hidden={!gaps.data}>{gaps.data ? gaps.data.length : "\u00a0"}</span>
           </label>
+          {/* Fixed-height slot so the controls never jump when clusters arrive. */}
+          <div data-testid="legend-slot" className="h-14 w-[min(36rem,calc(100vw-1.5rem))] max-w-xl">
           {clusterLegend.length > 0 && (
-            <ul aria-label="Topic clusters" className="glass flex max-w-xl flex-wrap gap-x-3 gap-y-1 px-3 py-2 text-xs text-mist">
+            <ul aria-label="Topic clusters" className="glass flex h-full flex-wrap content-start gap-x-3 gap-y-1 overflow-y-auto px-3 py-2 text-xs text-mist">
               {clusterLegend.map((row) => (
                 <li key={row.name}>
                   <button type="button" className="inline-flex items-center gap-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => setClusterQuery(row.name)}>
@@ -160,6 +193,7 @@ export function GalaxyHero() {
               ))}
             </ul>
           )}
+          </div>
         </div>
         <details className="glass max-h-40 overflow-auto px-3 py-2 text-sm text-mist">
           <summary className="cursor-pointer text-white" title="Each point is a research topic; gaps are topic pairs our sample rarely connects">Topics ({stars.length}){stars.some((n) => n.gap) ? <span className="text-mist"> · {stars.filter((n) => !n.gap).length} topics + {stars.filter((n) => n.gap).length} gaps</span> : null}</summary>
