@@ -11,7 +11,7 @@ type ShareFields = Pick<Partial<CountryStats>,
   "share_pct" | "share_prev_pct" | "share_change_pp" | "share_reason" |
   "growth_cur_count" | "growth_prev_count" | "growth_window_start" | "growth_window_end">;
 
-const pct = (v: number) => `${v.toFixed(1)}%`;
+const pct = (v: number) => `${v.toFixed(2)}%`;
 
 /** Tooltip: both shares, both counts and the window dates when the API sends them. */
 export function shareDetail(c: ShareFields): string {
@@ -40,7 +40,7 @@ export function Share({ c }: { c: ShareFields }) {
     <span title={detail} className="tabular-nums">
       {pct(c.share_pct!)}
       {d != null && Number.isFinite(d) && (
-        <span className={`block text-[10px] ${d >= 0 ? "text-up" : "text-down"}`}>{d >= 0 ? "+" : "\u2212"}{Math.abs(d).toFixed(1)} pp</span>
+        <span className={`block text-[10px] ${d >= 0 ? "text-up" : "text-down"}`}>{d >= 0 ? "+" : "\u2212"}{Math.abs(d).toFixed(2)} pp</span>
       )}
     </span>
   );

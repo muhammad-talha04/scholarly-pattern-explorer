@@ -6,14 +6,14 @@ test("share column is off by default", () => expect(SHOW_SHARE).toBe(false));
 
 test("shows share and pp change with tooltip details", () => {
   render(<Share c={{ share_pct: 31.24, share_prev_pct: 28.0, share_change_pp: 3.24, growth_cur_count: 4000, growth_prev_count: 3500, growth_window_start: "2026-01-01", growth_window_end: "2026-09-30" }} />);
-  const el = screen.getByText("31.2%");
-  expect(screen.getByText("+3.2 pp")).toBeInTheDocument();
-  expect(el.getAttribute("title")).toMatch(/2026-01-01 to 2026-09-30.*Share 31\.2% now vs 28\.0% before.*4,000 papers now vs 3,500/);
+  const el = screen.getByText("31.24%");
+  expect(screen.getByText("+3.24 pp")).toBeInTheDocument();
+  expect(el.getAttribute("title")).toMatch(/2026-01-01 to 2026-09-30.*Share 31\.24% now vs 28\.00% before.*4,000 papers now vs 3,500/);
 });
 
 test("negative change uses a minus sign", () => {
   render(<Share c={{ share_pct: 5, share_change_pp: -1.25 }} />);
-  expect(screen.getByText("\u22121.3 pp")).toBeInTheDocument();
+  expect(screen.getByText("\u22121.25 pp")).toBeInTheDocument();
 });
 
 test("share_reason and the 30-paper rule block the value", () => {
