@@ -35,7 +35,7 @@ export default function AboutPage() {
       </section>
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">Growth figures</h2>
-        <p>Growth compares two periods of equal length. When either period has fewer than 30 papers, we show &ldquo;Not enough data&rdquo; instead of a percentage, because small counts swing wildly.</p>
+        <p>Growth trends are hidden while we rebalance the paper sample. When they return, growth will compare two periods of equal length. When either period has fewer than 30 papers, it will show &ldquo;Not enough data&rdquo; instead of a percentage, because small counts swing wildly.</p>
       </section>
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">How search works today</h2>

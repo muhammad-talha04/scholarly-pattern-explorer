@@ -11,6 +11,8 @@ import { EmptyState, ErrorNote, LoadingBlock, PageHeader } from "@/components/ui
 import { CountingToggle } from "./CountingToggle";
 import { Globe2D } from "./Globe2D";
 import { isRegion } from "@/lib/regions";
+import Link from "next/link";
+import { SHOW_GROWTH } from "@/lib/flags";
 
 const Globe3D = dynamic(() => import("./Globe3D"), { ssr: false, loading: () => <LoadingBlock label="Raising the globe" /> });
 
@@ -35,7 +37,7 @@ export function CountriesPage() {
   const fmt = (n: number) => (counting === "full" ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 1 }));
   return (
     <div>
-      <PageHeader title="Countries and regions" subtitle="Paper counts, growth and collaboration arcs. Drag the globe, or pick a row.">
+      <PageHeader title="Countries and regions" subtitle={`Paper counts${SHOW_GROWTH ? ", growth" : ""} and collaboration arcs. Drag the globe, or pick a row.`}>
         <CountingToggle value={counting} onChange={setCounting} />
       </PageHeader>
       {cs.error && <ErrorNote msg={cs.error} onRetry={cs.reload} />}
@@ -67,7 +69,8 @@ export function CountriesPage() {
           {current && (
             <motion.div key={current.code} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="glass p-4">
               <div className="flex items-baseline justify-between"><h2 className="text-lg font-semibold text-white">{current.name}{isRegion(current.code) && <RegionTag />}</h2><button className="chip hover:text-white" onClick={() => setSel(null)}>clear</button></div>
-              <p className="mt-1 text-sm text-mist">{fmt(current.papers)} papers ({counting}{year !== "all" ? `, ${year}` : ""}) · growth <Growth v={current.growth_pct} c={current} /></p>
+              <p className="mt-1 text-sm text-mist">{fmt(current.papers)} papers ({counting}{year !== "all" ? `, ${year}` : ""}){SHOW_GROWTH && <> · growth <Growth v={current.growth_pct} c={current} /></>}</p>
+              {!SHOW_GROWTH && <div className="-mx-2"><GrowthHiddenNote /></div>}
               <h3 className="mt-3 text-xs uppercase tracking-wide text-mist">Top topics</h3>
               <div className="mt-1 flex flex-wrap gap-1.5">{current.top_topics.map((t) => <span key={t} className="chip">{t}</span>)}</div>
               {partners.length > 0 && <><h3 className="mt-3 text-xs uppercase tracking-wide text-mist">Top collaborators</h3>
@@ -85,17 +88,24 @@ function CountryTable({ list, sel, onSelect, fmt }: { list: CountryStats[]; sel:
   return (
     <div className="glass max-h-[440px] overflow-auto p-2">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-ink/90 text-left text-xs uppercase text-mist"><tr><th className="p-2">Country/region</th><th className="p-2 text-right">Papers</th><th className="p-2 text-right" title="Change between two equal-length periods">Growth</th></tr></thead>
+        <thead className="sticky top-0 bg-ink/90 text-left text-xs uppercase text-mist"><tr><th className="p-2">Country/region</th><th className="p-2 text-right">Papers</th>{SHOW_GROWTH && <th className="p-2 text-right" title="Change between two equal-length periods">Growth</th>}</tr></thead>
         <tbody>{list.map((c) => (
           <tr key={c.code} className={sel === c.code ? "bg-gap/10" : ""}>
             <td className="p-0"><button className="w-full px-2 py-2 text-left hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => onSelect(c.code)} aria-pressed={sel === c.code}>{c.name}{isRegion(c.code) && <RegionTag />}<div className="text-xs text-slate-400">{c.top_topics.slice(0, 2).join(" · ")}</div></button></td>
             <td className="p-2 text-right tabular-nums">{fmt(c.papers)}</td>
-            <td className="p-2 text-right"><Growth v={c.growth_pct} c={c} /></td>
+            {SHOW_GROWTH && <td className="p-2 text-right"><Growth v={c.growth_pct} c={c} /></td>}
           </tr>))}</tbody>
       </table>
-      <p className="px-2 pt-2 text-xs text-slate-400">Growth compares two equal-length periods. It shows &ldquo;Not enough data&rdquo; when either period has fewer than 30 papers or covers a partial year. Hover a value for both counts and the dates. &ldquo;Region&rdquo; marks territories that are not sovereign countries.</p>
+      {SHOW_GROWTH ? (
+        <p className="px-2 pt-2 text-xs text-slate-400">Growth compares two equal-length periods. It shows &ldquo;Not enough data&rdquo; when either period has fewer than 30 papers or covers a partial year. Hover a value for both counts and the dates.</p>
+      ) : <GrowthHiddenNote />}
+      <p className="px-2 pt-1 text-xs text-slate-400">&ldquo;Region&rdquo; marks territories that are not sovereign countries.</p>
     </div>
   );
+}
+
+export function GrowthHiddenNote() {
+  return <p data-testid="growth-hidden" className="px-2 pt-2 text-xs text-slate-400">Growth trends are hidden while we rebalance the paper sample; see <Link href="/about" className="text-accent hover:underline">About the data</Link>.</p>;
 }
 
 function RegionTag() {
