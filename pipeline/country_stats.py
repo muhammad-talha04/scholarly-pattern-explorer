@@ -20,7 +20,15 @@ from countries import COUNTRIES  # noqa: E402  (existing ISO table in repo root)
 from ml.paths import resolve, topic_country_year_db  # noqa: E402
 
 KEYS = ("by_year", "frac", "topics", "topic_years", "topic_countries",
-        "pairs_frac", "pairs_1n", "topic_names", "tcy_papers", "tcy_frac")
+        "pairs_frac", "pairs_1n", "topic_names", "tcy_papers", "tcy_frac",
+        "by_date", "frac_date")
+# by_date / frac_date: {country: {"YYYY-MM-DD": count}} (whole / fractional), used for
+# the equal-period growth metric. Papers without a publication date are skipped there.
+
+MIN_PAPERS = 30            # both periods need at least this many (active counting mode)
+PARTIAL_YEARS = {2024}     # corpus starts mid-Oct 2024: any window touching it is hidden
+GROWTH_FIELDS = ("growth_pct", "growth_reason", "growth_cur_count", "growth_prev_count",
+                 "growth_window_start", "growth_window_end")
 
 TOPIC_COUNTRY_YEAR_COLUMNS = (
     "topic_id", "topic_name", "country_code", "year", "paper_count", "fractional_count",
@@ -115,6 +123,11 @@ def tally(works) -> dict:
                 # default: every paper adds exactly 1 across its pairs
                 t["pairs_frac"]["all"][f"{a}-{b}"] += 2 / (n * (n - 1))
                 t["pairs_1n"]["all"][f"{a}-{b}"] += 1 / n
+        date = _iso_date(w.get("date") or w.get("publication_date"))
+        if date:
+            for c in cs:
+                t["by_date"][c][date] += 1
+                t["frac_date"][c][date] += weights[c]
         if cs:
             for tid, name in work_topic_refs(w):
                 t["topic_names"][tid][name] += 1
@@ -139,16 +152,61 @@ def combine(prev: dict | None, new: dict) -> dict:
     return out
 
 
+def _iso_date(v) -> str | None:
+    s = str(v or "")[:10]
+    if len(s) == 10 and s[4] == "-" and s[7] == "-" and s[:4].isdigit():
+        return s
+    return None
+
+
+def growth_window(t: dict) -> dict | None:
+    """Year-to-date window ending at the newest publication date in the data (not today).
+
+    current = Jan 1 .. cutoff of the cutoff's year; previous = the same dates a year earlier.
+    """
+    dates = [d for k in ("by_date",) for cs in (t.get(k) or {}).values() for d in cs]
+    if not dates:
+        return None
+    end = max(dates)
+    y = int(end[:4])
+    md = end[5:]
+    if md == "02-29":  # previous year may not have it
+        md = "02-28"
+    return {"cur_start": f"{y}-01-01", "cur_end": end,
+            "prev_start": f"{y - 1}-01-01", "prev_end": f"{y - 1}-{md}",
+            "years": (y - 1, y)}
+
+
+def growth_for(dates: dict | None, win: dict | None) -> dict:
+    """Equal-period growth for one series of {date: count}. Spec: docs/growth_spec.md."""
+    empty = dict.fromkeys(GROWTH_FIELDS)
+    if not win:
+        empty["growth_reason"] = "too_few_papers"
+        return empty
+    dates = dates or {}
+    cur = sum(v for d, v in dates.items() if win["cur_start"] <= d <= win["cur_end"])
+    prev = sum(v for d, v in dates.items() if win["prev_start"] <= d <= win["prev_end"])
+    out = {"growth_pct": None, "growth_reason": None,
+           "growth_cur_count": round(cur, 2), "growth_prev_count": round(prev, 2),
+           "growth_window_start": win["cur_start"], "growth_window_end": win["cur_end"]}
+    if PARTIAL_YEARS & set(win["years"]):
+        out["growth_reason"] = "partial_year"
+    elif cur < MIN_PAPERS or prev < MIN_PAPERS:
+        out["growth_reason"] = "too_few_papers"
+    else:
+        out["growth_pct"] = round(100 * (cur - prev) / prev, 1)
+    return out
+
+
 def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict]:
     src = t["frac"] if counting == "fractional" else t["by_year"]
+    dsrc = (t.get("frac_date") if counting == "fractional" else t.get("by_date")) or {}
+    win = growth_window(t)
     rows = []
     for code, years in src.items():
-        ys = sorted((int(y), n) for y, n in years.items() if y.isdigit())
-        growth = None
-        if len(ys) >= 2 and ys[-2][1]:
-            growth = round(100 * (ys[-1][1] - ys[-2][1]) / ys[-2][1], 1)
         rows.append({"code": code, "name": COUNTRIES.get(code, (code,))[0],
-                     "papers": round(sum(years.values()), 2), "growth_pct": growth,
+                     "papers": round(sum(years.values()), 2),
+                     **growth_for(dsrc.get(code), win),
                      "top_topics": [n for n, _ in t["topics"][code].most_common(top_n)],
                      "counting": counting})
     return sorted(rows, key=lambda r: -r["papers"])
@@ -273,11 +331,14 @@ def main(argv=None):
     ap.add_argument("--prev", help="previous snapshot JSON")
     ap.add_argument("--out", default="data/country_snapshot.json")
     ap.add_argument("--table", help="SQLite file for topic_country_year (default: beside --out)")
+    ap.add_argument("--dates", help="JSONL of {date, countries} for every work; rebuilds the "
+                    "date counters (by_date/frac_date) when --prev predates them")
     ap.add_argument("--corpus", help="full works JSONL; read once if --prev has no topic-country-year counters")
     a = ap.parse_args(argv)
     new_path = resolve(a.new)
     prev_path = resolve(a.prev) if a.prev else None
     corpus_path = resolve(a.corpus) if a.corpus else None
+    dates_path = resolve(a.dates) if a.dates else None
     with open(new_path, encoding="utf-8") as fh:
         new = tally(json.loads(l) for l in fh if l.strip())
     prev = json.loads(prev_path.read_text())["tally"] if prev_path and prev_path.exists() else None
@@ -289,6 +350,16 @@ def main(argv=None):
         with open(corpus_path, encoding="utf-8") as fh:
             seeded = tally(json.loads(l) for l in fh if l.strip())
         for key in ("topic_names", "tcy_papers", "tcy_frac"):
+            combined[key] = seeded[key]
+    if dates_path and dates_path.is_file():
+        with open(dates_path, encoding="utf-8") as fh:
+            seeded = tally(json.loads(l) for l in fh if l.strip())
+        for key in ("by_date", "frac_date"):
+            combined[key] = seeded[key]
+    elif prev is not None and "by_date" not in prev and corpus_path and corpus_path.is_file():
+        with open(corpus_path, encoding="utf-8") as fh:
+            seeded = tally(json.loads(l) for l in fh if l.strip())
+        for key in ("by_date", "frac_date"):
             combined[key] = seeded[key]
     snap = snapshot(combined)
     out, table = output_paths(a.out, a.table)

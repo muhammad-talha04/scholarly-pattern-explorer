@@ -52,9 +52,11 @@ def test_incremental_matches_full_and_counting():
     assert full["countries"] == inc["countries"] and full["topic_year_counts"] == inc["topic_year_counts"]
     assert full["topic_country_year"] == inc["topic_country_year"]
     pk = next(r for r in full["countries"] if r["code"] == "PK")
-    assert pk["papers"] == 1.5 and pk["growth_pct"] == 100.0 and pk["name"] == "Pakistan"
+    assert pk["papers"] == 1.5 and pk["name"] == "Pakistan"
+    # two papers are far below the 30-paper minimum: no growth figure
+    assert pk["growth_pct"] is None and pk["growth_reason"] == "too_few_papers"
     pkf = next(r for r in full["countries_full"] if r["code"] == "PK")
-    assert pkf["papers"] == 2 and pkf["growth_pct"] == 0.0
+    assert pkf["papers"] == 2 and pkf["growth_pct"] is None
     assert all(None not in r["top_topics"] for r in full["countries"])
     assert full["topic_year_counts"]["AI"] == {"2025": 1, "2026": 1}
     assert full["topic_top_countries"]["AI"][0] == ["PK", 1.5]
