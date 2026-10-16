@@ -50,11 +50,20 @@ export interface CountryYearCount {
   paper_count: number;
   fractional_count: number;
 }
+export type GrowthReason = "too_few_papers" | "partial_year";
+
 export interface CountryStats {
   code: string;
   name: string;
   papers: number;
   growth_pct: number | null;
+  /** Optional growth details (country_stats growth spec). Older snapshots omit them. */
+  growth_reason?: GrowthReason | null;
+  growth_cur_count?: number | null;
+  growth_prev_count?: number | null;
+  /** ISO dates (YYYY-MM-DD) for the current window; the previous window is the same span one year earlier. */
+  growth_window_start?: string | null;
+  growth_window_end?: string | null;
   top_topics: string[];
   /** Present once the live snapshot includes it (PR #6). */
   counting?: Counting;

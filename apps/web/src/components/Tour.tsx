@@ -10,7 +10,7 @@ export function replayTour() {
 const STEPS = [
   { title: "Welcome aboard", body: "Each dot in the galaxy is a paper. Colors and groups are topic clusters, so papers sit together by theme. This takes about a minute.", selector: "" },
   { title: "Five rooms, one sky", body: "Galaxy, Search, Countries, Progress and Patterns are always in the menu. Saved keeps collections on this device.", selector: "[data-tour=nav]" },
-  { title: "Search by meaning", body: "Type a question, not just keywords. Open a result for the summary, a chat about that paper, and a map of related work.", selector: "[data-tour=search]" },
+  { title: "Search papers", body: "Search by keyword and topic (meaning-based search is being upgraded). Open a result for the summary, a chat about that paper, and a map of related work.", selector: "[data-tour=search]" },
   { title: "A flatter sky", body: "3D mode draws the paper galaxy and the globe. 2D mode is the same papers, grouped by theme, as a flat picture. It turns on by itself if you prefer less motion.", selector: "[data-tour=power]" },
   { title: "Keep what you find", body: "Save a paper into a collection, or pin two papers and open Compare. Both stay in this browser. Nothing is sent to a server.", selector: "[data-tour=saved]" },
 ];

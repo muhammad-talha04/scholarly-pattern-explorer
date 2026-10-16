@@ -1,5 +1,5 @@
 """Single source of truth for API types. The web client is generated from these."""
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from pydantic import BaseModel, HttpUrl
 
@@ -79,7 +79,13 @@ class CountryStats(BaseModel):
     code: str
     name: str
     papers: float  # value for `counting`; fractional counts are not integers
+    # Equal-period growth: Jan 1..newest publication date vs the same dates a year earlier.
     growth_pct: float | None = None
+    growth_reason: Literal["too_few_papers", "partial_year"] | None = None
+    growth_cur_count: float | None = None
+    growth_prev_count: float | None = None
+    growth_window_start: date | None = None
+    growth_window_end: date | None = None
     top_topics: list[str] = []
     counting: CountingMethod = "fractional"
     paper_count: int = 0            # whole papers, every country on the paper counted once
