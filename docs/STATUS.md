@@ -12,6 +12,7 @@ Last updated: 2026-10-16 ~17:00 PKT by bob: embedding evaluation and fastembed b
   - The model cache is `<repo>/.cache/fastembed` (`FASTEMBED_CACHE_PATH`), and the Render build now runs `python -m ml.prefetch_model`.
   - `fastembed==0.9.0` is pinned.
 - **Production is unchanged.** `render.yaml` pins `ML_EMBEDDER=hash` until the bge re-embed. `v2-ingest.yml` was not edited and must set `ML_EMBEDDER=fastembed` and `ML_EMBED_MODEL=BAAI/bge-small-en-v1.5` before it is re-enabled.
+- **Production switch runbook:** `docs/EMBEDDER_SWITCH.md`. Flip Render to bge first, then `ml.cli index --reembed` from `python -m ml.export_corpus`, then `galaxy --refit` and `discover`. Not run yet.
 - **Release `data-store/works_v2.jsonl` is not the live corpus.** It holds 50,000 works, all published 2025-10 or later, and only 2,999 of the live 14,159.
 
 ## 2026-10-16 (olli)

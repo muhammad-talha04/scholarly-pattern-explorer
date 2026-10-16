@@ -169,3 +169,17 @@ def test_prefetch_main(monkeypatch, tmp_path):
     assert prefetch_model.main([]) == 0                # hash deploy is not broken
     monkeypatch.setenv("ML_EMBEDDER", "fastembed")
     assert prefetch_model.main([]) == 1                # fastembed deploy must have its model
+
+
+def test_export_corpus_round_trips_meta(tmp_path):
+    from ml.export_corpus import export
+    from ml.papers import read_works
+    store = LocalStore(tmp_path / "vec")
+    papers = [Paper("W2", "Quantum error correction", "Surface codes.", 2025, "https://doi.org/10.1/x",
+                    ["QEC"], "2025-03-01", ["A. Author"], ["PK", "US"], 7, "https://example.org/w2.pdf"),
+              Paper("W1", "No abstract", "", 2024)]
+    store.upsert([p.work_id for p in papers], HashEmbedder().encode([p.text for p in papers]),
+                 [p.to_dict() for p in papers], model="hash-v1")
+    assert export(store, tmp_path / "out.jsonl") == 2
+    back = {p.work_id: p.to_dict() for p in read_works(tmp_path / "out.jsonl")}
+    assert back == {p.work_id: p.to_dict() for p in papers}
