@@ -100,7 +100,7 @@ NO_ABSTRACT = "No abstract available for this paper."
 # A follow-up may send earlier chat. Only the last two turns are used, and each
 # is cut so a long pasted turn cannot dominate the match.
 _HISTORY_TURNS = 2
-_HISTORY_CHARS = 500
+_HISTORY_CHARS = 1000
 
 
 def _recent_turns(history: list[dict] | None) -> list[dict]:

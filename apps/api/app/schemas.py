@@ -1,7 +1,7 @@
 """Single source of truth for API types. The web client is generated from these."""
 from datetime import date, datetime
 from typing import Literal
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 CountingMethod = Literal["fractional", "per_country", "full"]
 
@@ -39,13 +39,22 @@ class CorpusStats(BaseModel):
 
 
 class AskTurn(BaseModel):
-    """One earlier chat turn. At most two of these are accepted on /ask."""
+    """One earlier chat turn. Text is stripped and cut to 1000 characters."""
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=500)
+    content: str
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def limit_content(cls, value: str) -> str:
+        text = str(value).strip()[:1000]
+        if not text:
+            raise ValueError("content is empty")
+        return text
 
 
 class AskRequest(BaseModel):
     question: str
+    # Omitted by older clients. At most the last two turns.
     history: list[AskTurn] = Field(default_factory=list, max_length=2)
 
 

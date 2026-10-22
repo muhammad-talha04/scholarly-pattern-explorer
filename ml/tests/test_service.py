@@ -231,7 +231,7 @@ def test_pronoun_followup_resolves_via_history(service, monkeypatch):
     ])
     assert "does not seem" in buried["answer"]
     clipped = service.ask("W3", "explain that more simply", history=[
-        {"role": "assistant", "content": ("x" * 500) + " wheat yield"},
+        {"role": "assistant", "content": ("x" * 1000) + " wheat yield"},
     ])
     assert "does not seem" in clipped["answer"]
     # History can open the model call. The answer still has to be grounded.
