@@ -13,7 +13,7 @@ Rules
   hash embedder, so they count as ``hash-v1`` only when ML_EMBEDDER=hash; with
   any other embedder they are a different model and block the run.
 - Each batch is one transaction (one commit) and logs progress.
-- With ``max_db_bytes`` (default 430 MB) it checks ``pg_database_size`` before
+- With ``max_db_bytes`` (default 300 MB) it checks ``pg_database_size`` before
   each batch and stops cleanly once the database reaches it (Supabase free tier
   is 500 MB).
 - The galaxy is not rebuilt here; ``ml.cli index --galaxy`` or ``ml.cli galaxy`` does that.
@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from .embeddings import HASH_MODEL_LABEL, get_embedder, model_label
 
 log = logging.getLogger("spe.indexer")
-DEFAULT_MAX_DB_BYTES = 430 * 1024 * 1024
+DEFAULT_MAX_DB_BYTES = 300 * 1024 * 1024
 
 
 class ModelMismatch(RuntimeError):
