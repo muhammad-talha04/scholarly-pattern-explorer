@@ -4,16 +4,39 @@ import { api } from "@/lib/api/client";
 import { Spinner } from "@/components/ui";
 
 interface Msg { role: "user" | "bot"; text: string; sources?: string[] }
+
+/** History is plain text. Markers such as **bold** and [links](url) are not sent. */
+function plainText(value: string): string {
+  return value
+    .replace(/```[a-zA-Z]*\n?([\s\S]*?)```/g, "$1")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/(\*\*|__)([\s\S]*?)\1/g, "$2")
+    .replace(/(\*|_)([\s\S]*?)\1/g, "$2")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function AskChat({ paperId }: { paperId: string }) {
+  // Turns stay in this component. They are not written to storage or a shared store.
+  const [scope, setScope] = useState(paperId);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  if (scope !== paperId) {
+    setScope(paperId);
+    setMsgs([]);
+    setQ("");
+  }
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const question = q.trim(); if (!question || busy) return;
     const history = msgs.slice(-2).map((m) => ({
       role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
-      content: m.text,
+      content: plainText(m.text),
     }));
     setMsgs((m) => [...m, { role: "user", text: question }]); setQ(""); setBusy(true);
     try { const r = await api.ask(paperId, question, history); setMsgs((m) => [...m, { role: "bot", text: r.data.answer, sources: r.data.sources }]); }
