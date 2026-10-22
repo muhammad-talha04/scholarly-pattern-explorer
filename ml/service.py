@@ -17,29 +17,60 @@ from .store import get_store
 from .text import best_sentences, extractive_summary, grounded_in_abstract
 
 
+# Bump when a cached summary would be wrong under the current text rules.
+# Version 1 rows include titles stored in place of a missing abstract.
+CACHE_VERSION = 2
+
+
 class SummaryCache:
-    """One summary per paper, stored forever (sqlite file; free, no server)."""
+    """One summary per paper, stored in a sqlite file (free, no server).
+
+    A row from an older cache version is ignored, so the next summary rebuilds it.
+    A row at the current version is kept.
+    """
 
     def __init__(self, path: str | Path = ":memory:"):
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.lock = threading.Lock()
-        self.conn.execute("CREATE TABLE IF NOT EXISTS paper_summaries (work_id TEXT PRIMARY KEY, "
-                          "summary TEXT, method TEXT, created_at TEXT)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS paper_summaries ("
+            "work_id TEXT PRIMARY KEY, summary TEXT, method TEXT, created_at TEXT, "
+            "cache_version INTEGER NOT NULL DEFAULT 1)"
+        )
+        cols = {row[1] for row in self.conn.execute("PRAGMA table_info(paper_summaries)")}
+        if "cache_version" not in cols:
+            self.conn.execute(
+                "ALTER TABLE paper_summaries ADD COLUMN cache_version INTEGER NOT NULL DEFAULT 1"
+            )
+        self.conn.commit()
 
     def get(self, work_id):
         with self.lock:
-            row = self.conn.execute("SELECT summary, method, created_at FROM paper_summaries "
-                                    "WHERE work_id=?", (work_id,)).fetchone()
-        return None if row is None else {"summary": row[0], "method": row[1], "created_at": row[2]}
+            row = self.conn.execute(
+                "SELECT summary, method, created_at, cache_version FROM paper_summaries WHERE work_id=?",
+                (work_id,),
+            ).fetchone()
+        if row is None or row[3] != CACHE_VERSION:
+            return None
+        return {"summary": row[0], "method": row[1], "created_at": row[2]}
 
     def put(self, work_id, summary, method):
         ts = datetime.now(timezone.utc).isoformat()
         with self.lock:
-            self.conn.execute("INSERT OR IGNORE INTO paper_summaries VALUES (?,?,?,?)",
-                              (work_id, summary, method, ts))
-            self.conn.commit()
+            current = self.conn.execute(
+                "SELECT cache_version FROM paper_summaries WHERE work_id=?",
+                (work_id,),
+            ).fetchone()
+            # INSERT OR IGNORE would keep a stale primary key and block the rebuild.
+            if current is None or current[0] != CACHE_VERSION:
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO paper_summaries "
+                    "(work_id, summary, method, created_at, cache_version) VALUES (?,?,?,?,?)",
+                    (work_id, summary, method, ts, CACHE_VERSION),
+                )
+                self.conn.commit()
         return self.get(work_id)
 
 

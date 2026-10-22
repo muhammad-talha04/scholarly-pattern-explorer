@@ -12,7 +12,9 @@ using use used based via between among more most less both each other there here
 """.split())
 
 # ASCII sentence boundary, plus accented capitals (É…) and CJK full stops.
-# Common abbreviations keep their period so "Fig. 1" and "Dr. Smith" stay one sentence.
+# Common abbreviations keep their period so "Fig. 1", "Dr. Smith", and a
+# mid-sentence "etc." stay one sentence. The following word may be a digit
+# ("etc. 12"), which would otherwise look like a new sentence.
 _ABBREV = re.compile(
     r"\b(?:Fig|Figs|Dr|Mr|Mrs|Ms|Prof|Eq|vs|etc|al)\.|\b(?:e\.g|i\.e)\.",
     re.IGNORECASE,
@@ -87,18 +89,36 @@ def extractive_summary(title: str, abstract: str, n: int = 3) -> str:
     return " ".join(s for _, s in best)
 
 
-def grounded_in_abstract(text: str, abstract: str) -> bool:
-    """True when `text` shares a content word with the abstract itself.
+_NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
-    Instruction-override sentences are not evidence. A model answer that only
-    repeats them, or shares nothing with the abstract, is discarded.
+
+def _content_words(text: str) -> set[str]:
+    """Content tokens, not pure numbers. Digits are checked on their own."""
+    return {t for t in tokens(text) if not t.isdigit()}
+
+
+def _numbers(text: str) -> set[str]:
+    return set(_NUMBER.findall(text or ""))
+
+
+def grounded_in_abstract(text: str, abstract: str) -> bool:
+    """True when an answer is mostly the abstract's words, with no new numbers.
+
+    Instruction-override sentences are not evidence. A model answer is kept
+    only when at least 60% of its content words occur in the remaining abstract
+    and every number it states is written in that abstract. Otherwise callers
+    fall back to an extractive quote or a refusal.
     """
     if not text or _OVERRIDE.search(text):
         return False
     body = [s for s in sentences(abstract) if not _OVERRIDE.search(s)]
-    have = set(tokens(" ".join(body) if body else abstract))
-    got = set(tokens(text))
-    return bool(have and got and have & got)
+    source = " ".join(body) if body else (abstract or "")
+    have = _content_words(source)
+    got = _content_words(text)
+    if not have or not got or len(have & got) / len(got) < 0.6:
+        return False
+    known = _numbers(source)
+    return all(n in known for n in _numbers(text))
 
 
 def best_sentences(question: str, text: str, n: int = 2) -> list[tuple[str, float]]:

@@ -1,9 +1,11 @@
+import sqlite3
+
 import numpy as np
 
 from ml import service as svc_mod
-from ml.embeddings import Embedder
+from ml.embeddings import Embedder, HashEmbedder
 from ml.papers import Paper, abstract_from_inverted_index
-from ml.service import NO_ABSTRACT
+from ml.service import CACHE_VERSION, MLService, NO_ABSTRACT, SummaryCache
 from ml.store import LocalStore, PgVectorStore
 
 
@@ -211,6 +213,57 @@ def test_ungrounded_llm_output_is_not_returned(service, monkeypatch):
     assert invented["answer"] != "PWNED"
 
 
+def test_invented_trial_count_falls_back(service, monkeypatch):
+    _put(service, Paper(
+        "Wtrial", "A small trial",
+        "The trial enrolled 40 patients over 3 years. Satellite images predict wheat yield.",
+        2024))
+    monkeypatch.setattr(
+        svc_mod, "chat_complete",
+        lambda *a, **k: "The trial enrolled 512 patients over 3 years.",
+    )
+    out = service.ask("Wtrial", "How many patients were enrolled in the trial?")
+    assert out["method"] == "extractive"
+    assert "512" not in out["answer"]
+    assert "40" in out["answer"]
+
+
+def test_old_title_echo_summary_is_rebuilt(tmp_path):
+    path = tmp_path / "summaries.sqlite"
+    conn = sqlite3.connect(path)
+    conn.execute(
+        "CREATE TABLE paper_summaries (work_id TEXT PRIMARY KEY, summary TEXT, method TEXT, created_at TEXT)"
+    )
+    title = "Transformers for protein structure prediction"
+    conn.execute(
+        "INSERT INTO paper_summaries VALUES (?,?,?,?)",
+        ("W1", title, "extractive", "2026-10-01T00:00:00+00:00"),
+    )
+    conn.commit()
+    conn.close()
+    svc = MLService(
+        embedder=HashEmbedder(),
+        store=LocalStore(tmp_path / "vec"),
+        cache=SummaryCache(path),
+    )
+    svc.index_papers([Paper(
+        "W1", title,
+        "We apply transformer language models to protein folding. Attention maps reveal contacts.",
+        2021,
+    )])
+    assert svc.cache.get("W1") is None
+    out = svc.summarize("W1")
+    assert out["cached"] is False
+    assert out["summary"] != title
+    assert "protein folding" in out["summary"].lower()
+    again = svc.summarize("W1")
+    assert again["cached"] is True and again["summary"] == out["summary"]
+    stored = svc.cache.conn.execute(
+        "SELECT cache_version FROM paper_summaries WHERE work_id=?", ("W1",)
+    ).fetchone()
+    assert stored[0] == CACHE_VERSION == 2
+
+
 def test_ask_keeps_paper_text_out_of_the_system_prompt(service, monkeypatch):
     seen = {}
 
@@ -219,11 +272,11 @@ def test_ask_keeps_paper_text_out_of_the_system_prompt(service, monkeypatch):
         system = messages[0]["content"].lower()
         if "wheat" in system or "pwned" in system:
             return "PWNED"
-        return "The paper predicts wheat yield."
+        return "Satellite images and weather data predict wheat yield."
 
     monkeypatch.setattr(svc_mod, "chat_complete", fake)
     out = service.ask("W3", "What crop is the yield predicted for?")
-    assert out["method"] == "llm" and out["answer"] == "The paper predicts wheat yield."
+    assert out["method"] == "llm" and out["answer"] == "Satellite images and weather data predict wheat yield."
     system = seen["messages"][0]["content"]
     paper = seen["messages"][1]["content"]
     assert seen["messages"][0]["role"] == "system" and seen["messages"][1]["role"] == "user"
