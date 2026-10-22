@@ -9,7 +9,7 @@ Nothing here has been run yet. Every step that writes to Supabase is marked **WR
   corpus is just incomplete (search covers whatever has been written so far).
 - The one mismatch window is between "Render serves the new embedder" and "the table holds that
   embedder's rows". The two directions behave differently:
-  - **bge query vs hash rows:** cosines come out near 0. The bge floor (0.68) drops everything, so users
+  - **bge query vs hash rows:** cosines come out near 0. The bge floor (0.65, `ML_MIN_SCORE`) drops everything, so users
     see "No close matches". This is harmless.
   - **hash query vs bge rows:** the hash floor is 0, so users get confidently wrong results. Avoid this.
 - **So flip Render to bge first, then re-embed.** For a rollback, do the reverse (re-embed to hash first,
@@ -39,12 +39,13 @@ The release `works_v2.jsonl` is a different set of 50,000 works, so don't use it
 ```bash
 python -m ml.export_corpus --out data/works_live_14159.jsonl
 wc -l data/works_live_14159.jsonl                       # must be 14159
+psql "$DATABASE_URL" -Atc "SELECT count(*) FROM paper_embeddings WHERE meta ? 'publication_date'" | tee ~/pubdate-count-before.txt
 cp data/works_live_14159.jsonl ~/backup-works_live_14159-$(date +%F).jsonl
 psql "$DATABASE_URL" -c "\copy (SELECT kind, payload FROM documents) TO '$HOME/backup-documents-$(date +%F).tsv'"
 ```
 **Size check.** The new vectors are the same `vector(384)` as before. DELETE plus re-insert leaves dead
 tuples until VACUUM, so the peak is about 2× the table: roughly 90 MB + ~80 MB ≈ 170 MB, well under the
-indexer's `--max-db-mb 430` stop. If the baseline is already above about 250 MB, stop and VACUUM first.
+indexer's `--max-db-mb 350` stop. If the baseline is already above about 250 MB, stop and VACUUM first.
 
 Optional rehearsal, about 13 min, local files only, no writes:
 ```bash
@@ -67,7 +68,7 @@ curl -s -D- "https://scholarly-pattern-explorer.onrender.com/api/v1/search?q=fed
 c. **WRITE: re-embed immediately**, about 13 min of embedding plus the upload:
 ```bash
 ML_EMBEDDER=fastembed ML_EMBED_MODEL=BAAI/bge-small-en-v1.5 \
-  python -m ml.cli index --jsonl data/works_live_14159.jsonl --reembed --batch-size 1000 --max-db-mb 430
+  python -m ml.cli index --jsonl data/works_live_14159.jsonl --reembed --batch-size 1000 --max-db-mb 350
 ```
    - If it is interrupted, rerun the same command **without** `--reembed`. Resume is the default, it skips
      ids already written, and the model guard passes because every row has the fastembed label.
@@ -75,9 +76,16 @@ ML_EMBEDDER=fastembed ML_EMBED_MODEL=BAAI/bge-small-en-v1.5 \
    - If it stops at the size limit, VACUUM (step 3) and rerun without `--reembed`.
 
 ## 3. Verify and clean up the table
+**Dates must survive the re-embed.** `export_corpus` + `Paper` now carry `meta.publication_date`
+(including an explicit `null` from `backfill-dates`) and every other meta key through `--reembed`
+(`ml/tests/test_reembed_meta.py`). If the `meta ? 'publication_date'` count below differs from the count
+taken before the re-embed, stop: do not bulk-load or rebuild the galaxy; rerun
+`python -m ml.cli backfill-dates` (it only fills missing keys) and re-check.
 ```sql
 SELECT model, count(*) FROM paper_embeddings GROUP BY 1;   -- exactly one row: fastembed:BAAI/bge-small-en-v1.5@fastembed-0.9.0 | 14159
 SELECT count(*) FROM paper_embeddings WHERE meta IS NULL;   -- 0
+SELECT count(*) FROM paper_embeddings WHERE meta ? 'publication_date';  -- must equal ~/pubdate-count-before.txt
+SELECT count(*) FROM paper_embeddings WHERE meta->>'publication_date' IS NOT NULL;  -- dated rows, same as before
 VACUUM (ANALYZE) paper_embeddings;
 REINDEX INDEX paper_embeddings_hnsw;                        -- optional at 14k rows; rebuilds the HNSW graph without the deleted hash entries
 SELECT pg_size_pretty(pg_database_size(current_database()));
@@ -106,7 +114,9 @@ git checkout -b bob/discoveries-bge && git add deploy/data/ml/snapshots/discover
 ## 5. Check quality on live
 Run the council's six queries against the live API. Expect relevant top results for "teaching computers to
 spot tumours in medical scans" and "No close matches" for "medieval french poetry". If the floor is too
-tight or too loose, set `SEARCH_MIN_SCORE` on Render; no code change is needed.
+tight or too loose, set `ML_MIN_SCORE` on Render (read on every search, no code change or rebuild;
+`SEARCH_MIN_SCORE` still overrides it if set). The bge default was lowered from 0.68 to **0.65** on
+2026-10-22 and is **pending chris's post-re-embed benchmark**; make the benchmark's number the default.
 
 ## 6. Before re-enabling `v2 ingest`
 In a separate PR (the token has workflow scope), `v2-ingest.yml` must set

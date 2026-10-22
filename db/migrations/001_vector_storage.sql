@@ -29,8 +29,16 @@ BEGIN
     END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS paper_embeddings_hnsw
-    ON paper_embeddings USING hnsw (embedding vector_cosine_ops);
+-- Guarded so re-applying after 005 (halfvec column) does not fail: Postgres
+-- validates the operator class before it honours IF NOT EXISTS.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes
+                   WHERE schemaname = 'public' AND indexname = 'paper_embeddings_hnsw') THEN
+        CREATE INDEX paper_embeddings_hnsw
+            ON paper_embeddings USING hnsw (embedding vector_cosine_ops);
+    END IF;
+END $$;
 
 -- One row per document kind. Known kinds: galaxy, galaxy_state, patterns,
 -- countries, topics, topic_country_year.

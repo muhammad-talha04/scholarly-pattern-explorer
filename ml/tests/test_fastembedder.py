@@ -38,7 +38,7 @@ def fake_fastembed(monkeypatch):
     FakeTextEmbedding.instances = []
     monkeypatch.setitem(sys.modules, "fastembed", types.SimpleNamespace(TextEmbedding=FakeTextEmbedding))
     for k in ("ML_EMBED_BATCH_SIZE", "FASTEMBED_CACHE_PATH", "ML_EMBED_MODEL_REVISION",
-              "SEARCH_MIN_SCORE", "ML_SEARCH_MIN_SCORE", "ML_EMBED_MODEL"):
+              "SEARCH_MIN_SCORE", "ML_MIN_SCORE", "ML_SEARCH_MIN_SCORE", "ML_EMBED_MODEL"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -117,7 +117,7 @@ def test_indexer_refuses_to_mix_fastembed_into_torch_table(monkeypatch):
 @pytest.mark.parametrize("model,floor", [
     (HashEmbedder(), 0.0), ("hash", 0.0),
     (MINILM, 0.38), ("all-MiniLM-L6-v2", 0.38),
-    (BGE, 0.68), ("bge-small-en-v1.5", 0.68),
+    (BGE, 0.65), ("bge-small-en-v1.5", 0.65),
     ("intfloat/e5-small-v2", 0.0),          # uncalibrated: off
 ])
 def test_floor_per_model(model, floor):
@@ -125,7 +125,7 @@ def test_floor_per_model(model, floor):
 
 
 def test_floor_from_embedder_objects():
-    assert min_search_score(FastEmbedder(BGE)) == 0.68
+    assert min_search_score(FastEmbedder(BGE)) == 0.65
     assert min_search_score(FastEmbedder(MINILM)) == 0.38
 
 
@@ -133,6 +133,22 @@ def test_floor_env_override(monkeypatch):
     monkeypatch.setenv("ML_SEARCH_MIN_SCORE", "0.5")
     assert min_search_score(BGE) == 0.5
     monkeypatch.setenv("SEARCH_MIN_SCORE", "0")       # SEARCH_MIN_SCORE wins; 0 = off
+    assert min_search_score(BGE) == 0.0
+
+
+def test_ml_min_score_env_read_at_runtime(monkeypatch):
+    assert min_search_score(BGE) == 0.65                 # default, pending chris's benchmark
+    monkeypatch.setenv("ML_MIN_SCORE", "0.7")
+    assert min_search_score(BGE) == 0.7                  # no restart / re-import needed
+    monkeypatch.setenv("ML_MIN_SCORE", "0.6")
+    assert min_search_score(BGE) == 0.6
+    monkeypatch.setenv("ML_SEARCH_MIN_SCORE", "0.5")     # older name loses to ML_MIN_SCORE
+    assert min_search_score(BGE) == 0.6
+    monkeypatch.setenv("SEARCH_MIN_SCORE", "0.4")        # SEARCH_MIN_SCORE still wins
+    assert min_search_score(BGE) == 0.4
+    monkeypatch.delenv("SEARCH_MIN_SCORE")
+    monkeypatch.delenv("ML_SEARCH_MIN_SCORE")
+    monkeypatch.setenv("ML_MIN_SCORE", "0")              # 0 = off
     assert min_search_score(BGE) == 0.0
 
 

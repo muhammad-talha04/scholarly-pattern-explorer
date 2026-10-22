@@ -17,11 +17,20 @@ from .papers import Paper
 
 
 def meta_to_v2(meta: dict) -> dict:
-    return {"id": meta["work_id"], "title": meta.get("title") or "", "abstract": meta.get("abstract") or "",
+    """Stored meta -> v2 row. Keeps publication_date (key presence included) and passes
+    every other unmodelled meta key through ``meta_extra`` so a re-embed drops nothing."""
+    from .papers import META_KEYS
+    row = {"id": meta["work_id"], "title": meta.get("title") or "", "abstract": meta.get("abstract") or "",
             "year": meta.get("pub_year"), "date": meta.get("created"), "doi": meta.get("doi"),
             "topics": meta.get("topics") or [], "authors": meta.get("authors") or [],
             "countries": meta.get("countries") or [], "cited_by": meta.get("cited_by") or 0,
             "original_url": meta.get("original_url")}
+    if "publication_date" in meta:
+        row["publication_date"] = meta["publication_date"]
+    extra = {k: v for k, v in meta.items() if k not in META_KEYS}
+    if extra:
+        row["meta_extra"] = extra
+    return row
 
 
 def export(store, out: str | Path) -> int:

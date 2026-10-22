@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { TopicLink } from "@/lib/graph";
 import { gap as gapColor, ink } from "@/lib/theme";
 import { breathAmount, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
@@ -15,6 +15,19 @@ type Frame = {
   ry: number;
   rz: number;
 };
+
+/** Same radius the old hit test used. Only papers open a card. */
+const HIT_PX = 12;
+/** Pointer travel below this is tremor or a scroll-synthesized pointermove. */
+const STICK_PX = 4;
+/** A neighbouring paper must be this much closer before the card switches. */
+const SWITCH_MARGIN = 12;
+/** Keep the card while the pointer is still this close to the locked paper. */
+const RELEASE_PX = 36;
+
+type Stick = { x: number; y: number; id: string | null };
+
+type Placed = { id: string; paper: boolean; pos: [number, number, number]; phase: number };
 
 /** Flat plexus. Same band, orbit, and breathing zoom as the 3D view, unless motion is reduced. */
 export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null, onFocus, onHighlight, onPick }: {
@@ -45,6 +58,9 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
   }, [hover, net.edges, links]);
   const nearRef = useRef(near);
   nearRef.current = near;
+  const stickRef = useRef<Stick | null>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const placeRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -93,11 +109,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
         rz: still ? 0 : Math.sin(time * ROCK_Z_HZ + 1.4) * 0.03,
       };
       frameRef.current = frame;
-      const project = (pos: [number, number, number], phase: number) => {
-        const d = plexusDrift(phase, frame.time, frame.motion);
-        const [x, z] = spinPoint(pos[0] + d[0], pos[1] + d[1], pos[2] + d[2], frame.rx, frame.ry, frame.rz);
-        return [frame.ox + x * frame.unit + frame.shift, frame.oy + z * frame.unit] as [number, number];
-      };
+      const project = (pos: [number, number, number], phase: number) => projectNode(pos, phase, frame);
       const hoverId = hoverRef.current;
       const focusId = focusRef.current;
       const lit = highlightRef.current;
@@ -144,6 +156,8 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
         ctx.fill();
         ctx.globalAlpha = 1;
       }
+      canvas.dataset.plexusTime = String(frame.time);
+      placeRef.current();
     };
     const tick = (now: number) => {
       const poseNow = poseRef.current;
@@ -163,24 +177,82 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
     };
   }, [net, showGaps]);
 
-  const pick = (ev: { clientX: number; clientY: number }) => {
+  placeRef.current = () => {
+    const el = tipRef.current;
+    const canvas = canvasRef.current;
+    const id = hoverRef.current ?? focusRef.current;
+    if (!el || !canvas || !id) return;
+    const node = net.nodes.find((n) => n.paper && n.id === id);
+    if (!node) return;
+    const [x, y] = projectNode(node.pos, node.phase, frameRef.current);
+    const w = canvas.clientWidth || canvas.width || 1;
+    const h = canvas.clientHeight || canvas.height || 1;
+    const cardW = el.offsetWidth || 208;
+    const cardH = el.offsetHeight || 88;
+    let left = x + 14;
+    let top = y - Math.round(cardH * 0.35);
+    if (left + cardW > w - 8) left = x - cardW - 14;
+    if (left < 8) left = 8;
+    if (top < 8) top = 8;
+    if (top + cardH > h - 8) top = Math.max(8, h - cardH - 8);
+    el.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+  };
+
+  useLayoutEffect(() => {
+    placeRef.current();
+  }, [hover, focus]);
+
+  const pickAt = (ev: { clientX: number; clientY: number }, paperOnly: boolean) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const frame = frameRef.current;
+    return nearestId(net.nodes, ev.clientX - rect.left, ev.clientY - rect.top, frameRef.current, HIT_PX, paperOnly);
+  };
+
+  // A resting pointer and the wheel both emit pointermove while the band keeps
+  // orbiting. Re-picking on those events swaps the paper (or hits a filler dot
+  // and clears the card). Hold the paper until the pointer actually travels.
+  const onPointerMove = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
+    const stick = stickRef.current;
+    if (stick) {
+      const dx = ev.clientX - stick.x;
+      const dy = ev.clientY - stick.y;
+      if (dx * dx + dy * dy < STICK_PX * STICK_PX) return;
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
     const px = ev.clientX - rect.left;
     const py = ev.clientY - rect.top;
-    let best: string | null = null;
-    let bestD = 12 * 12;
-    for (const node of net.nodes) {
-      const d = plexusDrift(node.phase, frame.time, frame.motion);
-      const [x, z] = spinPoint(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2], frame.rx, frame.ry, frame.rz);
-      const sx = frame.ox + x * frame.unit + frame.shift;
-      const sy = frame.oy + z * frame.unit;
-      const dd = (sx - px) ** 2 + (sy - py) ** 2;
-      if (dd < bestD) { bestD = dd; best = node.id; }
+    const frame = frameRef.current;
+    const next = nearestId(net.nodes, px, py, frame, HIT_PX, true);
+    let chosen = next;
+    const currentId = stick?.id ?? null;
+    if (currentId) {
+      const cur = net.nodes.find((n) => n.id === currentId && n.paper);
+      if (cur) {
+        const [cx, cy] = projectNode(cur.pos, cur.phase, frame);
+        const distC = Math.hypot(cx - px, cy - py);
+        if (!next) chosen = distC <= RELEASE_PX ? currentId : null;
+        else if (next !== currentId) {
+          const nxt = net.nodes.find((n) => n.id === next);
+          if (nxt) {
+            const [nx, ny] = projectNode(nxt.pos, nxt.phase, frame);
+            const distN = Math.hypot(nx - px, ny - py);
+            chosen = distN + SWITCH_MARGIN < distC ? next : currentId;
+          }
+        }
+      }
     }
-    return best;
+    stickRef.current = { x: ev.clientX, y: ev.clientY, id: chosen };
+    if (chosen !== hoverRef.current) setHover(chosen);
+  };
+
+  const onPointerLeave = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
+    const next = ev.relatedTarget;
+    if (next instanceof Node && tipRef.current?.contains(next)) return;
+    stickRef.current = null;
+    setHover(null);
   };
 
   return (
@@ -190,10 +262,10 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
         className="h-full w-full"
         role="img"
         aria-label="Paper plexus. Color runs from copper at the lower left to pale gold at the upper right."
-        onPointerMove={(ev) => setHover(pick(ev))}
-        onPointerLeave={() => setHover(null)}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
         onClick={(ev) => {
-          const id = pick(ev);
+          const id = pickAt(ev, false);
           const node = net.nodes.find((n) => n.id === id);
           if (!node?.paper) return;
           onFocus?.(node.id);
@@ -210,15 +282,33 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
         ))}
       </ul>
       {active && (
-        <div className="glass absolute left-3 top-24 z-10 w-52 p-3 text-xs sm:left-auto sm:right-4" role="tooltip">
+        <div ref={tipRef} className="glass pointer-events-none absolute left-0 top-0 z-10 w-52 p-3 text-xs" role="tooltip" data-testid="galaxy-paper-card">
           <p className="font-medium text-white">{active.id}</p>
           <p className="mt-1 text-mist">Paper{active.cluster ? ` · topic cluster ${active.cluster}` : ""}</p>
           {showGaps && active.gap && <p className="text-gap">Research gap</p>}
-          <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(active.id)}>Search this paper</button>
+          <button className="btn pointer-events-auto mt-2 w-full py-1" onClick={() => onPick?.(active.id)}>Search this paper</button>
         </div>
       )}
     </div>
   );
+}
+
+function projectNode(pos: [number, number, number], phase: number, frame: Frame): [number, number] {
+  const d = plexusDrift(phase, frame.time, frame.motion);
+  const [x, z] = spinPoint(pos[0] + d[0], pos[1] + d[1], pos[2] + d[2], frame.rx, frame.ry, frame.rz);
+  return [frame.ox + x * frame.unit + frame.shift, frame.oy + z * frame.unit];
+}
+
+function nearestId(nodes: Placed[], px: number, py: number, frame: Frame, radius: number, paperOnly: boolean) {
+  let best: string | null = null;
+  let bestD = radius * radius;
+  for (const node of nodes) {
+    if (paperOnly && !node.paper) continue;
+    const [sx, sy] = projectNode(node.pos, node.phase, frame);
+    const dd = (sx - px) ** 2 + (sy - py) ** 2;
+    if (dd < bestD) { bestD = dd; best = node.id; }
+  }
+  return best;
 }
 
 /** Three.js XYZ euler: Rx, then Ry, then Rz. Returns screen-facing x and z. */

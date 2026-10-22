@@ -227,21 +227,24 @@ def model_label(embedder) -> str:
 # Per-model cosine floor for "no close matches". Calibrated on the live 14,159-paper corpus,
 # 20 judged queries + 5 off-topic queries: eval/embedder-2026-10-16/REPORT.md.
 #   MiniLM: off-topic max 0.312, weakest relevant hit 0.344  -> 0.38 keeps 99% of relevant hits
-#   bge:    off-topic max 0.649, weakest relevant hit 0.673  -> 0.68 keeps 99% of relevant hits
+#   bge:    off-topic max 0.649, weakest relevant hit 0.673  -> 0.65 (was 0.68; lowered 2026-10-22,
+#           pending chris's post-re-embed benchmark; tune with ML_MIN_SCORE, no code change)
 #   hash:   off-topic queries outscore real paraphrase hits  -> no floor
+BGE_MIN_SCORE_DEFAULT = 0.65
 MIN_SCORE_BY_MODEL = {
     "all-minilm-l6-v2": 0.38,
-    "bge-small-en-v1.5": 0.68,
+    "bge-small-en-v1.5": BGE_MIN_SCORE_DEFAULT,
 }
 
 
 def min_search_score(embedder_or_name) -> float:
     """Cosine floor below which a search hit is dropped ("no close matches").
 
-    SEARCH_MIN_SCORE (or the older ML_SEARCH_MIN_SCORE) overrides it; 0 turns it off.
-    hash and uncalibrated models get 0.0 (off).
+    Read from the environment on every call (no restart cache). Overrides, first set wins:
+    SEARCH_MIN_SCORE, ML_MIN_SCORE, ML_SEARCH_MIN_SCORE (older); 0 turns the floor off.
+    Without an override: bge 0.65, MiniLM 0.38, hash and uncalibrated models 0.0 (off).
     """
-    for key in ("SEARCH_MIN_SCORE", "ML_SEARCH_MIN_SCORE"):
+    for key in ("SEARCH_MIN_SCORE", "ML_MIN_SCORE", "ML_SEARCH_MIN_SCORE"):
         env = os.getenv(key)
         if env not in (None, ""):
             return float(env)
