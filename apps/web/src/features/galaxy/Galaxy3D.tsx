@@ -1,379 +1,410 @@
 "use client";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html, OrbitControls } from "@react-three/drei";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BufferGeometry, Color, Float32BufferAttribute, NoToneMapping, Vector3 } from "three";
+import { Html, OrbitControls, Stars } from "@react-three/drei";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  BufferGeometry, CircleGeometry, Color, Float32BufferAttribute, InstancedBufferAttribute, InstancedMesh,
+  Matrix4, NoToneMapping, Raycaster, Sphere, SphereGeometry, Vector2, Vector3,
+} from "three";
 import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
-import { accent, gap as gapColor, ink, plexusGold } from "@/lib/theme";
-import { breathAmount, DRIFT_HZ, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, TWINKLE_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
+import { NODE_BRIGHTNESS, clusterColors, gap as gapColor, galaxyColor, ink, linkGrey } from "@/lib/theme";
+import { HOVER_STICK_PX, leaveClearsHover, resolvePaperHover, resolveTouchPin, type PaperHit } from "./hover";
+import { centroid, neighborIds, posedPosition, type Star } from "./stars";
 
-/** Nearly overhead so the XZ diagonal reads lower-left to upper-right, with a little parallax. */
-const CAMERA_POS = new Vector3(0.2, 22.5, 2.8);
-const CAMERA_FOV = 46;
-
-const DRIFT = `
-vec3 bandDrift(float phase) {
-  return vec3(
-    sin(uTime * ${DRIFT_HZ.x} + phase) * 0.08,
-    sin(uTime * ${DRIFT_HZ.y} + phase * 1.7) * 0.045,
-    cos(uTime * ${DRIFT_HZ.z} + phase * 0.85) * 0.08
-  ) * uMotion;
-}
-`;
-
-const POINT_VERT = `
-attribute float aPhase;
-attribute float aSize;
-attribute float aFade;
-attribute float aWash;
-attribute float aTwinkle;
-attribute float aGlow;
-attribute vec3 aTint;
-attribute vec3 aCore;
-varying float vPhase;
-varying float vFade;
-varying float vWash;
-varying float vTwinkle;
-varying float vGlow;
-varying vec3 vTint;
-varying vec3 vCore;
-uniform float uTime;
-uniform float uMotion;
-uniform float uZoom;
-${DRIFT}
-void main() {
-  vec3 drifted = position + bandDrift(aPhase);
-  vec4 world = modelMatrix * vec4(drifted, 1.0);
-  gl_Position = projectionMatrix * viewMatrix * world;
-  gl_PointSize = aWash > 0.5 ? aSize * uZoom : aSize;
-  vPhase = aPhase;
-  vFade = aFade;
-  vWash = aWash;
-  vTwinkle = aTwinkle;
-  vGlow = aGlow;
-  vTint = aTint;
-  vCore = aCore;
-}
-`;
-
-const POINT_FRAG = `
-precision highp float;
-varying float vPhase;
-varying float vFade;
-varying float vWash;
-varying float vTwinkle;
-varying float vGlow;
-varying vec3 vTint;
-varying vec3 vCore;
-uniform float uTime;
-uniform float uMotion;
-void main() {
-  vec2 p = gl_PointCoord * 2.0 - 1.0;
-  float d = length(p);
-  if (d > 1.0) discard;
-  vec4 outc;
-  if (vWash > 0.5) {
-    float a = exp(-2.6 * d * d) * 0.075;
-    outc = vec4(vTint, a);
-  } else {
-    float core = smoothstep(0.48, 0.06, d);
-    float glow = exp(-4.6 * d * d) * 0.34;
-    float tw = uMotion * vTwinkle * pow(max(sin(uTime * ${TWINKLE_HZ} + vPhase), 0.0), 28.0);
-    float lit = clamp(vGlow, 0.0, 1.0);
-    vec3 col = mix(vTint, vCore, 0.12 + 0.88 * core);
-    col = mix(col, vec3(1.0), core * 0.22 + lit * 0.35 + tw);
-    float alpha = max(core * (0.7 + 0.3 * vFade), glow * vFade);
-    alpha = clamp(alpha * (1.0 + lit) + tw, 0.0, 1.0);
-    outc = vec4(col, alpha);
-  }
-  if (outc.a < 0.012) discard;
-  gl_FragColor = outc;
-  #include <colorspace_fragment>
-}
-`;
-
-const LINK_VERT = `
-attribute float aPhase;
+const NODE_VERT = `
 attribute vec3 aColor;
-attribute float aAlpha;
 attribute float aGlow;
+attribute float aTwinkle;
+attribute float aEmerging;
+attribute float aPhase;
 varying vec3 vColor;
-varying float vAlpha;
+varying vec3 vNormalV;
 varying float vGlow;
-uniform float uTime;
-uniform float uMotion;
-${DRIFT}
+varying float vTwinkle;
+varying float vEmerging;
+varying float vPhase;
 void main() {
-  vec3 drifted = position + bandDrift(aPhase);
-  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(drifted, 1.0);
+  vec4 viewPos = viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * viewPos;
+  vNormalV = normalize(mat3(viewMatrix) * mat3(instanceMatrix) * normal);
   vColor = aColor;
-  vAlpha = aAlpha;
   vGlow = aGlow;
+  vTwinkle = aTwinkle;
+  vEmerging = aEmerging;
+  vPhase = aPhase;
 }
 `;
 
-const LINK_FRAG = `
+const NODE_FRAG = `
 precision highp float;
 varying vec3 vColor;
-varying float vAlpha;
+varying vec3 vNormalV;
 varying float vGlow;
+varying float vTwinkle;
+varying float vEmerging;
+varying float vPhase;
+uniform float uTime;
+uniform float uMotion;
+uniform float uBrightness;
+uniform vec3 uWarm;
 void main() {
-  gl_FragColor = vec4(vColor, clamp(vAlpha * (1.0 + vGlow * 1.5), 0.0, 0.8));
+  float base = mix(uBrightness, 1.0, clamp(vGlow, 0.0, 1.0));
+  float tw = uMotion * vTwinkle * pow(max(sin(uTime * 2.4 + vPhase), 0.0), 18.0);
+  vec3 col = vColor * min(1.0, base + tw * 0.22);
+  col = mix(col, uWarm, clamp(vEmerging, 0.0, 1.0) * 0.35);
+  float rim = pow(1.0 - abs(dot(normalize(vNormalV), vec3(0.0, 0.0, 1.0))), 3.0);
+  col += rim * 0.045;
+  gl_FragColor = vec4(min(col, vec3(1.0)), 1.0);
   #include <colorspace_fragment>
 }
 `;
 
-function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onFocus, onHighlight, onPick }: Props & { reduce: boolean; pose: PlexusPose }) {
-  const { camera, gl, size } = useThree();
-  const controls = useRef<OrbitControlsImpl>(null);
-  const spin = useRef<Group>(null);
-  const [hover, setHover] = useState<number | null>(null);
-  const time = useRef(0);
-  const net = useMemo(() => heroNetwork(catalogue), [catalogue]);
-  const nodes = net.nodes;
-  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uMotion: { value: reduce || pose ? 0 : 1 }, uZoom: { value: pose === "in" ? zoomScale(1) : 1 } }), [reduce, pose]);
-  const intro = useRef(reduce || pose ? 1 : 0);
-  const fromV = useRef(new Vector3(0.2, 28, 4.2));
-  const restV = useRef(new Vector3());
-  const posedV = useRef(new Vector3());
+const SHADOW_VERT = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  vec3 pos = position + vec3(0.04, -0.12, 0.02);
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(pos, 1.0);
+}
+`;
+
+const SHADOW_FRAG = `
+precision highp float;
+varying vec2 vUv;
+void main() {
+  float d = length((vUv - 0.5) * 2.0);
+  float alpha = (1.0 - smoothstep(0.78, 0.98, d)) * 0.35;
+  if (alpha < 0.02) discard;
+  gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+}
+`;
+
+function CameraRig({ look, still, controls }: { look: [number, number, number]; still: boolean; controls: React.RefObject<OrbitControlsImpl | null> }) {
+  const { camera } = useThree();
+  const intro = useRef(still ? 1 : 0);
+  const from = useRef(new Vector3(0, 6.2, 18));
+  const to = useRef(new Vector3());
   const lookV = useRef(new Vector3());
-  const offsetV = useRef(new Vector3());
-  const goalV = useRef(new Vector3());
-
-  const geo = useMemo(() => {
-    const color = new Color();
-    const n = nodes.length;
-    const positions = new Float32Array((n + 1) * 3);
-    const sizes = new Float32Array(n + 1);
-    const phases = new Float32Array(n + 1);
-    const fades = new Float32Array(n + 1);
-    const wash = new Float32Array(n + 1);
-    const twinkle = new Float32Array(n + 1);
-    const glow = new Float32Array(n + 1);
-    const tint = new Float32Array((n + 1) * 3);
-    const core = new Float32Array((n + 1) * 3);
-    const hub = net.hub;
-    positions[0] = hub[0]; positions[1] = hub[1]; positions[2] = hub[2];
-    sizes[0] = 150;
-    wash[0] = 1;
-    fades[0] = 1;
-    color.set(accent);
-    tint[0] = color.r; tint[1] = color.g; tint[2] = color.b;
-    color.set(plexusGold);
-    core[0] = color.r; core[1] = color.g; core[2] = color.b;
-    const idAt = new Map(nodes.map((node, i) => [node.id, i]));
-    nodes.forEach((node, i) => {
-      const o = i + 1;
-      positions[o * 3] = node.pos[0]; positions[o * 3 + 1] = node.pos[1]; positions[o * 3 + 2] = node.pos[2];
-      sizes[o] = 7.5;
-      phases[o] = node.phase;
-      fades[o] = node.fade;
-      twinkle[o] = node.twinkle;
-      color.set(plexusTint(node.t));
-      tint[o * 3] = color.r; tint[o * 3 + 1] = color.g; tint[o * 3 + 2] = color.b;
-      color.set(showGaps && node.gap ? gapColor : plexusCore(node.t));
-      core[o * 3] = color.r; core[o * 3 + 1] = color.g; core[o * 3 + 2] = color.b;
-    });
-    const points = new BufferGeometry();
-    points.setAttribute("position", new Float32BufferAttribute(positions, 3));
-    points.setAttribute("aSize", new Float32BufferAttribute(sizes, 1));
-    points.setAttribute("aPhase", new Float32BufferAttribute(phases, 1));
-    points.setAttribute("aFade", new Float32BufferAttribute(fades, 1));
-    points.setAttribute("aWash", new Float32BufferAttribute(wash, 1));
-    points.setAttribute("aTwinkle", new Float32BufferAttribute(twinkle, 1));
-    points.setAttribute("aTint", new Float32BufferAttribute(tint, 3));
-    points.setAttribute("aCore", new Float32BufferAttribute(core, 3));
-    points.setAttribute("aGlow", new Float32BufferAttribute(glow, 1));
-
-    const lp: number[] = [];
-    const lc: number[] = [];
-    const la: number[] = [];
-    const lph: number[] = [];
-    const lg = new Float32Array(net.edges.length * 2);
-    net.edges.forEach((edge) => {
-      const ai = idAt.get(edge.source) ?? 0;
-      const bi = idAt.get(edge.target) ?? 0;
-      lp.push(edge.a[0], edge.a[1], edge.a[2], edge.b[0], edge.b[1], edge.b[2]);
-      lph.push(nodes[ai]?.phase ?? 0, nodes[bi]?.phase ?? 0);
-      la.push(edge.alpha, edge.alpha);
-      color.set(plexusTint(nodes[ai]?.t ?? 0));
-      lc.push(color.r, color.g, color.b);
-      color.set(plexusTint(nodes[bi]?.t ?? 1));
-      lc.push(color.r, color.g, color.b);
-    });
-    const lines = new BufferGeometry();
-    lines.setAttribute("position", new Float32BufferAttribute(lp, 3));
-    lines.setAttribute("aColor", new Float32BufferAttribute(lc, 3));
-    lines.setAttribute("aAlpha", new Float32BufferAttribute(la, 1));
-    lines.setAttribute("aPhase", new Float32BufferAttribute(lph, 1));
-    lines.setAttribute("aGlow", new Float32BufferAttribute(lg, 1));
-    return { points, lines };
-  }, [nodes, net.edges, net.hub, showGaps]);
-
   useEffect(() => {
-    const pointGlow = geo.points.getAttribute("aGlow");
-    const lineGlow = geo.lines.getAttribute("aGlow");
-    const arr = pointGlow.array as Float32Array;
-    const lines = lineGlow.array as Float32Array;
-    arr.fill(0);
-    lines.fill(0);
-    const hoverNode = hover == null ? null : nodes[hover];
-    const near = hoverNode ? neighborIds(hoverNode.id, networkLinks(net.edges)) : new Set<string>();
-    const lit = new Set<string>();
-    nodes.forEach((node, i) => {
-      let g = 0;
-      if (highlight?.has(node.id)) g = 0.7;
-      if (near.has(node.id)) g = 0.85;
-      if (node.id === hoverNode?.id || node.id === focus) g = 1;
-      arr[i + 1] = g;
-      if (g > 0) lit.add(node.id);
-    });
-    net.edges.forEach((edge, i) => {
-      const hot = (hoverNode && (edge.source === hoverNode.id || edge.target === hoverNode.id)) || lit.has(edge.source) || lit.has(edge.target);
-      if (!hot) return;
-      lines[i * 2] = 1;
-      lines[i * 2 + 1] = 1;
-    });
-    pointGlow.needsUpdate = true;
-    lineGlow.needsUpdate = true;
-  }, [hover, focus, highlight, nodes, net.edges, geo]);
-
-  useEffect(() => {
-    const el = gl.domElement;
-    const pick = (ev: { clientX: number; clientY: number }) => {
-      const rect = el.getBoundingClientRect();
-      const px = ev.clientX - rect.left;
-      const py = ev.clientY - rect.top;
-      spin.current?.updateWorldMatrix(true, false);
-      const v = new Vector3();
-      const motion = reduce || pose || document.hidden ? 0 : 1;
-      let best = -1;
-      let bestD = 15 * 15;
-      nodes.forEach((node, i) => {
-        const d = plexusDrift(node.phase, time.current, motion);
-        v.set(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2]);
-        spin.current?.localToWorld(v);
-        v.project(camera);
-        const x = (v.x * 0.5 + 0.5) * rect.width;
-        const y = (-v.y * 0.5 + 0.5) * rect.height;
-        const dd = (x - px) ** 2 + (y - py) ** 2;
-        if (dd < bestD) { bestD = dd; best = i; }
-      });
-      setHover(best >= 0 ? best : null);
-    };
-    const leave = () => setHover(null);
-    const click = (ev: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const px = ev.clientX - rect.left;
-      const py = ev.clientY - rect.top;
-      spin.current?.updateWorldMatrix(true, false);
-      const v = new Vector3();
-      let best = -1;
-      let bestD = 15 * 15;
-      const motion = reduce || pose || document.hidden ? 0 : 1;
-      nodes.forEach((node, i) => {
-        const d = plexusDrift(node.phase, time.current, motion);
-        v.set(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2]);
-        spin.current?.localToWorld(v);
-        v.project(camera);
-        const x = (v.x * 0.5 + 0.5) * rect.width;
-        const y = (-v.y * 0.5 + 0.5) * rect.height;
-        const dd = (x - px) ** 2 + (y - py) ** 2;
-        if (dd < bestD) { bestD = dd; best = i; }
-      });
-      const node = best >= 0 ? nodes[best] : null;
-      if (!node?.paper) return;
-      onFocus?.(node.id);
-      if (node.gap) onHighlight?.(node.cluster);
-    };
-    el.addEventListener("pointermove", pick);
-    el.addEventListener("pointerleave", leave);
-    el.addEventListener("click", click);
-    return () => {
-      el.removeEventListener("pointermove", pick);
-      el.removeEventListener("pointerleave", leave);
-      el.removeEventListener("click", click);
-    };
-  }, [camera, gl, nodes, onFocus, onHighlight, pose, reduce]);
-
-  const look = useMemo(() => {
-    const picked = highlight && highlight.size ? nodes.filter((n) => highlight.has(n.id)) : [];
-    if (picked.length) return centroidOf(picked);
-    const focused = nodes.find((n) => n.id === focus);
-    return focused ? focused.pos : net.hub;
-  }, [highlight, focus, nodes, net.hub]);
-
+    lookV.current.set(look[0], look[1], look[2]);
+    to.current.set(look[0] * 0.2, look[1] + 3.4, look[2] + 12.5);
+    if (still) {
+      camera.position.copy(to.current);
+      if (controls.current) { controls.current.target.copy(lookV.current); controls.current.update(); }
+    }
+  }, [look, still, camera, controls]);
   useFrame((_, dt) => {
     if (document.hidden) return;
-    const pinned = pose === "in" ? 1 : pose === "out" ? 0 : null;
-    const still = reduce || pinned != null;
-    const step = Math.min(dt, 0.05);
-    if (!still) time.current += step;
-    const t = time.current;
-    uniforms.uTime.value = t;
-    uniforms.uMotion.value = still ? 0 : 1;
-    const breath = reduce ? 0 : (pinned ?? breathAmount(t));
-    uniforms.uZoom.value = zoomScale(breath);
-    if (spin.current) {
-      const wide = size.width >= WIDE_CANVAS;
-      spin.current.position.x = wide ? REST_SHIFT * (1 - breath) : 0;
-      if (still) spin.current.rotation.set(0, 0, 0);
-      else {
-        spin.current.rotation.y = t * ORBIT_SPEED;
-        spin.current.rotation.x = Math.sin(t * ROCK_X_HZ + 0.7) * 0.045;
-        spin.current.rotation.z = Math.sin(t * ROCK_Z_HZ + 1.4) * 0.03;
-      }
+    if (still) {
+      camera.position.copy(to.current);
+      if (controls.current) { controls.current.target.copy(lookV.current); controls.current.update(); }
+      return;
     }
-    lookV.current.set(look[0], look[1], look[2]);
-    if (!still) intro.current = Math.min(1, intro.current + step * 1.15);
-    restV.current.set(look[0] * 0.12 + CAMERA_POS.x, look[1] + CAMERA_POS.y, look[2] + CAMERA_POS.z);
-    posedV.current.copy(fromV.current).lerp(restV.current, still ? 1 : intro.current);
-    offsetV.current.copy(posedV.current).sub(lookV.current);
-    const restDist = Math.max(1e-4, offsetV.current.length());
-    const dist = restDist / zoomScale(breath);
-    offsetV.current.multiplyScalar(dist / restDist);
-    goalV.current.copy(lookV.current).add(offsetV.current);
-    if (still || intro.current >= 1) camera.position.copy(goalV.current);
-    else camera.position.lerp(goalV.current, 1 - Math.exp(-step * 2.4));
+    intro.current = Math.min(1, intro.current + dt * 0.45);
+    const k = 1 - Math.exp(-dt * 2.4);
+    const dest = from.current.clone().lerp(to.current, intro.current);
+    camera.position.lerp(dest, k);
     if (controls.current) {
-      controls.current.target.copy(lookV.current);
+      controls.current.target.lerp(lookV.current, k);
       controls.current.update();
     }
   });
+  return null;
+}
 
-  const hovered = hover == null ? null : nodes[hover];
-  const tip = hovered?.paper ? hovered : null;
+function Field({ nodes, links, showGaps, focus, highlight, still, onFocus, onHighlight, onPick }: Props & { still: boolean }) {
+  const { camera, gl } = useThree();
+  const controls = useRef<OrbitControlsImpl>(null);
+  const groupRef = useRef<Group>(null);
+  const nodesRef = useRef<InstancedMesh>(null);
+  const shadowRef = useRef<InstancedMesh>(null);
+  const anchorRef = useRef<Group>(null);
+  const glowAttr = useRef<InstancedBufferAttribute | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const hoverRef = useRef<number | null>(null);
+  const stickRef = useRef<{ x: number; y: number; id: number | null } | null>(null);
+  const positions = useRef<[number, number, number][]>([]);
+  const scales = useRef<Float32Array>(new Float32Array(0));
+  const time = useRef(0);
+  const nodesLive = useRef(nodes);
+  nodesLive.current = nodes;
+  const stillRef = useRef(still);
+  stillRef.current = still;
+  const focusRef = useRef(onFocus);
+  focusRef.current = onFocus;
+  const highlightRef = useRef(onHighlight);
+  highlightRef.current = onHighlight;
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+  const raycaster = useRef(new Raycaster());
+  const ndc = useRef(new Vector2());
+  const tmp = useRef(new Vector3());
+  const mat = useRef(new Matrix4());
+  const sphere = useMemo(() => new SphereGeometry(1, 22, 16), []);
+  const disc = useMemo(() => { const g = new CircleGeometry(0.62, 20); g.rotateX(-Math.PI / 2); return g; }, []);
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uMotion: { value: 1 },
+    uBrightness: { value: NODE_BRIGHTNESS },
+    uWarm: { value: new Color(clusterColors[2]) },
+  }), []);
+  const shadowUniforms = useMemo(() => ({ uTime: uniforms.uTime, uMotion: uniforms.uMotion }), [uniforms]);
+
+  const segments = useMemo(() => {
+    const by = new Map(nodes.map((n, i) => [n.id, i]));
+    const pairs: [number, number][] = [];
+    for (const link of links) {
+      const a = by.get(link.source);
+      const b = by.get(link.target);
+      if (a == null || b == null) continue;
+      pairs.push([a, b]);
+    }
+    return pairs;
+  }, [nodes, links]);
+  const lineGeo = useMemo(() => {
+    const g = new BufferGeometry();
+    g.setAttribute("position", new Float32BufferAttribute(new Float32Array(Math.max(segments.length, 1) * 6), 3));
+    return g;
+  }, [segments.length]);
+
+  useLayoutEffect(() => {
+    const mesh = nodesRef.current;
+    const shadow = shadowRef.current;
+    if (!mesh || !shadow) return;
+    const color = new Color();
+    const n = nodes.length;
+    const colors = new Float32Array(n * 3);
+    const twinkle = new Float32Array(n);
+    const emerging = new Float32Array(n);
+    const phases = new Float32Array(n);
+    const glow = new Float32Array(n);
+    const sized = new Float32Array(n);
+    const maxS = Math.max(...nodes.map((node) => node.support), 0.01);
+    nodes.forEach((node, i) => {
+      sized[i] = 0.09 + 0.32 * Math.sqrt(node.support / maxS);
+      const hex = showGaps && node.gap ? gapColor : galaxyColor(node.colorIndex, node.clusterId);
+      color.set(hex);
+      colors[i * 3] = color.r; colors[i * 3 + 1] = color.g; colors[i * 3 + 2] = color.b;
+      twinkle[i] = node.fresh ? 1 : 0;
+      emerging[i] = node.gap ? 0 : Math.max(0, Math.min(1, node.emerging || 0));
+      phases[i] = (i * 17) % 628 / 100;
+      glow[i] = 0;
+    });
+    scales.current = sized;
+    const put = (target: InstancedMesh, name: string, data: Float32Array, size: number) => {
+      const attr = new InstancedBufferAttribute(data, size);
+      target.geometry.setAttribute(name, attr);
+      return attr;
+    };
+    put(mesh, "aColor", colors, 3);
+    put(mesh, "aTwinkle", twinkle, 1);
+    put(mesh, "aEmerging", emerging, 1);
+    put(mesh, "aPhase", phases, 1);
+    glowAttr.current = put(mesh, "aGlow", glow, 1);
+    mesh.count = n;
+    shadow.count = n;
+    mesh.frustumCulled = false;
+    shadow.frustumCulled = false;
+    const wide = new Sphere(new Vector3(), 1e5);
+    mesh.boundingSphere = wide;
+    shadow.boundingSphere = wide.clone();
+  }, [nodes, showGaps]);
+
+  useEffect(() => {
+    const attr = glowAttr.current;
+    if (!attr) return;
+    const arr = attr.array as Float32Array;
+    const hoverId = hover == null ? null : nodes[hover]?.id;
+    const near = hoverId ? neighborIds(hoverId, links) : new Set<string>();
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      let g = 0;
+      if (highlight?.has(n.id)) g = 0.62;
+      if (near.has(n.id)) g = 0.48;
+      if (n.id === hoverId || n.id === focus) g = 1;
+      arr[i] = g;
+    }
+    attr.needsUpdate = true;
+  }, [hover, focus, highlight, nodes, links]);
+
+  useFrame((_, dt) => {
+    if (document.hidden) return;
+    const frozen = stillRef.current;
+    if (!frozen) time.current += Math.min(dt, 0.05);
+    const motion = frozen ? 0 : 1;
+    uniforms.uTime.value = time.current;
+    uniforms.uMotion.value = motion;
+    const list = nodesLive.current;
+    const mesh = nodesRef.current;
+    const shadow = shadowRef.current;
+    if (!mesh || !shadow) return;
+    const posed = positions.current;
+    posed.length = list.length;
+    const m = mat.current;
+    for (let i = 0; i < list.length; i++) {
+      const p = posedPosition(list[i], time.current, motion);
+      posed[i] = p;
+      const s = scales.current[i] || 0.12;
+      m.makeScale(s, s, s);
+      m.setPosition(p[0], p[1], p[2]);
+      mesh.setMatrixAt(i, m);
+      shadow.setMatrixAt(i, m);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    shadow.instanceMatrix.needsUpdate = true;
+    if (segments.length && lineGeo) {
+      const attr = lineGeo.getAttribute("position");
+      const arr = attr.array as Float32Array;
+      segments.forEach(([a, b], i) => {
+        const pa = posed[a];
+        const pb = posed[b];
+        if (!pa || !pb) return;
+        const o = i * 6;
+        arr[o] = pa[0]; arr[o + 1] = pa[1]; arr[o + 2] = pa[2];
+        arr[o + 3] = pb[0]; arr[o + 4] = pb[1]; arr[o + 5] = pb[2];
+      });
+      attr.needsUpdate = true;
+    }
+    const tip = hoverRef.current;
+    if (anchorRef.current) {
+      const p = tip == null ? null : posed[tip];
+      if (p) anchorRef.current.position.set(p[0], p[1], p[2]);
+    }
+  });
+
+  useEffect(() => {
+    const el = gl.domElement;
+    const screenDistance = (index: number, px: number, py: number, rect: DOMRect) => {
+      const p = positions.current[index];
+      if (!p || rect.width === 0 || rect.height === 0) return Number.POSITIVE_INFINITY;
+      const v = tmp.current;
+      v.set(p[0], p[1], p[2]);
+      groupRef.current?.updateWorldMatrix(true, false);
+      groupRef.current?.localToWorld(v);
+      v.project(cameraRef.current);
+      const x = (v.x * 0.5 + 0.5) * rect.width;
+      const y = (-v.y * 0.5 + 0.5) * rect.height;
+      return Math.hypot(x - px, y - py);
+    };
+    const sample = (ev: { clientX: number; clientY: number }) => {
+      const rect = el.getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      const mesh = nodesRef.current;
+      const hits: PaperHit[] = [];
+      if (mesh && rect.width > 0 && rect.height > 0) {
+        ndc.current.set((px / rect.width) * 2 - 1, -(py / rect.height) * 2 + 1);
+        groupRef.current?.updateWorldMatrix(true, true);
+        raycaster.current.setFromCamera(ndc.current, cameraRef.current);
+        const found = raycaster.current.intersectObject(mesh, false);
+        const seen = new Set<number>();
+        for (const hit of found) {
+          const id = hit.instanceId;
+          if (id == null || seen.has(id) || id >= nodesLive.current.length) continue;
+          seen.add(id);
+          hits.push({ id, distance: screenDistance(id, px, py, rect) });
+        }
+      }
+      const locked = stickRef.current?.id ?? null;
+      const lockedDistance = locked == null ? null : screenDistance(locked, px, py, rect);
+      return { hits, lockedDistance };
+    };
+    const commit = (next: number | null, x: number, y: number) => {
+      stickRef.current = { x, y, id: next };
+      if (next === hoverRef.current) return;
+      hoverRef.current = next;
+      const p = next == null ? null : positions.current[next];
+      if (anchorRef.current && p) anchorRef.current.position.set(p[0], p[1], p[2]);
+      setHover(next);
+    };
+    const move = (ev: PointerEvent) => {
+      // A finger is not a hover. Taps are handled on pointerup so a lift cannot retarget the card.
+      if (ev.pointerType === "touch") return;
+      const stick = stickRef.current;
+      const travel = stick ? Math.hypot(ev.clientX - stick.x, ev.clientY - stick.y) : Number.POSITIVE_INFINITY;
+      const locked = stick?.id ?? null;
+      if (locked != null && travel < HOVER_STICK_PX) return;
+      const { hits, lockedDistance } = sample(ev);
+      commit(resolvePaperHover({ locked, travelPx: travel, hits, lockedDistance }), ev.clientX, ev.clientY);
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerType !== "touch") return;
+      const { hits } = sample(ev);
+      commit(resolveTouchPin(hits), ev.clientX, ev.clientY);
+    };
+    const leave = (ev: PointerEvent) => {
+      if (!leaveClearsHover(ev.pointerType)) return;
+      const next = ev.relatedTarget;
+      const card = el.parentElement?.querySelector("[data-testid=galaxy-paper-card]");
+      if (next instanceof Node && card?.contains(next)) return;
+      stickRef.current = null;
+      hoverRef.current = null;
+      setHover(null);
+    };
+    const click = (ev: MouseEvent) => {
+      const { hits } = sample(ev);
+      if (!hits.length) return;
+      hits.sort((a, b) => a.distance - b.distance);
+      const node = nodesLive.current[hits[0].id];
+      if (!node) return;
+      focusRef.current?.(node.id);
+      if (node.gap) highlightRef.current?.(node.cluster);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointerleave", leave);
+    el.addEventListener("click", click);
+    return () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointerleave", leave);
+      el.removeEventListener("click", click);
+    };
+  }, [gl]);
+
+  const look = useMemo(() => {
+    const picked = highlight && highlight.size ? nodes.filter((n) => highlight.has(n.id)) : [];
+    if (picked.length) return centroid(picked.map((n) => ({ pos: n.center })));
+    const focused = nodes.find((n) => n.id === focus);
+    return focused ? focused.pos : centroid(nodes);
+  }, [highlight, focus, nodes]);
+
+  const tip = hover == null ? null : nodes[hover] ?? null;
 
   return (
     <>
-      <group ref={spin}>
-        <lineSegments geometry={geo.lines} frustumCulled={false} raycast={() => null} renderOrder={1}>
-          <shaderMaterial args={[{ uniforms, vertexShader: LINK_VERT, fragmentShader: LINK_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
-        </lineSegments>
-        <points geometry={geo.points} frustumCulled={false} raycast={() => null} renderOrder={2}>
-          <shaderMaterial args={[{ uniforms, vertexShader: POINT_VERT, fragmentShader: POINT_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
-        </points>
-        {tip && (
-          <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
-            <div className="glass w-48 p-2.5 text-left text-xs" onPointerDown={(e) => e.stopPropagation()}>
-              <div className="font-medium text-white">{tip.id}</div>
-              <p className="mt-0.5 text-mist">Paper{tip.cluster ? ` · topic cluster ${tip.cluster}` : ""}</p>
-              {showGaps && tip.gap && <p className="text-gap">Research gap</p>}
-              <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(tip.id)}>Search this paper</button>
-            </div>
-          </Html>
+      <group ref={groupRef}>
+        <instancedMesh key={`shadow-${nodes.length}`} ref={shadowRef} args={[disc, undefined, Math.max(nodes.length, 1)]} frustumCulled={false} raycast={() => null}>
+          <shaderMaterial args={[{ uniforms: shadowUniforms, vertexShader: SHADOW_VERT, fragmentShader: SHADOW_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
+        </instancedMesh>
+        <instancedMesh key={`nodes-${nodes.length}`} ref={nodesRef} args={[sphere, undefined, Math.max(nodes.length, 1)]} frustumCulled={false}>
+          <shaderMaterial args={[{ uniforms, vertexShader: NODE_VERT, fragmentShader: NODE_FRAG, toneMapped: false }]} />
+        </instancedMesh>
+        {segments.length > 0 && (
+          <lineSegments geometry={lineGeo} frustumCulled={false} raycast={() => null}>
+            <lineBasicMaterial color={linkGrey} transparent opacity={0.28} toneMapped={false} />
+          </lineSegments>
         )}
+        <group ref={anchorRef}>
+          {tip && (
+            <Html position={[0.72, 0.42, 0]} zIndexRange={[12, 0]} style={{ pointerEvents: "none" }}>
+              <div className="glass w-48 p-2.5 text-left text-xs" role="tooltip" data-testid="galaxy-paper-card" style={{ pointerEvents: "none" }}>
+                <div className="font-medium text-white">{tip.id}</div>
+                <p className="mt-0.5 text-mist">Paper{tip.cluster ? ` · topic cluster ${tip.cluster}` : ""}</p>
+                {showGaps && tip.gap && <p className="text-gap">Research gap</p>}
+                <button className="btn mt-2 w-full py-1" style={{ pointerEvents: "auto" }} onPointerDown={(e) => e.stopPropagation()} onClick={() => onPick?.(tip.id)}>Search this paper</button>
+              </div>
+            </Html>
+          )}
+        </group>
       </group>
-      <OrbitControls ref={controls} enablePan={false} enableZoom={false} />
+      <CameraRig look={look} still={still} controls={controls} />
+      <OrbitControls ref={controls} enablePan={false} enableZoom={!still} enableRotate={!still} minDistance={5} maxDistance={26} />
+      <Stars radius={80} depth={40} count={1100} factor={2} fade speed={still ? 0 : 0.22} />
     </>
   );
-}
-
-function centroidOf(nodes: { pos: [number, number, number] }[]): [number, number, number] {
-  const c = nodes.reduce((a, n) => [a[0] + n.pos[0], a[1] + n.pos[1], a[2] + n.pos[2]] as [number, number, number], [0, 0, 0]);
-  return [c[0] / nodes.length, c[1] / nodes.length, c[2] / nodes.length];
 }
 
 interface Props {
@@ -382,24 +413,28 @@ interface Props {
   showGaps: boolean;
   focus: string | null;
   highlight: Set<string> | null;
+  /** Low power or reduced motion: the same galaxy, held still. */
+  still?: boolean;
   onFocus?: (id: string) => void;
   onHighlight?: (cluster?: string) => void;
   onPick?: (id: string) => void;
-  pose?: PlexusPose;
 }
 
 export default function Galaxy3D(p: Props) {
   const reduce = usePrefersReduced();
   const hidden = usePageHidden();
+  const still = !!p.still || reduce;
+  if (!p.nodes.length) return null;
   return (
     <Canvas
+      className="h-full w-full"
       frameloop={hidden ? "never" : "always"}
-      camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: CAMERA_FOV }}
+      camera={{ position: [0, 4.2, 13], fov: 48 }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, toneMapping: NoToneMapping }}
     >
       <color attach="background" args={[ink]} />
-      <Field {...p} reduce={reduce} pose={p.pose ?? null} />
+      <Field {...p} still={still} />
     </Canvas>
   );
 }

@@ -113,10 +113,10 @@ If the API is unset or unreachable, the web client serves its built-in 66-paper 
 | `apps/web/` | Next.js 14 front end (React 18, three 0.169, @react-three/fiber 8, drei, postprocessing, framer-motion, Tailwind) | Vercel root directory. Scripts: `dev`, `build`, `lint`, `typecheck`, `test` (vitest). |
 | `apps/web/src/lib/api/client.ts` | API client. Reads `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_API_MOCK`, `NEXT_PUBLIC_SEARCH_LIMIT`, `NEXT_PUBLIC_GALAXY_LIMIT`. `normalizeGalaxy` accepts both galaxy payload shapes. | Falls back to `mock.ts` per route. |
 | `apps/web/src/lib/api/mock.ts` | 66-paper sample (`FIXTURE_COUNT`) | Source of the "Demo data" badge (`components/SourceBadge.tsx`). |
-| `apps/web/src/lib/palette.ts` | **Every colour in the app** (Embedding Lens): ink `#0B0F1A`, accent amber `#F5A54A`, plexus copper `#C2410C`, plexus gold `#FDE7B0`, Okabe–Ito for charts. | Change colours here only. |
+| `apps/web/src/lib/palette.ts` | **Every colour in the app** (Champagne & Platinum): ink `#121216`, accent `#F3E3B5`, cluster tones champagne gold / platinum / antique gold / pewter / pale gold, Okabe–Ito for charts. | Change colours here only. |
 | `apps/web/src/lib/theme.ts` | CSS variables and `clusterColors` (Champagne & Platinum row in STATUS) | |
 | `apps/web/src/lib/paperLink.ts` | Paper links. Since #22 the fake `10.1234` DOIs are gone; demo papers show "Find on OpenAlex". | |
-| `apps/web/src/features/galaxy/` | `GalaxyHero.tsx` (landing), `Galaxy3D.tsx` (instanced points + one line-segment buffer, shader drift/twinkle), `Galaxy2D.tsx` (canvas fallback), `stars.ts` (plexus constants), `layout.ts` | `stars.ts`: `PLEXUS_COUNT = 310`, `BREATH_CYCLE = 14` s, `ORBIT_SPEED`, `LINK_REACH`. |
+| `apps/web/src/features/galaxy/` | `GalaxyHero.tsx` (landing), `Galaxy3D.tsx` (instanced spheres, contact shadow, hover lock on stable instance ids), `stars.ts`, `hover.ts`, `layout.ts` | Up to 600 papers. Reduced motion and low power hold the 3D view still. There is no 2D galaxy. |
 | `apps/web/src/features/{search,countries,timeline,patterns,compare,collections}/` | Pages: search + paper panel + ask chat, 3D/2D globe with counting toggle, streamgraph timeline, patterns, compare tray, localStorage collections | |
 | `apps/web/src/__tests__/` | 12 vitest files | CI job `web` in `test.yml`. |
 | `apps/api/app/main.py` | FastAPI app, CORS `*`, router at `/api/v1` | |
@@ -332,7 +332,9 @@ All times are PKT (UTC+5). Merges #1–#17 used merge commits; from #18 on, PRs 
 
 ### 7.1 Galaxy design (PR #18) — what was accepted and rejected
 
-- **Accepted:** a low-poly plexus of about **310 tiny instanced nodes** (`PLEXUS_COUNT`) in one diagonal band.
+Superseded on 2026-10-22: the landing galaxy is 3D only, in the Champagne & Platinum palette, with up to 600 papers and a hover lock. The 2D canvas and the plexus band below are no longer in the app. See `docs/STATUS.md`.
+
+- **Accepted (historical, PR #18):** a low-poly plexus of about **310 tiny instanced nodes** (`PLEXUS_COUNT`) in one diagonal band.
   - Colours run **copper `#C2410C` → amber `#F5A54A` → pale gold `#FDE7B0`** on navy **`#0B0F1A`**.
   - Each node links to at most 6 near neighbours, and line opacity fades with length.
   - Motion is **1.5×** the first plexus: drift, twinkle and a **continuous circular yaw** with a small tilt.

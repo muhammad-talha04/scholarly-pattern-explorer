@@ -3,7 +3,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useMotionPrefs } from "./MotionProvider";
 import { DemoNote, SourceBadge } from "./SourceBadge";
 import { replayTour } from "./Tour";
 
@@ -19,7 +18,6 @@ const LINKS = [
 
 export function Nav() {
   const path = usePathname();
-  const { lowPower, setLowPower } = useMotionPrefs();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   return (
@@ -43,9 +41,6 @@ export function Nav() {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <SourceBadge />
-          <button data-tour="power" className="chip hidden hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:inline-flex" onClick={() => setLowPower(!lowPower)} aria-pressed={lowPower} title="Toggle the flat drawing used for reduced motion and low power">
-            {lowPower ? "2D mode" : "3D mode"}
-          </button>
           <button className="chip hidden hover:text-white lg:inline-flex" onClick={() => replayTour()}>Tour</button>
           <button className="btn shrink-0 px-3 py-1.5 lg:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen((v) => !v)}>
             {open ? "Close" : "Menu"}
@@ -64,7 +59,6 @@ export function Nav() {
             );
           })}
           <div className="flex flex-wrap gap-2 pt-2">
-            <button className="chip hover:text-white sm:hidden" onClick={() => setLowPower(!lowPower)} aria-pressed={lowPower}>{lowPower ? "2D mode" : "3D mode"}</button>
             <button className="chip hover:text-white" onClick={() => { close(); replayTour(); }}>Replay tour</button>
           </div>
         </div>
