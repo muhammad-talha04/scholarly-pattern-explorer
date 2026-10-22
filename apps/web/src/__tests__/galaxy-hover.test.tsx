@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 import { Galaxy2D } from "@/features/galaxy/Galaxy2D";
+import { HOVER_DWELL_MS } from "@/features/galaxy/hoverLock";
 import { breathAmount, heroNetwork, ORBIT_SPEED, plexusDrift, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, WIDE_CANVAS, zoomScale } from "@/features/galaxy/stars";
 
 const WIDTH = 1100;
@@ -75,6 +76,7 @@ function translation(el: HTMLElement) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -133,10 +135,13 @@ function installCanvas() {
       now += ms;
       cb?.(now);
     },
+    advance(ms: number) {
+      now += ms;
+    },
   };
 }
 
-it("keeps the paper card beside the node while zero-movement pointermoves arrive", () => {
+it("keeps one paper and leaves the card where it opened while the band drifts", () => {
   const clock = installCanvas();
   const net = heroNetwork(papers(48));
   const far = net.nodes.filter((n) => n.paper).map((n) => {
@@ -172,10 +177,14 @@ it("keeps the paper card beside the node while zero-movement pointermoves arrive
   const still = screen.getByTestId("galaxy-paper-card");
   expect(still).toHaveTextContent(far.n.id);
   const followed = cardAnchor(x1, y1);
-  expect(translation(still)).toEqual(followed);
   expect(Math.hypot(followed[0] - parked[0], followed[1] - parked[1])).toBeGreaterThan(20);
+  expect(translation(still)).toEqual(parked);
 
   fireEvent.pointerMove(canvas!, { clientX: 2, clientY: 2, movementX: 30, movementY: 4 });
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(far.n.id);
+  expect(translation(screen.getByTestId("galaxy-paper-card"))).toEqual(parked);
+
+  fireEvent.pointerLeave(canvas!);
   expect(screen.queryByTestId("galaxy-paper-card")).toBeNull();
 });
 
@@ -218,7 +227,55 @@ it("picks a paper inside the hit radius even when a non-paper dot is closer", ()
   }).sort((a, b) => b.nearestPaper - a.nearestPaper)[0];
   expect(lonely.nearestPaper).toBeGreaterThan(HIT_PX);
   fireEvent.pointerMove(canvas!, { clientX: lonely.x, clientY: lonely.y, movementX: 9, movementY: -3 });
-  expect(screen.queryByTestId("galaxy-paper-card")).toBeNull();
+  const held = screen.getByTestId("galaxy-paper-card");
+  expect(held).toHaveTextContent(aim!.paperId);
+  expect(held.textContent).not.toMatch(/dot-/);
+});
+
+it("keeps the same paper while the pointer travels onto the card, then switches after a rest", () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const clock = installCanvas();
+  const net = heroNetwork(papers(48));
+  const papersOnScreen = net.nodes.filter((n) => n.paper).map((n) => {
+    const [x, y] = project(n, 0);
+    return { n, x, y };
+  });
+  const origin = papersOnScreen.find((p) => p.x > 80 && p.x < WIDTH - 240 && p.y > 80 && p.y < HEIGHT - 120);
+  expect(origin).toBeTruthy();
+  const other = papersOnScreen
+    .filter((p) => p.n.id !== origin!.n.id)
+    .sort((a, b) => Math.hypot(b.x - origin!.x, b.y - origin!.y) - Math.hypot(a.x - origin!.x, a.y - origin!.y))[0];
+  expect(Math.hypot(other.x - origin!.x, other.y - origin!.y)).toBeGreaterThan(80);
+
+  const onPick = vi.fn();
+  render(<Galaxy2D nodes={papers(48)} links={[]} showGaps={false} onPick={onPick} />);
+  const canvas = document.querySelector("canvas");
+  fireEvent.pointerMove(canvas!, { clientX: origin!.x, clientY: origin!.y, movementX: 6, movementY: 2 });
+  const parked = cardAnchor(origin!.x, origin!.y);
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(origin!.n.id);
+  expect(translation(screen.getByTestId("galaxy-paper-card"))).toEqual(parked);
+
+  const [cardX, cardY] = parked;
+  for (let i = 1; i <= 4; i++) {
+    const x = origin!.x + ((cardX + 24) - origin!.x) * (i / 4);
+    const y = origin!.y + ((cardY + 20) - origin!.y) * (i / 4);
+    fireEvent.pointerMove(canvas!, { clientX: x, clientY: y, movementX: 8, movementY: 3 });
+  }
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(origin!.n.id);
+  expect(translation(screen.getByTestId("galaxy-paper-card"))).toEqual(parked);
+
+  fireEvent.pointerMove(screen.getByTestId("galaxy-paper-card"), { clientX: cardX + 20, clientY: cardY + 16, movementX: 4, movementY: 2 });
+  fireEvent.click(screen.getByRole("button", { name: "Search this paper" }));
+  expect(onPick).toHaveBeenCalledWith(origin!.n.id);
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(origin!.n.id);
+
+  fireEvent.pointerMove(canvas!, { clientX: other.x, clientY: other.y, movementX: 12, movementY: -4 });
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(origin!.n.id);
+  clock.advance(HOVER_DWELL_MS);
+  act(() => { vi.advanceTimersByTime(HOVER_DWELL_MS); });
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(other.n.id);
+  expect(translation(screen.getByTestId("galaxy-paper-card"))).toEqual(cardAnchor(other.x, other.y));
+  vi.useRealTimers();
 });
 
 it("pins the card on a touch tap and clears it on a tap in empty space", () => {
