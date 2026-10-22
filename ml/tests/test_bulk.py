@@ -129,3 +129,48 @@ def test_client_raises_on_4xx():
                             sleep=lambda s: None)
     with pytest.raises(RuntimeError):
         c.get({})
+
+
+def test_backfill_dates_local_metadata_only_and_idempotent(tmp_path):
+    import numpy as np
+    from ml.store import LocalStore
+    s = LocalStore(tmp_path)
+    v = np.eye(3, 384, dtype=np.float32)
+    s.upsert(["W1", "W2", "W3"], v, [{"created": "2023-05-01"}, {"created": "2023-05-01"},
+                                     {"created": "2019-02-02", "publication_date": "2019-02-02"}], model="m")
+    assert s.month_counts() == {"2023-05": 2, "2019-02": 1}
+
+    class C:
+        requests = 0
+        calls = []
+
+        def get(self, p):
+            self.requests += 1
+            self.calls.append(p)
+            return {"results": [{"id": "https://openalex.org/W1", "publication_date": "2017-03-04"}]}
+    assert bulk.backfill_dates(s, client=C(), dry_run=True).missing == 2
+    c = C()
+    r = bulk.backfill_dates(s, client=c, batch=1)
+    assert (r.missing, r.updated, r.not_found, r.requests) == (2, 2, 1, 2)
+    assert c.calls[0]["filter"] == "openalex_id:W1" and c.calls[0]["select"] == "id,publication_date"
+    s2 = LocalStore(tmp_path)
+    assert s2.get("W1")["publication_date"] == "2017-03-04" and s2.get("W2")["publication_date"] is None
+    assert np.array_equal(s2.vecs, v) and set(s2.models.values()) == {"m"}
+    assert s2.month_counts() == {"2017-03": 1, "2023-05": 1, "2019-02": 1}
+    c2 = C()
+    assert bulk.backfill_dates(s2, client=c2).missing == 0 and c2.requests == 0
+
+
+def test_backfill_batches_of_50_with_http_backoff(tmp_path):
+    import numpy as np
+    from ml.store import LocalStore
+    s = LocalStore(tmp_path)
+    ids = [f"W{i}" for i in range(120)]
+    s.upsert(ids, np.ones((120, 384), dtype=np.float32), [{} for _ in ids], model="m")
+    seq = [Resp(429)] + [Resp(200, {"results": [{"id": f"https://openalex.org/{w}", "publication_date": "2020-01-01"}
+                                                 for w in ids[k:k + 50]]}) for k in (0, 50, 100)]
+    sess = Session(seq)
+    c = bulk.OpenAlexClient(session=sess, api_key="k", email="", min_interval=0, sleep=lambda x: None)
+    r = bulk.backfill_dates(s, client=c, batch=500)   # clamped to 50
+    assert r.updated == 120 and r.not_found == 0 and r.requests == 4
+    assert all(p["filter"].count("|") <= 49 and p["api_key"] == "k" for p in sess.params)

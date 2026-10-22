@@ -104,9 +104,41 @@ def test_roundtrip_on_real_postgres():
             assert cur.fetchone()[0] == "100"
         cur.execute("SHOW hnsw.ef_search")
         assert cur.fetchone()[0] == "40"   # SET LOCAL did not leak
+    # backfill-dates metadata update leaves vectors and model alone
+    before = s.vector("W3")
+    assert len(s.ids_missing_publication_date()) == 50
+    assert s.set_publication_dates({"W3": "2016-07-08", "W4": None}) == 2
+    assert s.get("W3")["publication_date"] == "2016-07-08" and s.get("W3")["i"] == 3
+    assert np.array_equal(s.vector("W3"), before) and s.model_counts() == {"m": 50}
+    assert len(s.ids_missing_publication_date()) == 48
+    assert s.month_counts().get("2016-07") == 1
     s.put_sampling_rate("2020-01", 1000, 5, "f")
     s.put_sampling_rate("2020-01", 1200, 6, "f")
     assert s.sampling_rates()["2020-01"]["openalex_total"] == 1200
     with s._cursor() as cur:
         cur.execute("DELETE FROM sampling_rates WHERE month = '2020-01-01'")
     s.delete_all_embeddings()
+
+
+def test_sampling_rates_policy_sql():
+    path = [p for p in migration_files() if p.name.startswith("006_")][0]
+    sql = path.read_text()
+    assert sql.count("CREATE POLICY") == 1
+    assert "DROP POLICY IF EXISTS sampling_rates_select_spe_api" in sql
+    assert "FOR SELECT TO spe_api" in sql
+
+
+@pytest.mark.skipif(not os.getenv("SPE_TEST_PG_URL"), reason="needs a throwaway Postgres+pgvector")
+def test_sampling_rates_policy_on_real_postgres():
+    import psycopg
+    from db.apply import apply
+    dsn = os.environ["SPE_TEST_PG_URL"]
+    with psycopg.connect(dsn, autocommit=True) as c:
+        c.execute("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='spe_api') "
+                  "THEN CREATE ROLE spe_api; END IF; END $$")
+    apply(dsn)
+    apply(dsn)   # re-runnable with the policy present
+    with psycopg.connect(dsn, autocommit=True) as c:
+        rows = c.execute("SELECT policyname, cmd, roles::text FROM pg_policies "
+                         "WHERE tablename = 'sampling_rates'").fetchall()
+        assert rows == [("sampling_rates_select_spe_api", "SELECT", "{spe_api}")]

@@ -12,3 +12,16 @@ CREATE TABLE IF NOT EXISTS sampling_rates (
 );
 
 ALTER TABLE sampling_rates ENABLE ROW LEVEL SECURITY;
+
+-- One read-only policy: the spe_api role may SELECT. No insert/update/delete
+-- policies (the loader writes as the table owner, which bypasses RLS).
+-- Guarded: skipped when spe_api does not exist; drop + create keeps it re-runnable.
+DROP POLICY IF EXISTS sampling_rates_select_spe_api ON sampling_rates;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'spe_api') THEN
+        CREATE POLICY sampling_rates_select_spe_api ON sampling_rates
+            FOR SELECT TO spe_api USING (true);
+    END IF;
+END $$;

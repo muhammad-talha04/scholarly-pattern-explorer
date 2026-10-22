@@ -138,13 +138,28 @@ class LocalStore:
         return None
 
     def month_counts(self) -> dict[str, int]:
-        """Stored papers per publication month 'YYYY-MM' (from meta.created)."""
+        """Stored papers per month: meta.publication_date, else meta.created."""
         out: dict[str, int] = {}
         for wid in self.ids:
             m = _month_of(self.meta.get(wid))
             if m:
                 out[m] = out.get(m, 0) + 1
         return out
+
+    def ids_missing_publication_date(self) -> list[str]:
+        """work_ids whose meta has no ``publication_date`` key (null = looked up, unknown)."""
+        return [w for w in self.ids if "publication_date" not in (self.meta.get(w) or {})]
+
+    def set_publication_dates(self, dates: dict[str, str | None]) -> int:
+        """Metadata-only update: sets meta.publication_date. Vectors and model untouched."""
+        n = 0
+        for wid, d in dates.items():
+            if wid in self.meta:
+                self.meta[wid] = {**(self.meta[wid] or {}), "publication_date": d}
+                n += 1
+        if n:
+            self._save()
+        return n
 
     def put_sampling_rate(self, month: str, openalex_total: int, sampled: int, filter: str) -> None:
         """File fallback for the sampling_rates table: <path>/sampling_rates.json."""
@@ -259,7 +274,8 @@ def hnsw_ef_search() -> int:
 
 
 def _month_of(meta: dict) -> str | None:
-    d = (meta or {}).get("created")
+    meta = meta or {}
+    d = meta.get("publication_date") or meta.get("created")
     return d[:7] if isinstance(d, str) and re.match(r"^\d{4}-\d{2}", d) else None
 
 
@@ -425,12 +441,33 @@ class PgVectorStore:
         return self._run(q)
 
     def month_counts(self) -> dict[str, int]:
-        """Stored papers per publication month 'YYYY-MM' (from meta->>'created')."""
+        """Stored papers per month: meta.publication_date, else meta.created."""
         def q(cur):
-            cur.execute("SELECT substr(meta->>'created', 1, 7) m, count(*) FROM paper_embeddings "
-                        "WHERE meta->>'created' ~ '^[0-9]{4}-[0-9]{2}' GROUP BY 1")
+            cur.execute("SELECT substr(d, 1, 7) m, count(*) FROM (SELECT coalesce(meta->>'publication_date', "
+                        "meta->>'created') d FROM paper_embeddings) t "
+                        "WHERE d ~ '^[0-9]{4}-[0-9]{2}' GROUP BY 1")
             return {m: int(n) for m, n in cur.fetchall()}
         return self._run(q)
+
+    def ids_missing_publication_date(self) -> list[str]:
+        def q(cur):
+            cur.execute("SELECT work_id FROM paper_embeddings "
+                        "WHERE meta IS NULL OR NOT (meta ? 'publication_date') ORDER BY work_id")
+            return [r[0] for r in cur.fetchall()]
+        return self._run(q)
+
+    def set_publication_dates(self, dates: dict[str, str | None]) -> int:
+        """Metadata-only update: sets meta.publication_date. Vectors and model untouched."""
+        rows = [(json.dumps(d), wid) for wid, d in dates.items()]
+        if not rows:
+            return 0
+        with self._connection() as c:
+            tx = c.transaction() if hasattr(c, "transaction") else contextlib.nullcontext()
+            with tx, c.cursor() as cur:
+                cur.executemany(
+                    "UPDATE paper_embeddings SET meta = jsonb_set(coalesce(meta, '{}'::jsonb), "
+                    "'{publication_date}', %s::jsonb) WHERE work_id = %s", rows)
+        return len(rows)
 
     def put_sampling_rate(self, month: str, openalex_total: int, sampled: int, filter: str) -> None:
         with self._cursor() as cur:

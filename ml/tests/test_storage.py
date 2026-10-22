@@ -53,9 +53,12 @@ def test_migration_statements_cover_embeddings_and_documents():
         assert column in sql
     assert "discovery_snapshots_kind_country_date_idx" in sql
     for table in ("paper_embeddings", "documents", "topic_country_year",
-                  "discovery_snapshots", "runs", "paper_summaries", "snapshots"):
+                  "discovery_snapshots", "runs", "paper_summaries", "snapshots", "sampling_rates"):
         assert f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" in sql
-    assert "CREATE POLICY" not in sql
+    # The only policy anywhere: read-only sampling_rates for spe_api (migration 006).
+    assert sql.count("CREATE POLICY") == 1
+    assert "CREATE POLICY sampling_rates_select_spe_api ON sampling_rates" in sql
+    assert "FOR SELECT TO spe_api" in sql
     joined = split_sql(sql)
     assert any(stmt.strip().startswith("DO $$") for stmt in joined)
     assert all(stmt.rstrip().endswith(";") for stmt in joined)

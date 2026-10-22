@@ -227,3 +227,40 @@ def fetch(target: int, out: str | Path, state: str | Path | None = None, start: 
             log.info("%s: %d/%d (OpenAlex total %d)", mo, ms["fetched"], want, ms["openalex_total"])
     res.requests = client.requests
     return res
+
+
+@dataclass
+class BackfillResult:
+    missing: int = 0
+    updated: int = 0
+    not_found: int = 0
+    requests: int = 0
+
+
+def backfill_dates(store, client: OpenAlexClient | None = None, batch: int = 50,
+                   dry_run: bool = False) -> BackfillResult:
+    """Set meta.publication_date on stored papers that lack it. Metadata only.
+
+    Looks ids up in OpenAlex ``batch`` at a time (``filter=openalex_id:a|b|...``,
+    max 50 per OpenAlex OR-filter). Each batch is written as soon as it returns,
+    so a rerun resumes where it stopped. Ids OpenAlex does not return are stored as
+    ``publication_date: null`` so they are not asked for again (idempotent).
+    """
+    batch = max(1, min(int(batch), 50))
+    todo = store.ids_missing_publication_date()
+    res = BackfillResult(missing=len(todo))
+    if dry_run or not todo:
+        return res
+    client = client or OpenAlexClient()
+    for i in range(0, len(todo), batch):
+        chunk = todo[i:i + batch]
+        data = client.get({"filter": "openalex_id:" + "|".join(chunk), "per-page": batch,
+                           "select": "id,publication_date"})
+        found = {(w.get("id") or "").rsplit("/", 1)[-1]: w.get("publication_date")
+                 for w in data.get("results") or []}
+        dates = {wid: found.get(wid) for wid in chunk}
+        res.not_found += sum(1 for wid in chunk if wid not in found)
+        res.updated += store.set_publication_dates(dates)
+        log.info("backfill-dates: %d/%d", min(i + batch, len(todo)), len(todo))
+    res.requests = client.requests
+    return res

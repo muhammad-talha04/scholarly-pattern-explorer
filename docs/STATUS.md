@@ -6,7 +6,8 @@ Last updated: 2026-10-22 by cursor: 2D galaxy hover card stays on one paper whil
 - `db/migrations/005_halfvec_embeddings.sql`: `embedding` -> `halfvec(384)`, HNSW `halfvec_cosine_ops` (same index name). 001's index is now guarded so re-applying never fails.
 - `ml/store.py`: PgVectorStore casts to `::halfvec`, reads via `::vector::text`, new `stored_dim()` (LocalStore too).
 - `ml/bulk.py` + `ml.cli bulk`: OpenAlex fetch split evenly per month (2015-01..now), abstracts only, dedupe vs stored ids, backoff, resumable; `--index` reuses the batched indexer and its ModelMismatch guard.
-- Review fixes: search runs `SET LOCAL hnsw.ef_search` (env `ML_HNSW_EF_SEARCH`, default 100) in the query's transaction; `--max-db-mb` default 300 everywhere; per-month quotas subtract stored papers; short months top up on resume; `--min-abstract-chars 200`; migration 006 `sampling_rates` (per-month OpenAlex total vs sampled) for anglina's gap scaling.
+- Review fixes: search runs `SET LOCAL hnsw.ef_search` (env `ML_HNSW_EF_SEARCH`, default 100) in the query's transaction; `--max-db-mb` default 300 everywhere; per-month quotas subtract stored papers; short months top up on resume; `--min-abstract-chars 200`; migration 006 `sampling_rates` (RLS, single SELECT policy for `spe_api`) (per-month OpenAlex total vs sampled) for anglina's gap scaling.
+- `python -m ml.cli backfill-dates [--dry-run] [--batch 50]`: sets `meta.publication_date` from OpenAlex for rows lacking it (metadata only, resumable); runs before re-embed. Real local run: 5,000 rows in 100 requests / 35 s, vectors and model unchanged.
 - **Deploy rule:** apply migrations 005/006 and redeploy the API in the same window; the old API's search breaks on halfvec.
 - Measured on local Postgres 17 + pgvector 0.8, 5,000 real OpenAlex papers: 3,763 B/paper with halfvec vs 5,678 with vector (-34%). 70k total projects to ~282 MB DB incl. galaxy docs. Runbook: `docs/WORKFLOW.md`.
 
