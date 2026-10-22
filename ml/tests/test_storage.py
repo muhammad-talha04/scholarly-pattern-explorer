@@ -66,7 +66,8 @@ def test_apply_requires_database_url(monkeypatch):
         apply()
 
 
-def test_pg_documents_use_the_documents_table():
+def test_pg_documents_use_the_documents_table(monkeypatch):
+    monkeypatch.setenv("SPE_RUN_MIGRATIONS", "1")  # opt-in back-compat path
     class Cur:
         def __init__(self, log, payload):
             self.log = log

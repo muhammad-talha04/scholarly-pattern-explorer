@@ -1,4 +1,5 @@
 """Contract routes. Bodies are wired to the ML package (ml/) via app.ml_bridge."""
+import os
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
@@ -6,8 +7,9 @@ from pydantic import ValidationError
 
 from .. import ml_bridge as ml
 from pipeline import country_api  # repo root is on sys.path via ml_bridge
-from ..schemas import (AskRequest, AskResponse, Collaboration, CountingMethod, CountryStats, ExamplePaper,
-                       GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchResponse,
+from ml.timing import stage  # noqa: E402
+from ..schemas import (AskRequest, AskResponse, Collaboration, CorpusStats, CountingMethod, CountryStats,
+                       ExamplePaper, GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchResponse,
                        TopicCountryYear)
 
 router = APIRouter()
@@ -36,12 +38,46 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+def _capped_int(raw: str | None, default: int) -> int:
+    try:
+        return max(1, int(raw)) if raw else default
+    except (TypeError, ValueError):
+        return default
+
+
+def search_max_limit() -> int:
+    """Most hits one search will rank. Override with SEARCH_MAX_LIMIT. Default 100."""
+    return _capped_int(os.getenv("SEARCH_MAX_LIMIT"), 100)
+
+
+def galaxy_node_limit() -> int | None:
+    """Optional cap on GET /galaxy. Unset means the whole stored graph."""
+    raw = (os.getenv("GALAXY_NODE_LIMIT") or "").strip()
+    if not raw:
+        return None
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return None
+
+
+@router.get("/stats", response_model=CorpusStats)
+def stats() -> CorpusStats:
+    return CorpusStats(papers=len(ml.get_service().store))
+
+
 @router.get("/search", response_model=SearchResponse)
-def search(q: str, limit: int = 20, country: str | None = None,
+def search(q: str, limit: int = 20, offset: int = 0, country: str | None = None,
            year_from: int | None = None) -> SearchResponse:
-    hits = ml.get_service().search(q, k=max(1, min(limit, 100)), country=country,
-                                   year_from=year_from)
-    return SearchResponse(query=q, results=[_summary_model(h) for h in hits])
+    cap = search_max_limit()
+    limit = max(1, min(limit, cap))
+    offset = max(0, offset)
+    hits = ml.get_service().search(q, k=cap, country=country, year_from=year_from)
+    page = hits[offset:offset + limit]
+    with stage("summaries"):
+        results = [_summary_model(h) for h in page]
+    return SearchResponse(query=q, results=results,
+                          total=len(hits), limit=limit, offset=offset)
 
 
 @router.get("/papers/{paper_id}", response_model=PaperDetail)
@@ -177,9 +213,21 @@ def country(code: str, counting: CountingMethod = "fractional") -> CountryStats:
 
 
 @router.get("/galaxy", response_model=GalaxyGraph)
-def galaxy() -> GalaxyGraph:
-    """Stored galaxy graph. The index job precomputes it; this route only reads it."""
-    return GalaxyGraph(**ml.get_service().read_galaxy())
+def galaxy(limit: int | None = None) -> GalaxyGraph:
+    """Stored galaxy graph. The index job precomputes it; this route only reads it.
+
+    ``limit`` and ``GALAXY_NODE_LIMIT`` are optional. With neither set, every stored
+    node is returned. With a limit, the nodes are a representative sample: a
+    proportional share of every cluster (at least 3 each), most-cited first. There is no fixed page size on this route.
+    """
+    cap = galaxy_node_limit()
+    if limit is not None and limit < 0:
+        limit = 0
+    if cap is not None:
+        limit = cap if limit is None else min(limit, cap)
+    # limit -> deterministic stratified sample per cluster (not a prefix); see ml.galaxy.sample_graph
+    graph = ml.get_service().read_galaxy(limit)
+    return GalaxyGraph(**graph)
 
 
 @router.get("/topic-country-years", response_model=list[TopicCountryYear])

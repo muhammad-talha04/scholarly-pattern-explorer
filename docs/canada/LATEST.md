@@ -1,46 +1,43 @@
 # Weekly snapshot
 
-_Generated 2026-10-11 10:46. Corpus: 3,676 papers, 18,199 authors,
-1,097 topics, publication years 2023-2026._
+_Generated 2026-10-18 08:49. Corpus: 3,745 papers, 18,576 authors,
+1,102 topics, publication years 2023-2026._
 
 ![papers per year](charts/papers_per_year.png)
 
 ## Emerging topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0207 | 2024 | 0.0228 | 0.002 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2024 | 0.0203 | 2024 | 0.0203 | 0.0 |
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.04 | 2024 | 0.0369 | -0.0032 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0204 | 2024 | 0.0223 | 0.0019 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0396 | 2024 | 0.0364 | -0.0032 |
 
 ![lifecycles](charts/pattern_lifecycles.png)
 
 ## Declining topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.04 | 2024 | 0.0369 | -0.0032 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2024 | 0.0203 | 2024 | 0.0203 | 0.0 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0207 | 2024 | 0.0228 | 0.002 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0396 | 2024 | 0.0364 | -0.0032 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0204 | 2024 | 0.0223 | 0.0019 |
 
 ## Strongest patterns in 2024-2026
 | itemset | k | support_count | n_tx | support |
 |---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 107 | 2901 | 0.03688383316097897 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 66 | 2901 | 0.022750775594622543 |
-| Advanced Malware Detection Techniques | Network Security and Intrusion Detection | 2 | 59 | 2901 | 0.020337814546708032 |
+| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 108 | 2966 | 0.03641267700606878 |
+| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 66 | 2966 | 0.022252191503708697 |
 
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |
 |---|---|---|
-| Xuemin Shen | 31 | 199 |
-| Dusit Tao Niyato | 21 | 157 |
+| Xuemin Shen | 30 | 196 |
+| Dusit Tao Niyato | 22 | 160 |
 | Habib Hamam | 19 | 126 |
 | Jiawen Kang | 16 | 111 |
-| Hongyang Du | 12 | 96 |
+| Witold Pedrycz | 15 | 58 |
 | Fei Richard Yu | 12 | 48 |
-| Witold Pedrycz | 12 | 48 |
-| Tehseen Mazhar | 10 | 84 |
+| Tehseen Mazhar | 11 | 87 |
+| Hongyang Du | 10 | 90 |
 | Zehui Xiong | 10 | 81 |
-| Trung Q. Duong | 9 | 45 |
+| Roberto Morandotti | 10 | 36 |
 
 ![network](charts/coauthor_network.png)
 

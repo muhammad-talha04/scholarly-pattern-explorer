@@ -24,7 +24,15 @@ export interface PaperDetail extends PaperSummary {
   original_url: string | null;
   openalex_url: string | null;
 }
-export interface SearchResponse { query: string; results: PaperSummary[] }
+export interface SearchResponse {
+  query: string;
+  results: PaperSummary[];
+  /** Ranked hits in this window. Omitted by older APIs. */
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+export interface CorpusStats { papers: number }
 export interface AskRequest { question: string }
 export interface AskResponse { answer: string; sources: string[] }
 export interface Pattern {
@@ -42,11 +50,25 @@ export interface CountryYearCount {
   paper_count: number;
   fractional_count: number;
 }
+export type GrowthReason = "too_few_papers" | "partial_year";
+
 export interface CountryStats {
   code: string;
   name: string;
   papers: number;
   growth_pct: number | null;
+  /** Optional growth details (country_stats growth spec). Older snapshots omit them. */
+  growth_reason?: GrowthReason | null;
+  growth_cur_count?: number | null;
+  growth_prev_count?: number | null;
+  /** ISO dates (YYYY-MM-DD) for the current window; the previous window is the same span one year earlier. */
+  growth_window_start?: string | null;
+  growth_window_end?: string | null;
+  /** Optional share-of-papers fields. Same windows and counts as growth; share_reason is separate from growth_reason. */
+  share_pct?: number | null;
+  share_prev_pct?: number | null;
+  share_change_pp?: number | null;
+  share_reason?: GrowthReason | null;
   top_topics: string[];
   /** Present once the live snapshot includes it (PR #6). */
   counting?: Counting;
@@ -76,8 +98,15 @@ export interface TopicCountryYear {
   fractional_count: number;
 }
 
-export interface GalaxyCluster { id: string; name: string }
-/** A topic placed in 3D, plus the cluster it belongs to (GET /galaxy). */
+export interface GalaxyCluster {
+  id: string;
+  name: string;
+  /** Optional 0-based swatch. Missing means the client derives one from the id. */
+  color_index?: number;
+  /** Optional 0–1 warmth from /galaxy. Missing means the cluster does not glow warmer. */
+  emerging_score?: number;
+}
+/** One paper in the galaxy. `topic_name` is the label; `cluster_id` is its topic cluster. */
 export interface GalaxyPoint {
   topic_id: string;
   topic_name: string;
@@ -86,6 +115,7 @@ export interface GalaxyPoint {
   z: number;
   cluster_id: string;
   support: number;
+  color_index?: number;
 }
 export interface GalaxyGraph {
   nodes: GalaxyPoint[];
@@ -93,5 +123,5 @@ export interface GalaxyGraph {
   links: { source: string; target: string; weight: number }[];
 }
 
-export interface SearchParams { q: string; limit?: number; country?: string; year_from?: number }
+export interface SearchParams { q: string; limit?: number; offset?: number; country?: string; year_from?: number }
 export interface TopicYearQuery { topic_id?: string; country?: string; year?: number; limit?: number }

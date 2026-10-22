@@ -1,5 +1,5 @@
 import type {
-  AskResponse, Collaboration, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
+  AskResponse, Collaboration, CorpusStats, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
   Pattern, Run, SearchParams, SearchResponse, TopicCountryYear, TopicYearQuery,
 } from "./types";
 import * as mock from "./mock";
@@ -9,6 +9,25 @@ const FORCE_MOCK = process.env.NEXT_PUBLIC_API_MOCK === "1";
 
 /** True when the app is configured to stay on fixtures (no gateway, or the mock flag). */
 export function prefersFixtures() { return !API_URL || FORCE_MOCK; }
+
+/** Page size for /search. NEXT_PUBLIC_SEARCH_LIMIT overrides the default of 20. */
+export function searchPageSize(): number {
+  const raw = Number(process.env.NEXT_PUBLIC_SEARCH_LIMIT);
+  if (Number.isFinite(raw) && raw >= 1) return Math.floor(raw);
+  return 20;
+}
+
+/**
+ * Optional cap sent as GET /galaxy?limit=. Unset means the client asks for the
+ * whole graph. The API also returns every node unless GALAXY_NODE_LIMIT is set.
+ */
+export function galaxyNodeLimit(): number | undefined {
+  const raw = process.env.NEXT_PUBLIC_GALAXY_LIMIT;
+  if (raw == null || raw.trim() === "") return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.floor(n);
+}
 
 export type Source = "live" | "mock";
 export interface Result<T> { data: T; source: Source }
@@ -33,6 +52,18 @@ function text(v: unknown): string | null {
   return null;
 }
 
+function colorIndex(v: unknown): number | undefined {
+  const n = finite(v);
+  if (n == null) return undefined;
+  return Math.trunc(n);
+}
+
+function unitScore(v: unknown): number | undefined {
+  const n = finite(v);
+  if (n == null) return undefined;
+  return Math.min(1, Math.max(0, n));
+}
+
 function clusterName(id: string, label: unknown): string {
   const named = text(label);
   if (named) return named;
@@ -47,13 +78,16 @@ function pointToNode(row: Record<string, unknown>): GalaxyGraph["nodes"][number]
   const id = text(row.id) ?? text(row.topic_id);
   if (x == null || y == null || z == null || !id) return null;
   const cluster_id = text(row.cluster_id) ?? "0";
-  return {
+  const node: GalaxyGraph["nodes"][number] = {
     topic_id: id,
     topic_name: text(row.topic_name) ?? id,
     x, y, z,
     cluster_id,
     support: finite(row.support) ?? 1,
   };
+  const color_index = colorIndex(row.color_index);
+  if (color_index !== undefined) node.color_index = color_index;
+  return node;
 }
 
 function fromPaperList(rows: unknown[]): GalaxyGraph {
@@ -86,7 +120,12 @@ function fromGraph(raw: Record<string, unknown>): GalaxyGraph {
       const rec = c as Record<string, unknown>;
       const id = text(rec.id);
       if (!id) continue;
-      clusters.push({ id, name: text(rec.name) ?? id });
+      const cluster: GalaxyGraph["clusters"][number] = { id, name: text(rec.name) ?? id };
+      const color_index = colorIndex(rec.color_index);
+      const emerging_score = unitScore(rec.emerging_score);
+      if (color_index !== undefined) cluster.color_index = color_index;
+      if (emerging_score !== undefined) cluster.emerging_score = emerging_score;
+      clusters.push(cluster);
     }
   }
   const links: GalaxyGraph["links"] = [];
@@ -155,13 +194,15 @@ export async function request<T>(path: string, fallback: () => T, init?: Request
 export const api = {
   health: () => request<{ status: string }>("/health", () => ({ status: "mock" })),
   search: (p: SearchParams) =>
-    request<SearchResponse>(`/search${qs({ q: p.q, limit: p.limit, country: p.country, year_from: p.year_from })}`, () => mock.search(p)),
+    request<SearchResponse>(`/search${qs({ q: p.q, limit: p.limit, offset: p.offset, country: p.country, year_from: p.year_from })}`, () => mock.search(p)),
+  /** Indexed paper count. Fixtures report the sample size, not a live corpus. */
+  stats: () => request<CorpusStats>("/stats", () => ({ papers: mock.FIXTURE_COUNT })),
   paper: (id: string) => request<PaperDetail>(`/papers/${encodeURIComponent(id)}`, () => mock.paper(id)),
   ask: (id: string, question: string) =>
     request<AskResponse>(`/papers/${encodeURIComponent(id)}/ask`, () => mock.ask(id, question), { method: "POST", body: JSON.stringify({ question }) }),
   related: (id: string, limit = 6) => request<PaperSummary[]>(`/papers/${encodeURIComponent(id)}/related${qs({ limit })}`, () => mock.related(id, limit)),
-  patterns: (opts: { window?: number; trend?: "gap" } = {}) =>
-    request<Pattern[]>(`/patterns${qs(opts)}`, () => (opts.trend === "gap" ? mock.gaps() : mock.patterns(opts.window))),
+  patterns: (opts: { window?: number; trend?: "gap" | "emerging" } = {}) =>
+    request<Pattern[]>(`/patterns${qs(opts)}`, () => (opts.trend === "gap" ? mock.gaps() : opts.trend === "emerging" ? mock.emerging() : mock.patterns(opts.window))),
   countries: (counting: Counting = "fractional") =>
     request<CountryStats[]>(`/countries${qs({ counting })}`, () => mock.countries(counting)),
   country: (code: string, counting: Counting = "fractional") =>
@@ -170,8 +211,9 @@ export const api = {
     request<Collaboration[]>(`/countries/collaborations${qs({ counting })}`, () => mock.collaborations(counting), undefined, fetch, { notFoundIsMock: true }),
   runs: () => request<Run[]>("/runs", () => mock.runs()),
   /** Paper or topic coordinates. Accepts the #8 list and `{nodes, clusters, links}`. */
-  galaxy: async () => {
-    const result = await request<unknown>("/galaxy", () => mock.galaxy(), undefined, fetch, { notFoundIsMock: true });
+  galaxy: async (limit?: number) => {
+    const cap = limit ?? galaxyNodeLimit();
+    const result = await request<unknown>(`/galaxy${qs({ limit: cap })}`, () => mock.galaxy(cap), undefined, fetch, { notFoundIsMock: true });
     return { data: normalizeGalaxy(result.data), source: result.source };
   },
   /** Topic × country × year rows. Mock until GET /topic-country-years exists (PR #6). */
