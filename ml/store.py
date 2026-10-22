@@ -115,6 +115,10 @@ class LocalStore:
     def rows(self):
         return list(self.ids), self.vecs, [self.meta.get(i, {}) for i in self.ids]
 
+    def stored_dim(self) -> int | None:
+        """Dimension of the stored vectors, or None when nothing is stored."""
+        return int(self.vecs.shape[1]) if len(self.ids) else None
+
     def existing_ids(self) -> set[str]:
         return set(self.ids)
 
@@ -132,6 +136,51 @@ class LocalStore:
 
     def database_size(self) -> int | None:
         return None
+
+    def month_counts(self) -> dict[str, int]:
+        """Stored papers per month: meta.publication_date, else meta.created."""
+        out: dict[str, int] = {}
+        for wid in self.ids:
+            m = _month_of(self.meta.get(wid))
+            if m:
+                out[m] = out.get(m, 0) + 1
+        return out
+
+    def ids_missing_publication_date(self) -> list[str]:
+        """work_ids whose meta has no ``publication_date`` key (null = looked up, unknown)."""
+        return [w for w in self.ids if "publication_date" not in (self.meta.get(w) or {})]
+
+    def set_publication_dates(self, dates: dict[str, str | None]) -> int:
+        """Metadata-only update: sets meta.publication_date. Vectors and model untouched."""
+        n = 0
+        for wid, d in dates.items():
+            if wid in self.meta:
+                self.meta[wid] = {**(self.meta[wid] or {}), "publication_date": d}
+                n += 1
+        if n:
+            self._save()
+        return n
+
+    def put_sampling_rate(self, month: str, openalex_total: int, sampled: int, filter: str) -> None:
+        """File fallback for the sampling_rates table: <path>/sampling_rates.json."""
+        if not self.path:
+            self._rates = getattr(self, "_rates", {})
+            rates = self._rates
+        else:
+            f = self.path / "sampling_rates.json"
+            rates = json.loads(f.read_text()) if f.exists() else {}
+        from datetime import datetime, timezone
+        rates[month] = {"openalex_total": int(openalex_total), "sampled": int(sampled),
+                        "filter": filter, "fetched_at": datetime.now(timezone.utc).isoformat()}
+        if self.path:
+            self.path.mkdir(parents=True, exist_ok=True)
+            (self.path / "sampling_rates.json").write_text(json.dumps(rates, indent=1, sort_keys=True))
+
+    def sampling_rates(self) -> dict[str, dict]:
+        if not self.path:
+            return dict(getattr(self, "_rates", {}))
+        f = self.path / "sampling_rates.json"
+        return json.loads(f.read_text()) if f.exists() else {}
 
     def upsert(self, ids, vectors, meta, model: str | None = None):
         for wid in ids:
@@ -209,6 +258,25 @@ class LocalStore:
         if payload is None:
             return None
         return json.loads(json.dumps(payload))
+
+
+def hnsw_ef_search() -> int:
+    """HNSW candidate list size for search (ML_HNSW_EF_SEARCH, default 100, 1..1000).
+
+    pgvector's default of 40 missed exact self-matches in testing; 100 keeps
+    recall high at 70k rows for a few ms more per query.
+    """
+    try:
+        ef = int(os.getenv("ML_HNSW_EF_SEARCH", "100"))
+    except ValueError:
+        ef = 100
+    return max(1, min(ef, 1000))
+
+
+def _month_of(meta: dict) -> str | None:
+    meta = meta or {}
+    d = meta.get("publication_date") or meta.get("created")
+    return d[:7] if isinstance(d, str) and re.match(r"^\d{4}-\d{2}", d) else None
 
 
 def _vec_literal(v) -> str:
@@ -336,7 +404,7 @@ class PgVectorStore:
 
     # ---- writes ----
     _UPSERT = ("INSERT INTO paper_embeddings (work_id, embedding, meta, model) "
-               "VALUES (%s, %s::vector, %s::jsonb, %s) ON CONFLICT (work_id) DO UPDATE "
+               "VALUES (%s, %s::halfvec, %s::jsonb, %s) ON CONFLICT (work_id) DO UPDATE "
                "SET embedding = EXCLUDED.embedding, meta = EXCLUDED.meta, model = EXCLUDED.model")
 
     def upsert(self, ids, vectors, meta, model: str | None = None):
@@ -364,6 +432,60 @@ class PgVectorStore:
         with self._cursor() as cur:
             cur.execute("DELETE FROM paper_embeddings")
 
+    def stored_dim(self) -> int | None:
+        """Dimension of the stored vectors (vector or halfvec column), None when empty."""
+        def q(cur):
+            cur.execute("SELECT vector_dims(embedding::vector) FROM paper_embeddings LIMIT 1")
+            row = cur.fetchone()
+            return int(row[0]) if row and row[0] is not None else None
+        return self._run(q)
+
+    def month_counts(self) -> dict[str, int]:
+        """Stored papers per month: meta.publication_date, else meta.created."""
+        def q(cur):
+            cur.execute("SELECT substr(d, 1, 7) m, count(*) FROM (SELECT coalesce(meta->>'publication_date', "
+                        "meta->>'created') d FROM paper_embeddings) t "
+                        "WHERE d ~ '^[0-9]{4}-[0-9]{2}' GROUP BY 1")
+            return {m: int(n) for m, n in cur.fetchall()}
+        return self._run(q)
+
+    def ids_missing_publication_date(self) -> list[str]:
+        def q(cur):
+            cur.execute("SELECT work_id FROM paper_embeddings "
+                        "WHERE meta IS NULL OR NOT (meta ? 'publication_date') ORDER BY work_id")
+            return [r[0] for r in cur.fetchall()]
+        return self._run(q)
+
+    def set_publication_dates(self, dates: dict[str, str | None]) -> int:
+        """Metadata-only update: sets meta.publication_date. Vectors and model untouched."""
+        rows = [(json.dumps(d), wid) for wid, d in dates.items()]
+        if not rows:
+            return 0
+        with self._connection() as c:
+            tx = c.transaction() if hasattr(c, "transaction") else contextlib.nullcontext()
+            with tx, c.cursor() as cur:
+                cur.executemany(
+                    "UPDATE paper_embeddings SET meta = jsonb_set(coalesce(meta, '{}'::jsonb), "
+                    "'{publication_date}', %s::jsonb) WHERE work_id = %s", rows)
+        return len(rows)
+
+    def put_sampling_rate(self, month: str, openalex_total: int, sampled: int, filter: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                "INSERT INTO sampling_rates (month, openalex_total, sampled, filter, fetched_at) "
+                "VALUES (%s::date, %s, %s, %s, now()) ON CONFLICT (month) DO UPDATE SET "
+                "openalex_total = EXCLUDED.openalex_total, sampled = EXCLUDED.sampled, "
+                "filter = EXCLUDED.filter, fetched_at = now()",
+                (f"{month}-01", int(openalex_total), int(sampled), filter))
+
+    def sampling_rates(self) -> dict[str, dict]:
+        def q(cur):
+            cur.execute("SELECT to_char(month, 'YYYY-MM'), openalex_total, sampled, filter, "
+                        "fetched_at FROM sampling_rates")
+            return cur.fetchall()
+        return {m: {"openalex_total": t, "sampled": n, "filter": f, "fetched_at": str(at)}
+                for m, t, n, f, at in self._run(q)}
+
     def database_size(self) -> int:
         def q(cur):
             cur.execute("SELECT pg_database_size(current_database())")
@@ -374,12 +496,19 @@ class PgVectorStore:
     def search(self, query, k=10):
         lit = _vec_literal(query)
 
+        ef = hnsw_ef_search()
+
         def q(cur):
-            cur.execute(
-                "SELECT work_id, 1 - (embedding <=> %s::vector) AS score, meta "
-                "FROM paper_embeddings ORDER BY embedding <=> %s::vector LIMIT %s",
-                (lit, lit, k))
-            return cur.fetchall()
+            conn = getattr(cur, "connection", None)
+            tx = conn.transaction() if conn is not None and hasattr(conn, "transaction") \
+                else contextlib.nullcontext()
+            with tx:   # SET LOCAL only lasts inside a transaction
+                cur.execute(f"SET LOCAL hnsw.ef_search = {ef}")
+                cur.execute(
+                    "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, meta "
+                    "FROM paper_embeddings ORDER BY embedding <=> %s::halfvec LIMIT %s",
+                    (lit, lit, k))
+                return cur.fetchall()
         rows = self._run(q)
         return [(w, float(s), m if isinstance(m, dict) else json.loads(m)) for w, s, m in rows]
 
@@ -394,14 +523,14 @@ class PgVectorStore:
 
     def vector(self, work_id):
         def q(cur):
-            cur.execute("SELECT embedding::text FROM paper_embeddings WHERE work_id = %s", (work_id,))
+            cur.execute("SELECT embedding::vector::text FROM paper_embeddings WHERE work_id = %s", (work_id,))
             return cur.fetchone()
         row = self._run(q)
         return None if not row else np.array(json.loads(row[0]), dtype=np.float32)
 
     def rows(self):
         def q(cur):
-            cur.execute("SELECT work_id, embedding::text, meta FROM paper_embeddings")
+            cur.execute("SELECT work_id, embedding::vector::text, meta FROM paper_embeddings")
             return cur.fetchall()
         fetched = self._run(q)
         if not fetched:
