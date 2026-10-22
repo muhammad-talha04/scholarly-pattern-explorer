@@ -99,6 +99,9 @@ def fetch(since: str, filters: list[str], max_records: int, session=requests):
     if os.environ.get("OPENALEX_API_KEY"):
         params["api_key"] = os.environ["OPENALEX_API_KEY"]
     while cursor and got < max_records:
+        # Ask only for the rows still needed. A full page is 200, and the loop
+        # used to yield that whole page even when --max-records was smaller.
+        params["per-page"] = str(min(200, max_records - got))
         for attempt in range(6):
             r = session.get(API, params={**params, "cursor": cursor}, timeout=60)
             if r.status_code == 200:
@@ -110,8 +113,12 @@ def fetch(since: str, filters: list[str], max_records: int, session=requests):
             raise SystemExit(f"OpenAlex kept failing: HTTP {r.status_code}")
         data = r.json()
         for w in data.get("results", []):
+            if got >= max_records:
+                break
             got += 1
             yield normalize(w)
+        if got >= max_records:
+            break
         cursor = (data.get("meta") or {}).get("next_cursor")
         time.sleep(0.15)
 
