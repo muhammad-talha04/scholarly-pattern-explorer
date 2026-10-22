@@ -72,19 +72,23 @@ function clusterName(id: string, label: unknown): string {
   return `cluster ${id}`;
 }
 
-/** #8 paper point → a graph node. The paper id is the node id so keys stay unique. */
+/** #8 paper point, or one node of a `{nodes, clusters, links}` graph. */
 function pointToNode(row: Record<string, unknown>): GalaxyGraph["nodes"][number] | null {
   const x = finite(row.x), y = finite(row.y), z = finite(row.z);
-  const id = text(row.id) ?? text(row.topic_id);
+  const workId = text(row.id);
+  const id = workId ?? text(row.topic_id);
   if (x == null || y == null || z == null || !id) return null;
   const cluster_id = text(row.cluster_id) ?? "0";
   const node: GalaxyGraph["nodes"][number] = {
-    topic_id: id,
+    topic_id: text(row.topic_id) ?? id,
     topic_name: text(row.topic_name) ?? id,
     x, y, z,
     cluster_id,
     support: finite(row.support) ?? 1,
   };
+  if (workId) node.id = workId;
+  const title = text(row.title);
+  if (title) node.title = title;
   const color_index = colorIndex(row.color_index);
   if (color_index !== undefined) node.color_index = color_index;
   return node;

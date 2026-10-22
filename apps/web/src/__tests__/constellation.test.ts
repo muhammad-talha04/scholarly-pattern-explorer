@@ -110,3 +110,22 @@ it("breathes on a 14s loop and moves 1.5× faster", () => {
   expect(drift[0]).toBeCloseTo(Math.sin(1.2 * DRIFT_HZ.x + 0.4) * 0.08);
   expect(plexusDrift(0.4, 1.2, 0)).toEqual([0, 0, 0]);
 });
+
+it("binds the paper title and OpenAlex topic onto the hovered node", () => {
+  const net = heroNetwork([{
+    id: "W1",
+    title: "Transformers for protein structure",
+    topic: "Protein folding",
+    support: 1,
+    gap: false,
+    cluster: "protein, structure",
+    clusterId: "0",
+    emerging: 0,
+    pos: [0, 0, 0],
+    center: [0, 0, 0],
+  }]);
+  const paper = net.nodes.find((n) => n.paper);
+  expect(paper?.id).toBe("W1");
+  expect(paper?.title).toBe("Transformers for protein structure");
+  expect(paper?.topic).toBe("Protein folding");
+});

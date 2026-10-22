@@ -81,9 +81,9 @@ def test_galaxy_layout(client):
     assert set(body) == {"nodes", "clusters", "links"}
     nodes = body["nodes"]
     assert {n["id"] for n in nodes} == {"W1", "W2", "W3"}
-    names = {n["topic_name"] for n in nodes}
+    ids = {n["id"] for n in nodes}
     for node in nodes:
-        assert set(node) == {"id", "topic_id", "topic_name", "x", "y", "z",
+        assert set(node) == {"id", "title", "topic_id", "topic_name", "x", "y", "z",
                              "cluster_id", "cluster_label", "year", "support"}
         assert isinstance(node["cluster_id"], str) and node["cluster_label"]
         assert isinstance(node["x"], float) and isinstance(node["y"], float) and isinstance(node["z"], float)
@@ -91,8 +91,10 @@ def test_galaxy_layout(client):
     assert {n["id"]: n["year"] for n in nodes} == {"W1": 2021, "W2": 2023, "W3": 2020}
     by_id = {n["id"]: n for n in nodes}
     assert by_id["W1"]["support"] == 1.0
-    assert by_id["W1"]["topic_name"] == "Transformers for protein structure prediction"
+    assert by_id["W1"]["title"] == "Transformers for protein structure prediction"
+    assert by_id["W1"]["topic_name"] == "Proteins"
     assert by_id["W1"]["topic_id"] == "proteins"
+    assert by_id["W3"]["topic_name"] == "Quantum"
     cluster_ids = {c["id"] for c in body["clusters"]}
     assert {n["cluster_id"] for n in nodes} <= cluster_ids
     for cluster in body["clusters"]:
@@ -102,7 +104,7 @@ def test_galaxy_layout(client):
     assert len(body["links"]) <= 200
     for link in body["links"]:
         assert set(link) == {"source", "target", "weight"}
-        assert link["source"] in names and link["target"] in names
+        assert link["source"] in ids and link["target"] in ids
         assert link["source"] != link["target"]
     assert client.get("/api/v1/galaxy").json() == body
     assert client.row_calls["rows"] == 0

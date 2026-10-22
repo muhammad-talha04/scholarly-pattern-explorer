@@ -77,8 +77,14 @@ function project(graph: { nodes: TopicNode[]; links: TopicLink[] }, galaxy: Gala
   const gaps = new Map(graph.nodes.filter((n) => n.gap).map((n) => [n.id, n]));
   const nodes = withCenters(gNodes.map((n) => {
     const cluster = clusterById.get(n.cluster_id);
+    // A title means this payload keys links on the work id. Older galaxies
+    // key links on topic_name and have no separate title.
+    const titled = Boolean(n.title);
+    const topic = titled && n.topic_name && n.topic_name !== n.title ? n.topic_name : undefined;
     return {
-      id: n.topic_name,
+      id: titled && n.id ? n.id : n.topic_name,
+      title: n.title || n.topic_name,
+      topic,
       support: n.support || gaps.get(n.topic_name)?.support || 0.05,
       gap: gaps.has(n.topic_name),
       gapScore: gaps.get(n.topic_name)?.gapScore,
@@ -123,7 +129,7 @@ export function GalaxyHero() {
     if (!clusterQuery) return null;
     const q = clusterQuery.toLowerCase();
     const byName = stars.filter((n) => n.cluster?.toLowerCase() === q);
-    const picked = byName.length ? byName : stars.filter((n) => n.id.toLowerCase().includes(q) || n.cluster?.toLowerCase().includes(q));
+    const picked = byName.length ? byName : stars.filter((n) => `${n.id} ${n.title ?? ""} ${n.topic ?? ""} ${n.cluster ?? ""}`.toLowerCase().includes(q));
     return picked.length ? new Set(picked.map((n) => n.id)) : null;
   }, [clusterQuery, stars]);
   const clusterLegend = useMemo(() => {
@@ -196,12 +202,14 @@ export function GalaxyHero() {
           </div>
         </div>
         <details className="glass max-h-40 overflow-auto px-3 py-2 text-sm text-mist">
-          <summary className="cursor-pointer text-white" title="Each point is a research topic; gaps are topic pairs our sample rarely connects">Topics ({stars.length}){stars.some((n) => n.gap) ? <span className="text-mist"> · {stars.filter((n) => !n.gap).length} topics + {stars.filter((n) => n.gap).length} gaps</span> : null}</summary>
+          <summary className="cursor-pointer text-white" title="Each point is a paper. The line under the title is its OpenAlex topic.">Topics ({stars.length}){stars.some((n) => n.gap) ? <span className="text-mist"> · {stars.filter((n) => !n.gap).length} topics + {stars.filter((n) => n.gap).length} gaps</span> : null}</summary>
           <ul className="mt-2 max-h-28 space-y-1 overflow-auto">
             {stars.map((n) => (
               <li key={n.id}>
                 <button className="w-full rounded-lg px-2 py-1 text-left hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => { setFocus(n.id); }}>
-                  {n.id}{showGaps && n.gap ? " · gap" : ""}
+                  <span className="block">{n.title || n.id}</span>
+                  {n.topic ? <span className="block text-xs text-mist">{n.topic}</span> : null}
+                  {showGaps && n.gap ? " · gap" : ""}
                 </button>
               </li>
             ))}

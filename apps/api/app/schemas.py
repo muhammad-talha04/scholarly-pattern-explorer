@@ -139,10 +139,16 @@ class GalaxyCluster(BaseModel):
 
 
 class GalaxyNode(BaseModel):
-    """One paper. ``topic_name`` is the display id the front end uses for links."""
+    """One paper. Links join on ``id`` (the work id).
+
+    ``title`` is the paper title. ``topic_name`` is the OpenAlex display name.
+    ``title`` defaults to empty so a galaxy document stored before that split
+    still validates; the client then keeps the older title-keyed links.
+    """
     id: str
     topic_id: str
     topic_name: str
+    title: str = ""
     x: float
     y: float
     z: float

@@ -358,10 +358,11 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
         {tip && (
           <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
             <div className="glass w-48 p-2.5 text-left text-xs" onPointerDown={(e) => e.stopPropagation()}>
-              <div className="font-medium text-white">{tip.id}</div>
+              <div className="font-medium text-white">{tip.title || tip.id}</div>
+              {tip.topic ? <p className="mt-0.5 text-mist">{tip.topic}</p> : null}
               <p className="mt-0.5 text-mist">Paper{tip.cluster ? ` · topic cluster ${tip.cluster}` : ""}</p>
               {showGaps && tip.gap && <p className="text-gap">Research gap</p>}
-              <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(tip.id)}>Search this paper</button>
+              <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(tip.title || tip.id)}>Search this paper</button>
             </div>
           </Html>
         )}

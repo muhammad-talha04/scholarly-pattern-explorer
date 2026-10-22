@@ -159,7 +159,8 @@ export function galaxy(limit?: number): GalaxyGraph {
     const theme = themeFor(p.topics[0]);
     const r = 6 * Math.sqrt((i + 0.5) / PAPERS.length), a = i * golden;
     return {
-      topic_id: slug(p.topics[0]), topic_name: p.title,
+      id: p.id, title: p.title,
+      topic_id: slug(p.topics[0]), topic_name: p.topics[0],
       x: r * Math.cos(a), y: (((i * 7919) % 13) / 13 - 0.5) * 1.6, z: r * Math.sin(a),
       cluster_id: theme.id, color_index: THEMES.findIndex((t) => t.id === theme.id),
       support: Math.round((0.15 + (p.cited_by % 70) / 100) * 100) / 100,
@@ -168,7 +169,7 @@ export function galaxy(limit?: number): GalaxyGraph {
   const links: GalaxyGraph["links"] = [];
   for (let i = 0; i < nodes.length; i++) {
     const mate = nodes.find((n, j) => j > i && n.cluster_id === nodes[i].cluster_id);
-    if (mate) links.push({ source: nodes[i].topic_name, target: mate.topic_name, weight: 0.4 });
+    if (mate && nodes[i].id && mate.id) links.push({ source: nodes[i].id, target: mate.id, weight: 0.4 });
   }
   const clusters = THEMES.map(({ id, name }, i) => ({
     id, name, color_index: i,
@@ -176,7 +177,7 @@ export function galaxy(limit?: number): GalaxyGraph {
   }));
   if (limit == null) return { nodes, clusters, links };
   const kept = nodes.slice(0, Math.max(0, limit));
-  const names = new Set(kept.map((n) => n.topic_name));
+  const names = new Set(kept.map((n) => n.id));
   return { nodes: kept, clusters, links: links.filter((e) => names.has(e.source) && names.has(e.target)) };
 }
 export function topicCountryYears(q: TopicYearQuery = {}): TopicCountryYear[] {
