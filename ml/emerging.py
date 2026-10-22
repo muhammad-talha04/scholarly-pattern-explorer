@@ -90,18 +90,16 @@ def topic_pairs(work: dict) -> list[tuple[str, str]]:
 def _countries(work: dict) -> list[str]:
     if "countries" in work:
         raw = work.get("countries") or []
-    else:
-        raw = []
-        for author in work.get("authorships") or []:
-            raw.extend(author.get("countries") or [])
-    out: list[str] = []
-    for code in raw:
-        if not code:
-            continue
-        text = str(code).strip().upper()
-        if text and text not in out:
-            out.append(text)
-    return out
+        out: list[str] = []
+        for code in raw:
+            if not code:
+                continue
+            text = str(code).strip().upper()
+            if text and text not in out:
+                out.append(text)
+        return out
+    from .papers import countries_from_authorships
+    return countries_from_authorships(work.get("authorships"))
 
 
 def _as_work(work) -> dict:

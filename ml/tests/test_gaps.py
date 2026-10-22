@@ -78,6 +78,14 @@ def test_counts_from_works_fractional():
     assert abs(sum(v for _, v in top["QML"]) - 90) < 1e-6   # each paper weighs 1
 
 
+def test_counts_from_works_folds_country_case():
+    tyc, top = counts_from_works([
+        {"id": "W1", "year": 2024, "topics": ["QML"], "countries": ["ca", "CA"]},
+    ])
+    assert tyc["QML"] == {2024: 1}
+    assert top["QML"] == [["CA", 1.0]]
+
+
 def test_load_prefers_snapshot(tmp_path):
     snap = tmp_path / "snap.json"
     snap.write_text(json.dumps({"topic_year_counts": synthetic(),

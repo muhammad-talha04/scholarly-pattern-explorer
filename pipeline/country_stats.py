@@ -229,8 +229,11 @@ def share_for(dates: dict | None, totals: dict | None, win: dict | None) -> dict
         out["share_reason"] = "too_few_papers"
     else:
         sc, sp = cur / tot_cur, prev / tot_prev
-        out.update(share_pct=round(sc * 100, 2), share_prev_pct=round(sp * 100, 2),
-                   share_change_pp=round((sc - sp) * 100, 2))
+        share_pct = round(sc * 100, 2)
+        share_prev_pct = round(sp * 100, 2)
+        # Difference of the displayed percents, so 4.77 - 4.03 is 0.74.
+        out.update(share_pct=share_pct, share_prev_pct=share_prev_pct,
+                   share_change_pp=round(share_pct - share_prev_pct, 2))
     return out
 
 

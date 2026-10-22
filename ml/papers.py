@@ -28,6 +28,26 @@ def short_id(work_id: str) -> str:
     return work_id.rsplit("/", 1)[-1] if work_id else work_id
 
 
+def countries_from_authorships(authorships) -> list[str]:
+    """Distinct uppercase ISO codes from author countries and institution country_code."""
+    raw = []
+    for author in authorships or []:
+        if not isinstance(author, dict):
+            continue
+        raw.extend(author.get("countries") or [])
+        for inst in author.get("institutions") or []:
+            if isinstance(inst, dict):
+                raw.append(inst.get("country_code"))
+    out: list[str] = []
+    for code in raw:
+        if not code:
+            continue
+        text = str(code).strip().upper()
+        if text and text not in out:
+            out.append(text)
+    return sorted(out)
+
+
 def is_placeholder_doi(value: str | None) -> bool:
     return bool(value and _PLACEHOLDER_DOI.search(value))
 
@@ -91,7 +111,7 @@ class Paper:
             created=w.get("created_date"),
             authors=[(a.get("author") or {}).get("display_name") for a in w.get("authorships") or []
                      if (a.get("author") or {}).get("display_name")],
-            countries=sorted({c for a in w.get("authorships") or [] for c in a.get("countries") or [] if c}),
+            countries=countries_from_authorships(w.get("authorships")),
             cited_by=w.get("cited_by_count") or 0,
             original_url=((w.get("open_access") or {}).get("oa_url")
                           or (w.get("primary_location") or {}).get("landing_page_url")),

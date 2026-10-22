@@ -221,7 +221,9 @@ def find_semantic_gaps(papers: list[dict], vectors: np.ndarray, *,
             if co == 0:
                 together = f"No papers study {left} and {right} together"
             else:
-                together = f"{co} {'paper' if co == 1 else 'papers'} study {left} and {right} together"
+                noun = "paper" if co == 1 else "papers"
+                verb = "studies" if co == 1 else "study"
+                together = f"{co} {noun} {verb} {left} and {right} together"
             demand_word = "paper" if demand == 1 else "papers"
             explanation = (
                 f"{left} and {right} cover closely related subjects (similarity {sim:.2f}). "
@@ -270,7 +272,7 @@ def find_semantic_gaps(papers: list[dict], vectors: np.ndarray, *,
             f"average about {nd:.0f} papers, so this part of the literature is thin "
             f"next to its neighbors."
         )
-        examples = _pick_examples([by_topic[t]] + [by_topic[o] for o in near_names], n=3)
+        examples = _pick_examples([by_topic[t]], n=3)
         gaps.append({
             "kind": "density",
             "items": [t],

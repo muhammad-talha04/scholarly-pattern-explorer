@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.country_stats import combine, snapshot, tally
+from pipeline.country_stats import combine, share_for, snapshot, tally
 
 SNAP = Path(__file__).resolve().parents[2] / "deploy" / "data" / "country_snapshot.json"
 
@@ -95,6 +95,18 @@ def test_share_of_corpus_same_window_and_rules():
     assert _row(few, "IS")["share_reason"] == "too_few_papers" and _row(few, "IS")["share_pct"] is None
     old = snapshot(tally(_works("CN", 100, "2024-11-01") + _works("CN", 100, "2025-06-01")))
     assert _row(old, "CN")["share_reason"] == "partial_year"
+
+
+def test_share_change_is_difference_of_rounded_percents():
+    # 477.4/10000 rounds to 4.77%; 402.6/10000 rounds to 4.03%.
+    # Rounding the raw difference first would show 0.75.
+    dates = {"2026-03-01": 477.4, "2025-03-01": 402.6}
+    totals = {"2026-03-01": 10000, "2025-03-01": 10000}
+    win = {"cur_start": "2026-01-01", "cur_end": "2026-10-03",
+           "prev_start": "2025-01-01", "prev_end": "2025-10-03",
+           "years": (2025, 2026)}
+    got = share_for(dates, totals, win)
+    assert (got["share_pct"], got["share_prev_pct"], got["share_change_pp"]) == (4.77, 4.03, 0.74)
 
 
 def test_share_fractional_shares_sum_to_100():
