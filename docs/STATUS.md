@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-22 by cursor: 2D galaxy hover card stays on one paper while the pointer is still (see below). Earlier, 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a month)` workflow and fixed country growth. Earlier, 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md`. Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
 
+## 2026-10-22 (lura): halfvec + 70k bulk ingest (prepared, not run)
+- `db/migrations/005_halfvec_embeddings.sql`: `embedding` -> `halfvec(384)`, HNSW `halfvec_cosine_ops` (same index name). 001's index is now guarded so re-applying never fails.
+- `ml/store.py`: PgVectorStore casts to `::halfvec`, reads via `::vector::text`, new `stored_dim()` (LocalStore too).
+- `ml/bulk.py` + `ml.cli bulk`: OpenAlex fetch split evenly per month (2015-01..now), abstracts only, dedupe vs stored ids, backoff, resumable; `--index` reuses the batched indexer and its ModelMismatch guard.
+- Measured on local Postgres 17 + pgvector 0.8, 5,000 real OpenAlex papers: 3,763 B/paper with halfvec vs 5,678 with vector (-34%). 70k total projects to ~282 MB DB incl. galaxy docs. Runbook: `docs/WORKFLOW.md`.
+
 ## 2026-10-22 (cursor): 2D galaxy hover
 - **Stable paper cards in 2D.** Hovering the homepage plexus in 2D re-picked the nearest node on every `pointermove`, including the zero-movement events the browser fires while the wheel scrolls the page and the pointer stays put. Orbit, drift, and the breathing zoom move nodes under that point, and a filler dot (not a paper) cleared the card, so the title flashed. The card now stays on the paper acquired when the pointer actually moved, and it is drawn beside that node while the band moves, the way the 3D tip stays with its node. The 600-node sample, plexus structure, colors, 1.5× circular motion, and breathing zoom are unchanged. Reduced motion and the hidden-tab pause are unchanged. Test: `apps/web/src/__tests__/galaxy-hover.test.tsx`.
 

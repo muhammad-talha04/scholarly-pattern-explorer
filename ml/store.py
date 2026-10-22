@@ -115,6 +115,10 @@ class LocalStore:
     def rows(self):
         return list(self.ids), self.vecs, [self.meta.get(i, {}) for i in self.ids]
 
+    def stored_dim(self) -> int | None:
+        """Dimension of the stored vectors, or None when nothing is stored."""
+        return int(self.vecs.shape[1]) if len(self.ids) else None
+
     def existing_ids(self) -> set[str]:
         return set(self.ids)
 
@@ -336,7 +340,7 @@ class PgVectorStore:
 
     # ---- writes ----
     _UPSERT = ("INSERT INTO paper_embeddings (work_id, embedding, meta, model) "
-               "VALUES (%s, %s::vector, %s::jsonb, %s) ON CONFLICT (work_id) DO UPDATE "
+               "VALUES (%s, %s::halfvec, %s::jsonb, %s) ON CONFLICT (work_id) DO UPDATE "
                "SET embedding = EXCLUDED.embedding, meta = EXCLUDED.meta, model = EXCLUDED.model")
 
     def upsert(self, ids, vectors, meta, model: str | None = None):
@@ -364,6 +368,14 @@ class PgVectorStore:
         with self._cursor() as cur:
             cur.execute("DELETE FROM paper_embeddings")
 
+    def stored_dim(self) -> int | None:
+        """Dimension of the stored vectors (vector or halfvec column), None when empty."""
+        def q(cur):
+            cur.execute("SELECT vector_dims(embedding::vector) FROM paper_embeddings LIMIT 1")
+            row = cur.fetchone()
+            return int(row[0]) if row and row[0] is not None else None
+        return self._run(q)
+
     def database_size(self) -> int:
         def q(cur):
             cur.execute("SELECT pg_database_size(current_database())")
@@ -376,8 +388,8 @@ class PgVectorStore:
 
         def q(cur):
             cur.execute(
-                "SELECT work_id, 1 - (embedding <=> %s::vector) AS score, meta "
-                "FROM paper_embeddings ORDER BY embedding <=> %s::vector LIMIT %s",
+                "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, meta "
+                "FROM paper_embeddings ORDER BY embedding <=> %s::halfvec LIMIT %s",
                 (lit, lit, k))
             return cur.fetchall()
         rows = self._run(q)
@@ -394,14 +406,14 @@ class PgVectorStore:
 
     def vector(self, work_id):
         def q(cur):
-            cur.execute("SELECT embedding::text FROM paper_embeddings WHERE work_id = %s", (work_id,))
+            cur.execute("SELECT embedding::vector::text FROM paper_embeddings WHERE work_id = %s", (work_id,))
             return cur.fetchone()
         row = self._run(q)
         return None if not row else np.array(json.loads(row[0]), dtype=np.float32)
 
     def rows(self):
         def q(cur):
-            cur.execute("SELECT work_id, embedding::text, meta FROM paper_embeddings")
+            cur.execute("SELECT work_id, embedding::vector::text, meta FROM paper_embeddings")
             return cur.fetchall()
         fetched = self._run(q)
         if not fetched:

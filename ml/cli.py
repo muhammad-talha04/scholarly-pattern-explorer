@@ -10,6 +10,7 @@
   python -m ml.cli discover                                # emerging topics + embedding gaps only
   python -m ml.cli index  --jsonl data/works.jsonl         # old JSONL fallback
   python -m ml.cli update --db data/openalex.duckdb
+  python -m ml.cli bulk --target 70000 --start 2015-01 [--index]  # stratified OpenAlex fetch (ml/bulk.py)
 """
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ def read_jsonl(path=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["index", "update", "galaxy", "discover"])
+    ap.add_argument("cmd", choices=["index", "update", "galaxy", "discover", "bulk"])
     ap.add_argument("--jsonl")
     ap.add_argument("--db")
     ap.add_argument("--model", help="sentence-transformers model id (ignored when ML_EMBEDDER=hash)")
@@ -43,7 +44,37 @@ def main(argv=None):
     ap.add_argument("--max-db-mb", type=float, default=430,
                     help="stop before a batch once pg_database_size reaches this (0 = off)")
     ap.add_argument("--galaxy", action="store_true", help="index: rebuild the galaxy afterwards")
+    ap.add_argument("--target", type=int, default=70000, help="bulk: papers to fetch")
+    ap.add_argument("--start", default="2015-01", help="bulk: first month YYYY-MM")
+    ap.add_argument("--end", default=None, help="bulk: last month YYYY-MM (default now)")
+    ap.add_argument("--out", default="data/bulk_works.jsonl", help="bulk: JSONL checkpoint")
+    ap.add_argument("--index", action="store_true", help="bulk: embed + upsert after fetching")
     a = ap.parse_args(argv)
+    if a.cmd == "bulk":
+        import logging
+        from .bulk import fetch
+        from .indexer import ModelMismatch, check_models, index
+        from .embeddings import model_label
+        from .store import get_store
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+        store = get_store()
+        embedder = get_embedder(a.model)
+        if a.index:   # refuse before spending an hour fetching
+            try:
+                check_models(store, model_label(embedder))
+            except ModelMismatch as exc:
+                raise SystemExit(str(exc))
+        r = fetch(a.target, a.out, start=a.start, end=a.end, exclude_ids=store.existing_ids())
+        print(f"fetched {r.fetched} new papers in {r.requests} requests; short months: {len(r.short_months)}")
+        if a.index:
+            try:
+                res = index(store, read_jsonl(a.out), batch_size=a.batch_size, resume=True,
+                            embedder=embedder, max_db_bytes=int(a.max_db_mb * 2**20) or None)
+            except ModelMismatch as exc:
+                raise SystemExit(str(exc))
+            print(f"indexed {res.embedded} papers with {res.model}"
+                  + ("; STOPPED at size limit" if res.stopped_for_size else ""))
+        return
     if a.cmd == "discover":
         from .discover import refresh_discoveries
         print(refresh_discoveries())
