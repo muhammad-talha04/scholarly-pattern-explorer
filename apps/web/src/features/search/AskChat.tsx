@@ -3,7 +3,9 @@ import { useState } from "react";
 import { api } from "@/lib/api/client";
 import { Spinner } from "@/components/ui";
 
-interface Msg { role: "user" | "bot"; text: string; sources?: string[] }
+interface Msg { role: "user" | "bot"; text: string; sources?: string[]; failed?: boolean }
+
+const HISTORY_CHARS = 1000;
 
 /** History is plain text. Markers such as **bold** and [links](url) are not sent. */
 function plainText(value: string): string {
@@ -34,13 +36,22 @@ export function AskChat({ paperId }: { paperId: string }) {
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const question = q.trim(); if (!question || busy) return;
-    const history = msgs.slice(-2).map((m) => ({
-      role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
-      content: plainText(m.text),
-    }));
+    const history = msgs
+      .filter((m) => !m.failed && !m.text.startsWith("Could not answer"))
+      .slice(-2)
+      .map((m) => ({
+        role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+        content: plainText(m.text).slice(0, HISTORY_CHARS),
+      }));
     setMsgs((m) => [...m, { role: "user", text: question }]); setQ(""); setBusy(true);
     try { const r = await api.ask(paperId, question, history); setMsgs((m) => [...m, { role: "bot", text: r.data.answer, sources: r.data.sources }]); }
-    catch (err) { setMsgs((m) => [...m, { role: "bot", text: `Could not answer: ${(err as Error).message}` }]); }
+    catch (err) {
+      const text = `Could not answer: ${(err as Error).message}`;
+      setMsgs((m) => {
+        const next = m.map((msg, i) => i === m.length - 1 && msg.role === "user" ? { ...msg, failed: true } : msg);
+        return [...next, { role: "bot", text, failed: true }];
+      });
+    }
     finally { setBusy(false); }
   }
   return (
