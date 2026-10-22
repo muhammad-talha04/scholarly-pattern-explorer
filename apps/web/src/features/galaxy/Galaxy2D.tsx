@@ -16,18 +16,8 @@ type Frame = {
   rz: number;
 };
 
-/** Same radius the old hit test used. Only papers open a card. */
+/** Same radius the pre-#50 hit test used. Only papers open a card. */
 const HIT_PX = 12;
-/** Pointer travel below this is tremor or a scroll-synthesized pointermove. */
-const STICK_PX = 4;
-/** A neighbouring paper must be this much closer before the card switches. */
-const SWITCH_MARGIN = 12;
-/** Keep the card while the pointer is still this close to the locked paper. */
-const RELEASE_PX = 36;
-
-type Stick = { x: number; y: number; id: string | null };
-
-type Placed = { id: string; paper: boolean; pos: [number, number, number]; phase: number };
 
 /** Flat plexus. Same band, orbit, and breathing zoom as the 3D view, unless motion is reduced. */
 export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null, onFocus, onHighlight, onPick }: {
@@ -38,17 +28,20 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const net = useMemo(() => heroNetwork(nodes), [nodes]);
   const [hover, setHover] = useState<string | null>(null);
+  const [keepFocusCard, setKeepFocusCard] = useState(true);
   const hoverRef = useRef(hover);
   const focusRef = useRef(focus);
   const highlightRef = useRef(highlight);
   const poseRef = useRef(pose);
   const reduceRef = useRef(false);
+  const keepFocusRef = useRef(keepFocusCard);
   const frameRef = useRef<Frame>({ time: 0, motion: 0, unit: 1, shift: 0, ox: 0, oy: 0, rx: 0, ry: 0, rz: 0 });
   hoverRef.current = hover;
   focusRef.current = focus;
   highlightRef.current = highlight;
   poseRef.current = pose;
-  const activeId = hover ?? focus ?? null;
+  keepFocusRef.current = keepFocusCard;
+  const activeId = hover ?? (keepFocusCard ? focus ?? null : null);
   const active = net.nodes.find((n) => n.paper && n.id === activeId);
   const near = useMemo(() => {
     if (!hover) return new Set<string>();
@@ -58,7 +51,6 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
   }, [hover, net.edges, links]);
   const nearRef = useRef(near);
   nearRef.current = near;
-  const stickRef = useRef<Stick | null>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const placeRef = useRef<() => void>(() => {});
 
@@ -180,7 +172,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
   placeRef.current = () => {
     const el = tipRef.current;
     const canvas = canvasRef.current;
-    const id = hoverRef.current ?? focusRef.current;
+    const id = hoverRef.current ?? (keepFocusRef.current ? focusRef.current : null);
     if (!el || !canvas || !id) return;
     const node = net.nodes.find((n) => n.paper && n.id === id);
     if (!node) return;
@@ -188,9 +180,9 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
     const w = canvas.clientWidth || canvas.width || 1;
     const h = canvas.clientHeight || canvas.height || 1;
     const cardW = el.offsetWidth || 208;
-    const cardH = el.offsetHeight || 88;
+    const cardH = el.offsetHeight || 96;
     let left = x + 14;
-    let top = y - Math.round(cardH * 0.35);
+    let top = y - cardH * 0.35;
     if (left + cardW > w - 8) left = x - cardW - 14;
     if (left < 8) left = 8;
     if (top < 8) top = 8;
@@ -200,59 +192,57 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
 
   useLayoutEffect(() => {
     placeRef.current();
-  }, [hover, focus]);
+  }, [hover, focus, keepFocusCard]);
 
-  const pickAt = (ev: { clientX: number; clientY: number }, paperOnly: boolean) => {
+  const pickPaper = (ev: { clientX: number; clientY: number }) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    return nearestId(net.nodes, ev.clientX - rect.left, ev.clientY - rect.top, frameRef.current, HIT_PX, paperOnly);
-  };
-
-  // A resting pointer and the wheel both emit pointermove while the band keeps
-  // orbiting. Re-picking on those events swaps the paper (or hits a filler dot
-  // and clears the card). Hold the paper until the pointer actually travels.
-  const onPointerMove = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
-    const stick = stickRef.current;
-    if (stick) {
-      const dx = ev.clientX - stick.x;
-      const dy = ev.clientY - stick.y;
-      if (dx * dx + dy * dy < STICK_PX * STICK_PX) return;
-    }
-    const canvas = canvasRef.current;
-    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const px = ev.clientX - rect.left;
     const py = ev.clientY - rect.top;
     const frame = frameRef.current;
-    const next = nearestId(net.nodes, px, py, frame, HIT_PX, true);
-    let chosen = next;
-    const currentId = stick?.id ?? null;
-    if (currentId) {
-      const cur = net.nodes.find((n) => n.id === currentId && n.paper);
-      if (cur) {
-        const [cx, cy] = projectNode(cur.pos, cur.phase, frame);
-        const distC = Math.hypot(cx - px, cy - py);
-        if (!next) chosen = distC <= RELEASE_PX ? currentId : null;
-        else if (next !== currentId) {
-          const nxt = net.nodes.find((n) => n.id === next);
-          if (nxt) {
-            const [nx, ny] = projectNode(nxt.pos, nxt.phase, frame);
-            const distN = Math.hypot(nx - px, ny - py);
-            chosen = distN + SWITCH_MARGIN < distC ? next : currentId;
-          }
-        }
-      }
+    let best: string | null = null;
+    let bestD = HIT_PX * HIT_PX;
+    for (const node of net.nodes) {
+      if (!node.paper) continue;
+      const [sx, sy] = projectNode(node.pos, node.phase, frame);
+      const dd = (sx - px) ** 2 + (sy - py) ** 2;
+      if (dd < bestD) { bestD = dd; best = node.id; }
     }
-    stickRef.current = { x: ev.clientX, y: ev.clientY, id: chosen };
-    if (chosen !== hoverRef.current) setHover(chosen);
+    return best;
+  };
+
+  const commit = (id: string | null) => {
+    if (hoverRef.current === id) return;
+    hoverRef.current = id;
+    setHover(id);
+  };
+
+  // A resting pointer and the wheel emit pointermove with zero travel while
+  // dots drift under that point. Ignore those events so the card stays put.
+  const onPointerMove = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (ev.pointerType === "touch") return;
+    if (ev.movementX === 0 && ev.movementY === 0) return;
+    if (!keepFocusRef.current) {
+      keepFocusRef.current = true;
+      setKeepFocusCard(true);
+    }
+    commit(pickPaper(ev));
+  };
+
+  const onPointerUp = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (ev.pointerType !== "touch") return;
+    const id = pickPaper(ev);
+    keepFocusRef.current = id != null;
+    setKeepFocusCard(id != null);
+    commit(id);
   };
 
   const onPointerLeave = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (ev.pointerType === "touch") return;
     const next = ev.relatedTarget;
     if (next instanceof Node && tipRef.current?.contains(next)) return;
-    stickRef.current = null;
-    setHover(null);
+    commit(null);
   };
 
   return (
@@ -263,9 +253,10 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
         role="img"
         aria-label="Paper plexus. Color runs from copper at the lower left to pale gold at the upper right."
         onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
         onPointerLeave={onPointerLeave}
         onClick={(ev) => {
-          const id = pickAt(ev, false);
+          const id = pickPaper(ev);
           const node = net.nodes.find((n) => n.id === id);
           if (!node?.paper) return;
           onFocus?.(node.id);
@@ -297,18 +288,6 @@ function projectNode(pos: [number, number, number], phase: number, frame: Frame)
   const d = plexusDrift(phase, frame.time, frame.motion);
   const [x, z] = spinPoint(pos[0] + d[0], pos[1] + d[1], pos[2] + d[2], frame.rx, frame.ry, frame.rz);
   return [frame.ox + x * frame.unit + frame.shift, frame.oy + z * frame.unit];
-}
-
-function nearestId(nodes: Placed[], px: number, py: number, frame: Frame, radius: number, paperOnly: boolean) {
-  let best: string | null = null;
-  let bestD = radius * radius;
-  for (const node of nodes) {
-    if (paperOnly && !node.paper) continue;
-    const [sx, sy] = projectNode(node.pos, node.phase, frame);
-    const dd = (sx - px) ** 2 + (sy - py) ** 2;
-    if (dd < bestD) { bestD = dd; best = node.id; }
-  }
-  return best;
 }
 
 /** Three.js XYZ euler: Rx, then Ry, then Rz. Returns screen-facing x and z. */
