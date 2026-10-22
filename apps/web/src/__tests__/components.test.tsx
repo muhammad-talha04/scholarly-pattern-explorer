@@ -3,8 +3,6 @@ import { vi } from "vitest";
 import { CountingToggle } from "@/features/countries/CountingToggle";
 import { ResultCard } from "@/features/search/ResultCard";
 import { SearchBar } from "@/features/search/SearchBar";
-import { Galaxy2D } from "@/features/galaxy/Galaxy2D";
-
 it("counting toggle shows which method is displayed", () => {
   const on = vi.fn();
   const { rerender } = render(<CountingToggle value="fractional" onChange={on} />);
@@ -28,8 +26,4 @@ it("search bar submits trimmed query", () => {
   const on = vi.fn(); render(<SearchBar onSubmit={on} />);
   fireEvent.change(screen.getByLabelText("Search papers"), { target: { value: "  gnn  " } });
   fireEvent.submit(screen.getByRole("search")); expect(on).toHaveBeenCalledWith("gnn");
-});
-it("2D galaxy highlights gap nodes", () => {
-  render(<Galaxy2D nodes={[{ id: "A", support: 1, gap: false }, { id: "G", support: 0.1, gap: true }]} links={[]} showGaps />);
-  expect(screen.getAllByTestId("gap-node")).toHaveLength(1);
 });

@@ -6,7 +6,7 @@ interface MotionPrefs { lowPower: boolean; setLowPower: (v: boolean) => void }
 const Ctx = createContext<MotionPrefs>({ lowPower: false, setLowPower: () => {} });
 export const useMotionPrefs = () => useContext(Ctx);
 
-/** Detects prefers-reduced-motion, missing WebGL, or a saved low-power choice; pages then render 2D fallbacks. */
+/** Detects prefers-reduced-motion, missing WebGL, or a saved low-power choice. The galaxy stays 3D and holds still; the globe uses its flat map. */
 export function detectLowPower(): boolean {
   if (typeof window === "undefined") return false;
   if (localStorage.getItem("spe-low-power") === "1") return true;

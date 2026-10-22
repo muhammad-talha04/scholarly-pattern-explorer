@@ -41,7 +41,7 @@ A 404 on `/galaxy` or `/topic-country-years` uses fixtures for that call only. T
 - `src/lib/api/client.ts`: typed client. Falls back when the API is unset, unreachable, or returns 501.
 - `src/features/<name>/`: page modules. `src/app/<route>/page.tsx` only mounts one.
 - `src/lib/world.ts`: country outlines from `world-atlas` (Natural Earth, public domain) via `topojson-client`.
-- Low-power mode: `prefers-reduced-motion`, no WebGL, or the nav toggle. Galaxy and globe both have an SVG fallback.
+- Low-power mode: `prefers-reduced-motion`, no WebGL, or a saved `spe-low-power` flag. The galaxy stays 3D and holds still. The globe keeps its flat fallback.
 
 ## Design
-Colors live in `src/lib/palette.ts` (CSS variables plus `clusterColors`). The ground is deep navy `#0B0F1A` with an amber accent `#F5A54A`. Galaxy nodes are a small spaced set of warm amber spheres with a tight soft halo, spokes to a hub, and a dense field of pale-blue dust around them. Charts and the globe use the Okabe–Ito set. UI type is Space Grotesk, panels use the `glass` class, and the landing search uses `search-hero`. The audit of the previous UI is `docs/ui/AUDIT.md`.
+Colors live in `src/lib/palette.ts` (CSS variables plus `clusterColors`). The ground is `#121216` and the accent is champagne `#F3E3B5`. Galaxy clusters, in order, are champagne gold, platinum, antique gold, pewter, and pale gold. The landing view is one 3D galaxy of up to 600 papers: instanced spheres, a contact shadow, and a thin rim, orbiting their cluster centre. Reduced motion holds that view still. Charts and the globe use the Okabe–Ito set. UI type is Space Grotesk, panels use the `glass` class, and the landing search uses `search-hero`. The audit of the previous UI is `docs/ui/AUDIT.md`.

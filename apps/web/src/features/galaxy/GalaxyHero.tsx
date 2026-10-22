@@ -10,13 +10,12 @@ import { buildTopicGraph, type TopicLink, type TopicNode } from "@/lib/graph";
 import { useApi } from "@/lib/useApi";
 import { useMotionPrefs } from "@/components/MotionProvider";
 import { EmptyState, ErrorNote, Spinner, StarMark } from "@/components/ui";
-import { Galaxy2D } from "./Galaxy2D";
 import { positionNodes } from "./layout";
 import { SearchBar } from "@/features/search/SearchBar";
 import { galaxyColor } from "@/lib/palette";
 
 const SUGGESTIONS = ["Protein folding", "Climate modelling", "Large language models"];
-import { centroid, freshPaperIds, type PlexusPose, type Star } from "./stars";
+import { centroid, freshPaperIds, type Star } from "./stars";
 
 const Galaxy3D = dynamic(() => import("./Galaxy3D"), { ssr: false, loading: () => <GalaxyPlaceholder /> });
 
@@ -46,7 +45,7 @@ export function useAfterIdle(): boolean {
 
 /** Static stand-in that fills the same absolute box as the canvas, so swapping it in causes no layout shift. */
 export function GalaxyPlaceholder() {
-  return <div data-testid="galaxy-placeholder" aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_45%,rgba(255,190,120,0.10),transparent_60%)]" />;
+  return <div data-testid="galaxy-placeholder" aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_45%,rgba(217,194,142,0.14),transparent_60%)]" />;
 }
 
 function withCenters(nodes: Star[]): Star[] {
@@ -102,13 +101,10 @@ export function GalaxyHero() {
   const [focus, setFocus] = useState<string | null>(null);
   const [clusterQuery, setClusterQuery] = useState<string | null>(null);
   const [previewEmpty, setPreviewEmpty] = useState(false);
-  const [pose, setPose] = useState<PlexusPose>(null);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setPreviewEmpty(q.get("preview") === "empty");
     setClusterQuery(q.get("cluster"));
-    const plexus = q.get("plexus");
-    setPose(plexus === "in" || plexus === "out" ? plexus : null);
   }, []);
   const pats = useApi(() => api.patterns(), []);
   const gaps = useApi(() => api.patterns({ trend: "gap" }), []);
@@ -142,10 +138,8 @@ export function GalaxyHero() {
     <div className="flex h-full items-center justify-center px-6 pt-28" data-testid="galaxy-empty">
       <EmptyState title="No papers in this snapshot" body="The galaxy groups papers by theme once they are indexed. You can still search, or open Patterns once a run has landed." action={<Link href="/search" className="btn bg-accent/20">Search papers</Link>} />
     </div>
-  ) : lowPower ? (
-    <Galaxy2D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} pose={pose} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
   ) : !canvasReady ? <GalaxyPlaceholder /> : (
-    <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} pose={pose} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
+    <Galaxy3D nodes={stars} links={view.links} showGaps={showGaps} focus={focus} highlight={highlight} still={lowPower} onFocus={setFocus} onHighlight={(name) => setClusterQuery(name ?? null)} onPick={pick} />
   );
   return (
     <section className="relative -mx-3 -mt-20 h-[100dvh] min-h-[640px] overflow-hidden sm:-mx-4">
