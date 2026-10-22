@@ -5,6 +5,7 @@ import { breathAmount, heroNetwork, ORBIT_SPEED, plexusDrift, REST_SHIFT, ROCK_X
 
 const WIDTH = 1100;
 const HEIGHT = 700;
+const HIT_PX = 12;
 
 function papers(count: number) {
   return Array.from({ length: count }, (_, i) => ({
@@ -54,12 +55,31 @@ function project(node: { pos: [number, number, number]; phase: number }, time: n
   return [frame.ox + x * frame.unit + frame.shift, frame.oy + z * frame.unit] as [number, number];
 }
 
+/** Where Galaxy2D anchors the card: just beside the node, flipped to stay on the canvas. */
+function cardAnchor(x: number, y: number) {
+  const cardW = 208;
+  const cardH = 96;
+  let left = x + 14;
+  let top = y - cardH * 0.35;
+  if (left + cardW > WIDTH - 8) left = x - cardW - 14;
+  if (left < 8) left = 8;
+  if (top < 8) top = 8;
+  if (top + cardH > HEIGHT - 8) top = Math.max(8, HEIGHT - cardH - 8);
+  return [Math.round(left), Math.round(top)] as [number, number];
+}
+
+function translation(el: HTMLElement) {
+  const match = el.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+  expect(match).toBeTruthy();
+  return [Number(match![1]), Number(match![2])] as [number, number];
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-it("keeps the same paper card while the pointer is stationary and the plexus moves", () => {
+function installCanvas() {
   const queue: FrameRequestCallback[] = [];
   let now = 0;
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -95,10 +115,29 @@ it("keeps the same paper card while the pointer is stationary and the plexus mov
     x: 0, y: 0, left: 0, top: 0, right: WIDTH, bottom: HEIGHT, width: WIDTH, height: HEIGHT, toJSON() { return {}; },
   }));
   class PointerEventPolyfill extends MouseEvent {
-    constructor(type: string, props?: MouseEventInit) { super(type, props); }
+    pointerType: string;
+    constructor(type: string, props?: MouseEventInit & { pointerType?: string }) {
+      super(type, props);
+      this.pointerType = props?.pointerType ?? "mouse";
+      // jsdom's MouseEvent ignores movementX/Y, so shadow them for the test.
+      const mx = props?.movementX ?? 0;
+      const my = props?.movementY ?? 0;
+      Object.defineProperty(this, "movementX", { get: () => mx });
+      Object.defineProperty(this, "movementY", { get: () => my });
+    }
   }
   vi.stubGlobal("PointerEvent", PointerEventPolyfill);
+  return {
+    step(ms: number) {
+      const cb = queue.shift();
+      now += ms;
+      cb?.(now);
+    },
+  };
+}
 
+it("keeps the paper card beside the node while zero-movement pointermoves arrive", () => {
+  const clock = installCanvas();
   const net = heroNetwork(papers(48));
   const far = net.nodes.filter((n) => n.paper).map((n) => {
     const [x, y] = project(n, 0);
@@ -110,30 +149,96 @@ it("keeps the same paper card while the pointer is stationary and the plexus mov
   const canvas = document.querySelector("canvas");
   expect(canvas).toBeTruthy();
 
-  const steps = Math.ceil((Math.PI / 2) / ORBIT_SPEED / 0.05);
-  const later = steps * 0.05;
-  const [x1, y1] = project(far.n, later);
-  expect(Math.hypot(x1 - far.x, y1 - far.y)).toBeGreaterThan(40);
-
-  fireEvent.pointerMove(canvas!, { clientX: far.x, clientY: far.y });
+  fireEvent.pointerMove(canvas!, { clientX: far.x, clientY: far.y, movementX: 8, movementY: 2 });
   const card = screen.getByTestId("galaxy-paper-card");
   expect(card).toHaveTextContent(far.n.id);
-  const before = card.textContent;
+  expect(card.className).not.toContain("right-4");
+  expect(card.className).not.toContain("top-24");
+  const parked = cardAnchor(far.x, far.y);
+  expect(translation(card)).toEqual(parked);
 
+  const steps = Math.ceil((Math.PI / 2) / ORBIT_SPEED / 0.05);
   act(() => {
-    for (let i = 0; i < steps; i++) {
-      const cb = queue.shift();
-      now += 50;
-      cb?.(now);
-    }
+    for (let i = 0; i < steps; i++) clock.step(50);
   });
-  expect(Number(canvas!.dataset.plexusTime)).toBeGreaterThan(1);
+  const later = Number(canvas!.dataset.plexusTime);
+  expect(later).toBeGreaterThan(1);
+  const [x1, y1] = project(far.n, later);
+  expect(Math.hypot(x1 - far.x, y1 - far.y)).toBeGreaterThan(40);
 
   for (let i = 0; i < 8; i++) {
     fireEvent.pointerMove(canvas!, { clientX: far.x, clientY: far.y, movementX: 0, movementY: 0 });
   }
-  expect(screen.getByTestId("galaxy-paper-card").textContent).toBe(before);
+  const still = screen.getByTestId("galaxy-paper-card");
+  expect(still).toHaveTextContent(far.n.id);
+  const followed = cardAnchor(x1, y1);
+  expect(translation(still)).toEqual(followed);
+  expect(Math.hypot(followed[0] - parked[0], followed[1] - parked[1])).toBeGreaterThan(20);
 
-  fireEvent.pointerMove(canvas!, { clientX: 2, clientY: 2 });
+  fireEvent.pointerMove(canvas!, { clientX: 2, clientY: 2, movementX: 30, movementY: 4 });
+  expect(screen.queryByTestId("galaxy-paper-card")).toBeNull();
+});
+
+it("picks a paper inside the hit radius even when a non-paper dot is closer", () => {
+  installCanvas();
+  const net = heroNetwork(papers(48));
+  const fillers = net.nodes.filter((n) => !n.paper);
+  const paperNodes = net.nodes.filter((n) => n.paper);
+  let aim: { x: number; y: number; paperId: string } | null = null;
+  for (const filler of fillers) {
+    const [fx, fy] = project(filler, 0);
+    let nearest = paperNodes[0];
+    let best = Infinity;
+    for (const paper of paperNodes) {
+      const [px, py] = project(paper, 0);
+      const d = Math.hypot(px - fx, py - fy);
+      if (d < best) { best = d; nearest = paper; }
+    }
+    const fillerCloser = best > 0.5 && best <= HIT_PX;
+    if (!fillerCloser) continue;
+    aim = { x: fx, y: fy, paperId: nearest.id };
+    break;
+  }
+  expect(aim).toBeTruthy();
+
+  render(<Galaxy2D nodes={papers(48)} links={[]} showGaps={false} />);
+  const canvas = document.querySelector("canvas");
+  fireEvent.pointerMove(canvas!, { clientX: aim!.x, clientY: aim!.y, movementX: 6, movementY: 1 });
+  const card = screen.getByTestId("galaxy-paper-card");
+  expect(card).toHaveTextContent(aim!.paperId);
+  expect(card.textContent).not.toMatch(/dot-/);
+
+  const lonely = fillers.map((filler) => {
+    const [x, y] = project(filler, 0);
+    const nearestPaper = Math.min(...paperNodes.map((paper) => {
+      const [px, py] = project(paper, 0);
+      return Math.hypot(px - x, py - y);
+    }));
+    return { x, y, nearestPaper };
+  }).sort((a, b) => b.nearestPaper - a.nearestPaper)[0];
+  expect(lonely.nearestPaper).toBeGreaterThan(HIT_PX);
+  fireEvent.pointerMove(canvas!, { clientX: lonely.x, clientY: lonely.y, movementX: 9, movementY: -3 });
+  expect(screen.queryByTestId("galaxy-paper-card")).toBeNull();
+});
+
+it("pins the card on a touch tap and clears it on a tap in empty space", () => {
+  installCanvas();
+  const net = heroNetwork(papers(48));
+  const paper = net.nodes.find((n) => n.paper)!;
+  const [x, y] = project(paper, 0);
+  render(<Galaxy2D nodes={papers(48)} links={[]} showGaps={false} focus={paper.id} />);
+  const canvas = document.querySelector("canvas");
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(paper.id);
+
+  fireEvent.pointerUp(canvas!, { clientX: 4, clientY: 4, pointerType: "touch" });
+  expect(screen.queryByTestId("galaxy-paper-card")).toBeNull();
+
+  fireEvent.pointerUp(canvas!, { clientX: x, clientY: y, pointerType: "touch" });
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(paper.id);
+  fireEvent.pointerLeave(canvas!, { pointerType: "touch" });
+  fireEvent.pointerMove(canvas!, { clientX: x, clientY: y, movementX: 0, movementY: 0, pointerType: "touch" });
+  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(paper.id);
+
+  fireEvent.pointerUp(canvas!, { clientX: 4, clientY: 4, pointerType: "touch" });
   expect(screen.queryByTestId("galaxy-paper-card")).toBeNull();
 });
