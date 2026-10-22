@@ -20,6 +20,8 @@ def test_etc_mid_sentence_is_not_a_boundary():
     numbered = sentences("We tried CNNs, RNNs, etc. 12 baselines in one comparison. Accuracy rose.")
     assert numbered[0] == "We tried CNNs, RNNs, etc. 12 baselines in one comparison."
     assert numbered[1] == "Accuracy rose."
+    ended = sentences("We used CNNs, RNNs, etc. The model then improved.")
+    assert ended == ["We used CNNs, RNNs, etc.", "The model then improved."]
 
 
 def test_cjk_full_stop_splits_and_bigrams_overlap():

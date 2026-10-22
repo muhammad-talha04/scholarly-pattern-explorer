@@ -11,8 +11,12 @@ export function AskChat({ paperId }: { paperId: string }) {
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const question = q.trim(); if (!question || busy) return;
+    const history = msgs.slice(-2).map((m) => ({
+      role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+      content: m.text.slice(0, 500),
+    }));
     setMsgs((m) => [...m, { role: "user", text: question }]); setQ(""); setBusy(true);
-    try { const r = await api.ask(paperId, question); setMsgs((m) => [...m, { role: "bot", text: r.data.answer, sources: r.data.sources }]); }
+    try { const r = await api.ask(paperId, question, history); setMsgs((m) => [...m, { role: "bot", text: r.data.answer, sources: r.data.sources }]); }
     catch (err) { setMsgs((m) => [...m, { role: "bot", text: `Could not answer: ${(err as Error).message}` }]); }
     finally { setBusy(false); }
   }

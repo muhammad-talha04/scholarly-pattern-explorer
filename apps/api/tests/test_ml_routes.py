@@ -73,6 +73,28 @@ def test_paper_detail_summary_and_ask(client):
     a = client.post("/api/v1/papers/W1/ask", json={"question": "What do attention maps reveal?"}).json()
     assert "contacts" in a["answer"] and a["sources"]
     assert client.post("/api/v1/papers/NOPE/ask", json={"question": "x"}).status_code == 404
+    follow = client.post("/api/v1/papers/W1/ask", json={
+        "question": "explain that more simply",
+        "history": [
+            {"role": "user", "content": "What do attention maps reveal?"},
+            {"role": "assistant", "content": "Attention maps reveal contacts."},
+        ],
+    }).json()
+    assert "contacts" in follow["answer"].lower()
+    alone = client.post("/api/v1/papers/W1/ask", json={"question": "explain that more simply"}).json()
+    assert "does not seem" in alone["answer"]
+    assert client.post("/api/v1/papers/W1/ask", json={
+        "question": "explain that more simply",
+        "history": [{"role": "user", "content": "x" * 501}],
+    }).status_code == 422
+    assert client.post("/api/v1/papers/W1/ask", json={
+        "question": "explain that more simply",
+        "history": [
+            {"role": "user", "content": "one"},
+            {"role": "assistant", "content": "two"},
+            {"role": "user", "content": "three"},
+        ],
+    }).status_code == 422
 
 
 def test_galaxy_layout(client):

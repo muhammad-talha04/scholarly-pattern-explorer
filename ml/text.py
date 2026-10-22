@@ -12,11 +12,11 @@ using use used based via between among more most less both each other there here
 """.split())
 
 # ASCII sentence boundary, plus accented capitals (É…) and CJK full stops.
-# Common abbreviations keep their period so "Fig. 1", "Dr. Smith", and a
-# mid-sentence "etc." stay one sentence. The following word may be a digit
-# ("etc. 12"), which would otherwise look like a new sentence.
+# Common abbreviations keep their period so "Fig. 1" and "Dr. Smith" stay one
+# sentence. "etc." ends the sentence when the next word is capitalized
+# ("etc. The"). A lowercase word ("etc. and") or a number ("etc. 12") does not.
 _ABBREV = re.compile(
-    r"\b(?:Fig|Figs|Dr|Mr|Mrs|Ms|Prof|Eq|vs|etc|al)\.|\b(?:e\.g|i\.e)\.",
+    r"\b(?:Fig|Figs|Dr|Mr|Mrs|Ms|Prof|Eq|vs|al)\.|\b(?:e\.g|i\.e)\.|\betc\.(?=\s+\d)",
     re.IGNORECASE,
 )
 _SENT = re.compile(

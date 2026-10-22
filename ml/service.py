@@ -97,6 +97,24 @@ def _keep(meta: dict, country: str | None, year_from: int | None) -> bool:
 
 
 NO_ABSTRACT = "No abstract available for this paper."
+# A follow-up may send earlier chat. Only the last two turns are used, and each
+# is cut so a long pasted turn cannot dominate the match.
+_HISTORY_TURNS = 2
+_HISTORY_CHARS = 500
+
+
+def _recent_turns(history: list[dict] | None) -> list[dict]:
+    kept = []
+    for turn in history or []:
+        role = turn.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        content = str(turn.get("content") or "").strip()
+        if not content:
+            continue
+        kept.append({"role": role, "content": content[:_HISTORY_CHARS]})
+    return kept[-_HISTORY_TURNS:]
+
 
 # Paper text is data. It stays out of the system message so a hostile abstract
 # cannot rewrite the instruction. "Summarise" is the spelling the local-LLM test matches.
@@ -278,10 +296,16 @@ class MLService:
         abstract = (meta.get("abstract") or "").strip()
         # Evidence is abstract sentences only. The title is not the abstract, and
         # quoting it as "From the abstract" states facts the abstract never made.
+        turns = _recent_turns(history)
         evidence = best_sentences(question, abstract, n=2) if abstract else []
+        # "explain that more simply" shares no content word with the abstract.
+        # The previous user and assistant turns still name what "that" refers to.
+        if not evidence and abstract and turns:
+            prior = " ".join(turn["content"] for turn in turns)
+            evidence = best_sentences(f"{prior} {question}", abstract, n=2)
         msgs = [{"role": "system", "content": _ASK_SYSTEM},
                 {"role": "user", "content": _paper_block(title, abstract)}]
-        msgs += [m for m in (history or []) if m.get("role") in ("user", "assistant")][-6:]
+        msgs += turns
         msgs.append({"role": "user", "content": question})
         # No lexical evidence means the abstract does not support an answer.
         # Small models still invent one (a sample size, a fact that is only in the title).

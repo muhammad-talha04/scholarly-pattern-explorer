@@ -213,6 +213,38 @@ def test_ungrounded_llm_output_is_not_returned(service, monkeypatch):
     assert invented["answer"] != "PWNED"
 
 
+def test_pronoun_followup_resolves_via_history(service, monkeypatch):
+    history = [
+        {"role": "user", "content": "What crop is the yield predicted for?"},
+        {"role": "assistant", "content": "Satellite images and weather data predict wheat yield."},
+    ]
+    alone = service.ask("W3", "explain that more simply")
+    assert "does not seem" in alone["answer"]
+    follow = service.ask("W3", "explain that more simply", history=history)
+    assert "wheat" in follow["answer"].lower()
+    assert "does not seem" not in follow["answer"]
+    # An older third turn is dropped. Words past the length cap are dropped too.
+    buried = service.ask("W3", "explain that more simply", history=[
+        {"role": "user", "content": "Satellite images predict wheat yield."},
+        {"role": "assistant", "content": "Noted."},
+        {"role": "user", "content": "Thanks."},
+    ])
+    assert "does not seem" in buried["answer"]
+    clipped = service.ask("W3", "explain that more simply", history=[
+        {"role": "assistant", "content": ("x" * 500) + " wheat yield"},
+    ])
+    assert "does not seem" in clipped["answer"]
+    # History can open the model call. The answer still has to be grounded.
+    monkeypatch.setattr(
+        svc_mod, "chat_complete",
+        lambda *a, **k: "The trial enrolled 512 patients over 3 years.",
+    )
+    invented = service.ask("W3", "explain that more simply", history=history)
+    assert invented["method"] == "extractive"
+    assert "512" not in invented["answer"]
+    assert "wheat" in invented["answer"].lower()
+
+
 def test_invented_trial_count_falls_back(service, monkeypatch):
     _put(service, Paper(
         "Wtrial", "A small trial",
