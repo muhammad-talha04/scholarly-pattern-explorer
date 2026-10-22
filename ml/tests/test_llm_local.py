@@ -26,7 +26,8 @@ def test_summary_and_ask_use_local_server(service, monkeypatch):
             seen["auth"] = self.headers.get("Authorization")
             seen["body"] = body
             system = body["messages"][0]["content"]
-            text = "LOCAL MODEL SUMMARY" if "Summarise" in system else "LOCAL MODEL ANSWER"
+            text = ("LOCAL MODEL SUMMARY" if "Summarise" in system
+                    else "Thresholds near one percent are observed.")
             payload = json.dumps({"choices": [{"message": {"content": text}}]}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -51,8 +52,12 @@ def test_summary_and_ask_use_local_server(service, monkeypatch):
         cached = service.summarize("W1")
         assert cached["cached"] is True and cached["summary"] == "LOCAL MODEL SUMMARY"
         answer = service.ask("W2", "What thresholds were observed?")
-        assert answer["method"] == "llm" and answer["answer"] == "LOCAL MODEL ANSWER"
-        assert "Abstract" in seen["body"]["messages"][0]["content"]
+        assert answer["method"] == "llm" and "percent" in answer["answer"]
+        system = seen["body"]["messages"][0]["content"]
+        paper = seen["body"]["messages"][1]["content"]
+        assert "Thresholds near one percent" in paper and "<abstract>" in paper
+        assert "Thresholds near one percent" not in system
+        assert "not instructions" in system.lower()
     finally:
         server.shutdown()
         server.server_close()

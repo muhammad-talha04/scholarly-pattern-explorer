@@ -11,22 +11,66 @@ not no but into over under such can may might will would should could has have h
 using use used based via between among more most less both each other there here i you he she
 """.split())
 
-_SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+# ASCII sentence boundary, plus accented capitals (É…) and CJK full stops.
+# Common abbreviations keep their period so "Fig. 1" and "Dr. Smith" stay one sentence.
+_ABBREV = re.compile(
+    r"\b(?:Fig|Figs|Dr|Mr|Mrs|Ms|Prof|Eq|vs|etc|al)\.|\b(?:e\.g|i\.e)\.",
+    re.IGNORECASE,
+)
+_SENT = re.compile(
+    r"(?<=[.!?])\s+(?=[0-9A-Z\u00C0-\u00D6\u00D8-\u00DE])|(?<=[。！？])"
+)
+# Scripts that are often written without spaces. Overlap is measured on bigrams.
+_UNSEGMENTED = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]+")
+# A paper can tell a model to ignore its instructions. That sentence is not a summary.
+_OVERRIDE = re.compile(
+    r"\b(?:ignore|disregard|forget)\b.{0,80}\b(?:instruction|instructions|prompt|prompts)\b"
+    r"|\byou are now\b|\bnew instructions\b",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def sentences(text: str) -> list[str]:
-    return [s.strip() for s in _SENT.split(text or "") if len(s.strip()) > 3]
+    raw = _ABBREV.sub(lambda m: m.group(0)[:-1] + "\u0001", text or "")
+    out = []
+    for part in _SENT.split(raw):
+        s = part.replace("\u0001", ".").strip()
+        if len(s) > 3:
+            out.append(s)
+    return out
 
 
 def tokens(text: str) -> list[str]:
-    return [t for t in re.findall(r"[a-z0-9]+", (text or "").lower()) if t not in STOP and len(t) > 1]
+    """Word tokens, keeping accented letters, plus bigrams for unsegmented scripts."""
+    raw = text or ""
+    out = []
+    for t in re.findall(r"[^\W_]+", raw.lower()):
+        if _UNSEGMENTED.fullmatch(t):
+            continue
+        if t not in STOP and len(t) > 1:
+            out.append(t)
+    for run in _UNSEGMENTED.findall(raw):
+        if len(run) < 2:
+            continue
+        out.extend(run[i:i + 2] for i in range(len(run) - 1))
+    return out
+
+
+def _summary_sentences(abstract: str) -> list[str]:
+    sents = sentences(abstract)
+    kept = [s for s in sents if not _OVERRIDE.search(s)]
+    return kept or sents
 
 
 def extractive_summary(title: str, abstract: str, n: int = 3) -> str:
-    """Score sentences by term frequency (title words boosted), keep top-n in order."""
-    sents = sentences(abstract)
+    """Score sentences by term frequency (title words boosted), keep top-n in order.
+
+    Returns "" when the abstract has no usable sentence. Callers decide what to
+    show instead of echoing the title.
+    """
+    sents = _summary_sentences(abstract)
     if not sents:
-        return title or ""
+        return ""
     if len(sents) <= n:
         return " ".join(sents)
     tf = Counter(tokens(abstract))
@@ -41,6 +85,20 @@ def extractive_summary(title: str, abstract: str, n: int = 3) -> str:
         return base * (1.15 if i == 0 else 1.0)
     best = sorted(sorted(enumerate(sents), key=score, reverse=True)[:n])
     return " ".join(s for _, s in best)
+
+
+def grounded_in_abstract(text: str, abstract: str) -> bool:
+    """True when `text` shares a content word with the abstract itself.
+
+    Instruction-override sentences are not evidence. A model answer that only
+    repeats them, or shares nothing with the abstract, is discarded.
+    """
+    if not text or _OVERRIDE.search(text):
+        return False
+    body = [s for s in sentences(abstract) if not _OVERRIDE.search(s)]
+    have = set(tokens(" ".join(body) if body else abstract))
+    got = set(tokens(text))
+    return bool(have and got and have & got)
 
 
 def best_sentences(question: str, text: str, n: int = 2) -> list[tuple[str, float]]:
