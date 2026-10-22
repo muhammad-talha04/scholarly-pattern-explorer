@@ -115,7 +115,7 @@ git checkout -b bob/discoveries-bge && git add deploy/data/ml/snapshots/discover
 Run the council's six queries against the live API. Expect relevant top results for "teaching computers to
 spot tumours in medical scans" and "No close matches" for "medieval french poetry". If the floor is too
 tight or too loose, set `ML_MIN_SCORE` on Render (read on every search, no code change or rebuild;
-`SEARCH_MIN_SCORE` still overrides it if set). The bge default was lowered from 0.68 to **0.65** on
+`ML_MIN_SCORE` takes precedence over `SEARCH_MIN_SCORE` and `ML_SEARCH_MIN_SCORE`; a value that is not a number in [0, 1], or is nan/inf, logs a warning and the per-model default is used). The bge default was lowered from 0.68 to **0.65** on
 2026-10-22 and is **pending chris's post-re-embed benchmark**; make the benchmark's number the default.
 
 ## 6. Before re-enabling `v2 ingest`

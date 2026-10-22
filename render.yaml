@@ -26,7 +26,8 @@ services:
       # Switch values after the bge re-embed:
       #   ML_EMBEDDER=fastembed
       #   ML_EMBED_MODEL=BAAI/bge-small-en-v1.5
-      #   (optional) ML_MIN_SCORE=0.65   # bge default already (pending chris's benchmark); 0 turns it off
+      #   (optional) ML_MIN_SCORE=0.65   # bge default already (pending chris's benchmark); 0 = off;
+      #     beats SEARCH_MIN_SCORE; must be in [0,1], invalid values warn and use the default
       - key: ML_EMBEDDER
         value: hash
       - key: ML_EMBED_MODEL

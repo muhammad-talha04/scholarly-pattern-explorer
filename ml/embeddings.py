@@ -15,6 +15,8 @@ library, so it is not a drop-in replacement.
 from __future__ import annotations
 
 import hashlib
+import logging
+import math
 import os
 
 import numpy as np
@@ -237,20 +239,46 @@ MIN_SCORE_BY_MODEL = {
 }
 
 
-def min_search_score(embedder_or_name) -> float:
-    """Cosine floor below which a search hit is dropped ("no close matches").
+_log = logging.getLogger("spe.embeddings")
 
-    Read from the environment on every call (no restart cache). Overrides, first set wins:
-    SEARCH_MIN_SCORE, ML_MIN_SCORE, ML_SEARCH_MIN_SCORE (older); 0 turns the floor off.
-    Without an override: bge 0.65, MiniLM 0.38, hash and uncalibrated models 0.0 (off).
-    """
-    for key in ("SEARCH_MIN_SCORE", "ML_MIN_SCORE", "ML_SEARCH_MIN_SCORE"):
-        env = os.getenv(key)
-        if env not in (None, ""):
-            return float(env)
+# Score-floor overrides, highest precedence first.
+MIN_SCORE_ENV_KEYS = ("ML_MIN_SCORE", "SEARCH_MIN_SCORE", "ML_SEARCH_MIN_SCORE")
+
+
+def _model_min_score(embedder_or_name) -> float:
     name = embedder_or_name if isinstance(embedder_or_name, str) else \
         getattr(embedder_or_name, "model_name", "") or ""
     short = name.lower().rsplit("/", 1)[-1]
     if short == "hash":
         return 0.0
     return MIN_SCORE_BY_MODEL.get(short, 0.0)
+
+
+def _parse_floor(key: str, raw: str) -> float | None:
+    """A cosine floor in [0, 1], or None (with a warning) when raw is unusable."""
+    try:
+        val = float(raw.strip())
+    except (TypeError, ValueError):
+        val = None
+    if val is None or not math.isfinite(val) or not 0.0 <= val <= 1.0:
+        _log.warning("%s=%r is not a number in [0, 1]; using the per-model default floor", key, raw)
+        return None
+    return val
+
+
+def min_search_score(embedder_or_name) -> float:
+    """Cosine floor below which a search hit is dropped ("no close matches").
+
+    Read from the environment on every call (no restart cache). The first override that is
+    set wins: ML_MIN_SCORE, then SEARCH_MIN_SCORE, then ML_SEARCH_MIN_SCORE (older); 0 turns
+    the floor off. An invalid value (not a number, nan/inf, outside [0, 1]) logs a warning and
+    the per-model default is used. Defaults: bge 0.65, MiniLM 0.38, hash/uncalibrated 0.0 (off).
+    """
+    default = _model_min_score(embedder_or_name)
+    for key in MIN_SCORE_ENV_KEYS:
+        raw = os.getenv(key)
+        if raw is None or raw.strip() == "":
+            continue
+        val = _parse_floor(key, raw)
+        return default if val is None else val
+    return default

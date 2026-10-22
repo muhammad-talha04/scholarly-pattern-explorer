@@ -132,7 +132,7 @@ def test_floor_from_embedder_objects():
 def test_floor_env_override(monkeypatch):
     monkeypatch.setenv("ML_SEARCH_MIN_SCORE", "0.5")
     assert min_search_score(BGE) == 0.5
-    monkeypatch.setenv("SEARCH_MIN_SCORE", "0")       # SEARCH_MIN_SCORE wins; 0 = off
+    monkeypatch.setenv("SEARCH_MIN_SCORE", "0")       # SEARCH_MIN_SCORE beats ML_SEARCH_MIN_SCORE; 0 = off
     assert min_search_score(BGE) == 0.0
 
 
@@ -140,16 +140,39 @@ def test_ml_min_score_env_read_at_runtime(monkeypatch):
     assert min_search_score(BGE) == 0.65                 # default, pending chris's benchmark
     monkeypatch.setenv("ML_MIN_SCORE", "0.7")
     assert min_search_score(BGE) == 0.7                  # no restart / re-import needed
-    monkeypatch.setenv("ML_MIN_SCORE", "0.6")
-    assert min_search_score(BGE) == 0.6
-    monkeypatch.setenv("ML_SEARCH_MIN_SCORE", "0.5")     # older name loses to ML_MIN_SCORE
-    assert min_search_score(BGE) == 0.6
-    monkeypatch.setenv("SEARCH_MIN_SCORE", "0.4")        # SEARCH_MIN_SCORE still wins
-    assert min_search_score(BGE) == 0.4
-    monkeypatch.delenv("SEARCH_MIN_SCORE")
-    monkeypatch.delenv("ML_SEARCH_MIN_SCORE")
     monkeypatch.setenv("ML_MIN_SCORE", "0")              # 0 = off
     assert min_search_score(BGE) == 0.0
+
+
+def test_floor_precedence_ml_min_score_first(monkeypatch):
+    monkeypatch.setenv("ML_SEARCH_MIN_SCORE", "0.5")
+    assert min_search_score(BGE) == 0.5
+    monkeypatch.setenv("SEARCH_MIN_SCORE", "0.4")        # beats the older name
+    assert min_search_score(BGE) == 0.4
+    monkeypatch.setenv("ML_MIN_SCORE", "0.6")            # beats both
+    assert min_search_score(BGE) == 0.6
+    monkeypatch.setenv("ML_MIN_SCORE", "")               # empty = unset
+    assert min_search_score(BGE) == 0.4
+
+
+@pytest.mark.parametrize("raw", ["abc", "nan", "inf", "-0.1", "1.5", "-inf"])
+@pytest.mark.parametrize("key", ["ML_MIN_SCORE", "SEARCH_MIN_SCORE", "ML_SEARCH_MIN_SCORE"])
+def test_invalid_floor_falls_back_to_model_default_with_warning(monkeypatch, caplog, key, raw):
+    monkeypatch.setenv(key, raw)
+    with caplog.at_level("WARNING", logger="spe.embeddings"):
+        assert min_search_score(BGE) == 0.65
+        assert min_search_score(MINILM) == 0.38
+        assert min_search_score("hash") == 0.0
+    assert any(key in r.getMessage() and "per-model default" in r.getMessage() for r in caplog.records)
+
+
+def test_invalid_top_override_does_not_fall_through(monkeypatch, caplog):
+    monkeypatch.setenv("SEARCH_MIN_SCORE", "0.4")
+    monkeypatch.setenv("ML_MIN_SCORE", "nan")
+    with caplog.at_level("WARNING", logger="spe.embeddings"):
+        assert min_search_score(BGE) == 0.65             # model default, not SEARCH_MIN_SCORE
+    monkeypatch.setenv("ML_MIN_SCORE", " 1 ")            # bounds inclusive, whitespace ok
+    assert min_search_score(BGE) == 1.0
 
 
 def test_search_applies_floor(tmp_path, monkeypatch):
