@@ -1,4 +1,4 @@
-import { HOVER_RELEASE_PX, HOVER_STICK_PX, HOVER_SWITCH_MARGIN, resolvePaperHover } from "@/features/galaxy/hover";
+import { HOVER_RELEASE_PX, HOVER_STICK_PX, HOVER_SWITCH_MARGIN, leaveClearsHover, resolvePaperHover, resolveTouchPin } from "@/features/galaxy/hover";
 
 it("keeps the locked paper while nodes drift under a still pointer", () => {
   const next = resolvePaperHover({
@@ -53,4 +53,16 @@ it("clears the card once the pointer has left the locked paper", () => {
 it("acquires the paper under the pointer when nothing is locked", () => {
   expect(resolvePaperHover({ locked: null, travelPx: 10, hits: [{ id: 4, distance: 8 }], lockedDistance: null })).toBe(4);
   expect(resolvePaperHover({ locked: null, travelPx: 10, hits: [], lockedDistance: null })).toBeNull();
+});
+
+it("pins a touch tap and ignores the pointerleave that follows the lift", () => {
+  expect(resolveTouchPin([{ id: 3, distance: 9 }, { id: 1, distance: 22 }])).toBe(3);
+  expect(leaveClearsHover("touch")).toBe(false);
+  expect(leaveClearsHover("mouse")).toBe(true);
+  expect(leaveClearsHover("pen")).toBe(true);
+});
+
+it("clears a touch pin on empty space and switches when another paper is tapped", () => {
+  expect(resolveTouchPin([])).toBeNull();
+  expect(resolveTouchPin([{ id: 7, distance: 6 }])).toBe(7);
 });

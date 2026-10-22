@@ -40,3 +40,23 @@ export function resolvePaperHover(args: {
   if (lockedDistance <= HOVER_RELEASE_PX) return locked;
   return null;
 }
+
+/**
+ * A touch tap pins the nearest paper under the finger.
+ * A tap on empty space clears the pin. The next tap on a different paper switches it.
+ */
+export function resolveTouchPin(hits: PaperHit[]): number | null {
+  let nearest: PaperHit | null = null;
+  for (const hit of hits) {
+    if (!nearest || hit.distance < nearest.distance) nearest = hit;
+  }
+  return nearest ? nearest.id : null;
+}
+
+/**
+ * A touch ends with pointerleave as soon as the finger lifts. That event must
+ * not clear a pin. Mouse and pen leaves still do.
+ */
+export function leaveClearsHover(pointerType: string): boolean {
+  return pointerType !== "touch";
+}

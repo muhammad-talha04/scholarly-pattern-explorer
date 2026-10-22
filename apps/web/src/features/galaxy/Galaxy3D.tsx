@@ -10,7 +10,7 @@ import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
 import { NODE_BRIGHTNESS, clusterColors, gap as gapColor, galaxyColor, ink, linkGrey } from "@/lib/theme";
-import { HOVER_STICK_PX, resolvePaperHover, type PaperHit } from "./hover";
+import { HOVER_STICK_PX, leaveClearsHover, resolvePaperHover, resolveTouchPin, type PaperHit } from "./hover";
 import { centroid, neighborIds, posedPosition, type Star } from "./stars";
 
 const NODE_VERT = `
@@ -311,22 +311,31 @@ function Field({ nodes, links, showGaps, focus, highlight, still, onFocus, onHig
       const lockedDistance = locked == null ? null : screenDistance(locked, px, py, rect);
       return { hits, lockedDistance };
     };
+    const commit = (next: number | null, x: number, y: number) => {
+      stickRef.current = { x, y, id: next };
+      if (next === hoverRef.current) return;
+      hoverRef.current = next;
+      const p = next == null ? null : positions.current[next];
+      if (anchorRef.current && p) anchorRef.current.position.set(p[0], p[1], p[2]);
+      setHover(next);
+    };
     const move = (ev: PointerEvent) => {
+      // A finger is not a hover. Taps are handled on pointerup so a lift cannot retarget the card.
+      if (ev.pointerType === "touch") return;
       const stick = stickRef.current;
       const travel = stick ? Math.hypot(ev.clientX - stick.x, ev.clientY - stick.y) : Number.POSITIVE_INFINITY;
       const locked = stick?.id ?? null;
       if (locked != null && travel < HOVER_STICK_PX) return;
       const { hits, lockedDistance } = sample(ev);
-      const next = resolvePaperHover({ locked, travelPx: travel, hits, lockedDistance });
-      stickRef.current = { x: ev.clientX, y: ev.clientY, id: next };
-      if (next !== hoverRef.current) {
-        hoverRef.current = next;
-        const p = next == null ? null : positions.current[next];
-        if (anchorRef.current && p) anchorRef.current.position.set(p[0], p[1], p[2]);
-        setHover(next);
-      }
+      commit(resolvePaperHover({ locked, travelPx: travel, hits, lockedDistance }), ev.clientX, ev.clientY);
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerType !== "touch") return;
+      const { hits } = sample(ev);
+      commit(resolveTouchPin(hits), ev.clientX, ev.clientY);
     };
     const leave = (ev: PointerEvent) => {
+      if (!leaveClearsHover(ev.pointerType)) return;
       const next = ev.relatedTarget;
       const card = el.parentElement?.querySelector("[data-testid=galaxy-paper-card]");
       if (next instanceof Node && card?.contains(next)) return;
@@ -344,10 +353,12 @@ function Field({ nodes, links, showGaps, focus, highlight, still, onFocus, onHig
       if (node.gap) highlightRef.current?.(node.cluster);
     };
     el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
     el.addEventListener("pointerleave", leave);
     el.addEventListener("click", click);
     return () => {
       el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
       el.removeEventListener("pointerleave", leave);
       el.removeEventListener("click", click);
     };
