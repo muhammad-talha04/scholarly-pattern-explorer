@@ -1,0 +1,44 @@
+# Render blueprint for the FastAPI app. The service root is the repo root because
+# apps/api imports ml/ and pipeline/ from there. Set every sync:false variable in
+# the Render dashboard. This file has no secret values.
+services:
+  - type: web
+    name: scholarly-pattern-explorer-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r apps/api/requirements.txt
+    startCommand: uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENALEX_API_KEY
+        sync: false
+      - key: OPENALEX_MAILTO
+        sync: false
+      - key: ML_EMBEDDER
+        sync: false
+      - key: ML_EMBED_MODEL
+        sync: false
+      - key: ML_VECTOR_BACKEND
+        sync: false
+      - key: ML_DATA_DIR
+        sync: false
+      - key: ML_WORKS_PATH
+        sync: false
+      - key: ML_LLM_URL
+        sync: false
+      - key: ML_LLM_MODEL
+        sync: false
+      - key: ML_LLM_API_KEY
+        sync: false
+      - key: SEARCH_MAX_LIMIT
+        sync: false
+      - key: GALAXY_NODE_LIMIT
+        sync: false
+      - key: COUNTRY_SNAPSHOT
+        sync: false
+      - key: TOPIC_COUNTRY_YEAR_DB
+        sync: false

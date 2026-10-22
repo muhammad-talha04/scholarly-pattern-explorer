@@ -219,7 +219,7 @@ def test_api_paper_detail_validates(client):
     r = client.get("/api/v1/papers/W1")
     assert r.status_code == 200
     d = PaperDetail.model_validate(r.json())
-    assert str(d.original_url) == "https://example.org/w1.pdf"
+    assert str(d.original_url) == "https://doi.org/10.1/a"
     assert str(d.openalex_url) == "https://openalex.org/W1"
     assert d.countries == ["CA", "PK"] and d.year == 2021
     assert client.get("/api/v1/papers/W404").status_code == 404

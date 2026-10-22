@@ -7,12 +7,19 @@ existing JSONL without duplicates. Free: uses the public OpenAlex API.
     python -m pipeline.ingest --out data/works_v2.jsonl --state data/ingest_state.json
 """
 from __future__ import annotations
-import argparse, json, os, time
+import argparse, json, os, re, time
 from datetime import date, timedelta
 from pathlib import Path
 import requests
 
 API = "https://api.openalex.org/works"
+_PLACEHOLDER_DOI = re.compile(r"10\.1234(?:/|$)", re.IGNORECASE)
+
+
+def _public_url(url: str | None) -> str | None:
+    if not isinstance(url, str) or not url.strip() or _PLACEHOLDER_DOI.search(url):
+        return None
+    return url
 SELECT = ("id,doi,display_name,publication_year,publication_date,cited_by_count,"
           "topics,authorships,abstract_inverted_index,open_access,primary_location")
 
@@ -56,9 +63,9 @@ def normalize(w: dict) -> dict:
         "year": w.get("publication_year"),
         "date": w.get("publication_date"),
         "cited_by": w.get("cited_by_count") or 0,
-        "doi": w.get("doi"),
+        "doi": _public_url(w.get("doi")),
         "abstract": abstract_from_index(w.get("abstract_inverted_index")),
-        "original_url": oa.get("oa_url") or loc.get("landing_page_url") or w.get("doi"),
+        "original_url": _public_url(oa.get("oa_url")) or _public_url(loc.get("landing_page_url")) or _public_url(w.get("doi")),
         "openalex_url": w["id"],
         "authors": [n for a in w.get("authorships") or [] if (n := (a.get("author") or {}).get("display_name"))],
         "countries": countries,

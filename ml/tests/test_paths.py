@@ -54,3 +54,22 @@ def test_country_api_snapshot_is_root_anchored_from_other_cwd(tmp_path):
             "from pipeline import country_api as c; print(c.SNAPSHOT)") % str(ROOT)
     out = subprocess.run([sys.executable, "-c", code], cwd=tmp_path, capture_output=True, text=True, check=True)
     assert Path(out.stdout.strip()) == ROOT / "data" / "country_snapshot.json"
+
+
+def test_render_falls_back_to_committed_snapshots(monkeypatch, tmp_path):
+    from ml import paths
+    monkeypatch.delenv("ML_DATA_DIR", raising=False)
+    monkeypatch.delenv("COUNTRY_SNAPSHOT", raising=False)
+    monkeypatch.delenv("SPE_DEPLOY_SNAPSHOTS", raising=False)
+    monkeypatch.setattr(paths, "REPO_ROOT", tmp_path)
+    deployed = tmp_path / "deploy" / "data"
+    (deployed / "ml").mkdir(parents=True)
+    (deployed / "country_snapshot.json").write_text("{}")
+    monkeypatch.setattr(paths, "DEPLOY_DATA", deployed)
+    monkeypatch.delenv("RENDER", raising=False)
+    assert paths.ml_data_dir() == tmp_path / "data" / "ml"
+    monkeypatch.setenv("RENDER", "true")
+    assert paths.ml_data_dir() == deployed / "ml"
+    assert paths.country_snapshot() == deployed / "country_snapshot.json"
+    monkeypatch.setenv("SPE_DEPLOY_SNAPSHOTS", "0")
+    assert paths.country_snapshot() == tmp_path / "data" / "country_snapshot.json"

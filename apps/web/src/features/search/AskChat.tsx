@@ -20,7 +20,7 @@ export function AskChat({ paperId }: { paperId: string }) {
     <div>
       <div className="max-h-64 space-y-2 overflow-y-auto">
         {msgs.map((m, i) => (
-          <div key={i} className={`rounded-xl px-3 py-2 text-sm ${m.role === "user" ? "ml-8 bg-sky-500/15" : "mr-8 bg-white/5"}`}>
+          <div key={i} className={`rounded-xl px-3 py-2 text-sm ${m.role === "user" ? "ml-8 bg-accent/15" : "mr-8 bg-white/5"}`}>
             {m.text}
             {m.sources && m.sources.filter(Boolean).length > 0 && <details className="mt-1 text-xs text-slate-400"><summary>Evidence</summary>{m.sources.map((s, j) => <p key={j} className="mt-1 border-l border-white/10 pl-2">{s}</p>)}</details>}
           </div>

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { PaperSummary } from "@/lib/api/types";
+import { chartColor, mist } from "@/lib/theme";
 
 /** Related papers as a small radial map. Layout is computed here; no extra service. */
 export function CitationMap({ center, related, onOpen }: { center: string; related: PaperSummary[]; onOpen: (id: string) => void }) {
@@ -18,12 +19,12 @@ export function CitationMap({ center, related, onOpen }: { center: string; relat
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-52 w-full" role="img" aria-label="Related papers around this one">
-        {nodes.map((n) => <line key={n.id} x1={cx} y1={cy} x2={n.x} y2={n.y} stroke="#7dd3fc" strokeOpacity={0.45} />)}
-        <circle cx={cx} cy={cy} r={16} fill="#c4b5fd" />
-        <text x={cx} y={cy + 32} textAnchor="middle" fill="#c5d0e6" fontSize={10}>this paper</text>
+        {nodes.map((n) => <line key={n.id} x1={cx} y1={cy} x2={n.x} y2={n.y} stroke={chartColor(2)} strokeOpacity={0.55} />)}
+        <circle cx={cx} cy={cy} r={16} fill={chartColor(0)} />
+        <text x={cx} y={cy + 32} textAnchor="middle" fill={mist} fontSize={10}>this paper</text>
         {nodes.map((n) => (
           <g key={n.id} className="cursor-pointer" onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover((h) => (h === n.id ? null : h))} onClick={() => onOpen(n.id)}>
-            <circle cx={n.x} cy={n.y} r={hover === n.id ? 11 : 8} fill="#7dd3fc" />
+            <circle cx={n.x} cy={n.y} r={hover === n.id ? 11 : 8} fill={chartColor(1)} />
             <title>{n.title}</title>
           </g>
         ))}

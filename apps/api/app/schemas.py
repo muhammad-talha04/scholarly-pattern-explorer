@@ -1,5 +1,5 @@
 """Single source of truth for API types. The web client is generated from these."""
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from pydantic import BaseModel, HttpUrl
 
@@ -28,6 +28,14 @@ class PaperDetail(PaperSummary):
 class SearchResponse(BaseModel):
     query: str
     results: list[PaperSummary]
+    total: int = 0
+    limit: int = 20
+    offset: int = 0
+
+
+class CorpusStats(BaseModel):
+    """Indexed papers. This is the corpus size, not a search page."""
+    papers: int
 
 
 class AskRequest(BaseModel):
@@ -71,7 +79,18 @@ class CountryStats(BaseModel):
     code: str
     name: str
     papers: float  # value for `counting`; fractional counts are not integers
+    # Equal-period growth: Jan 1..newest publication date vs the same dates a year earlier.
     growth_pct: float | None = None
+    growth_reason: Literal["too_few_papers", "partial_year"] | None = None
+    growth_cur_count: float | None = None
+    growth_prev_count: float | None = None
+    growth_window_start: date | None = None
+    growth_window_end: date | None = None
+    # Share of corpus in the same window (percent of all papers; change in percentage points)
+    share_pct: float | None = None
+    share_prev_pct: float | None = None
+    share_change_pp: float | None = None
+    share_reason: Literal["too_few_papers", "partial_year"] | None = None
     top_topics: list[str] = []
     counting: CountingMethod = "fractional"
     paper_count: int = 0            # whole papers, every country on the paper counted once

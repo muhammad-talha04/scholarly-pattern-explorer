@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { Collaboration, CountryStats } from "@/lib/api/types";
 import { CENTROIDS } from "@/lib/geo";
 import { bordersPath } from "@/lib/world";
+import { chartColor, panel } from "@/lib/theme";
 
 /** Equirectangular fallback: country outlines, dots sized by papers, arcs for collaborations. */
 export function Globe2D({ countries, collabs, selected, onSelect }: { countries: CountryStats[]; collabs: Collaboration[]; selected: string | null; onSelect: (c: string) => void }) {
@@ -14,18 +15,18 @@ export function Globe2D({ countries, collabs, selected, onSelect }: { countries:
   return (
     <div className="relative h-full w-full">
       <svg viewBox="0 0 800 400" className="h-full w-full" role="img" aria-label="Country map, flat drawing">
-        <rect width="800" height="400" fill="#10182e" />
-        <path d={outline} fill="none" stroke="#9bd7ff" strokeOpacity={0.55} strokeWidth={0.7} />
+        <rect width="800" height="400" fill={panel} />
+        <path d={outline} fill="none" stroke={chartColor(4)} strokeOpacity={0.7} strokeWidth={0.7} />
         {collabs.map((c, i) => {
           const a = CENTROIDS[c.source], b = CENTROIDS[c.target]; if (!a || !b) return null;
           const x1 = X(a[1]), y1 = Y(a[0]), x2 = X(b[1]), y2 = Y(b[0]);
           const hot = selected && (c.source === selected || c.target === selected);
-          return <path key={i} d={`M${x1},${y1} Q${(x1 + x2) / 2},${Math.min(y1, y2) - 50} ${x2},${y2}`} fill="none" stroke={hot ? "#f9a8d4" : "#c4b5fd"} strokeOpacity={selected && !hot ? 0.15 : 0.7} />;
+          return <path key={i} d={`M${x1},${y1} Q${(x1 + x2) / 2},${Math.min(y1, y2) - 50} ${x2},${y2}`} fill="none" stroke={hot ? chartColor(5) : chartColor(2)} strokeOpacity={selected && !hot ? 0.15 : 0.75} />;
         })}
         {countries.map((c) => {
           const ll = CENTROIDS[c.code]; if (!ll) return null;
           return (
-            <circle key={c.code} cx={X(ll[1])} cy={Y(ll[0])} r={3 + 14 * Math.sqrt(c.papers / max)} fill={selected === c.code ? "#f9a8d4" : "#38bdf8"} fillOpacity={0.8}
+            <circle key={c.code} cx={X(ll[1])} cy={Y(ll[0])} r={3 + 14 * Math.sqrt(c.papers / max)} fill={selected === c.code ? chartColor(0) : chartColor(1)} fillOpacity={0.9}
               className="cursor-pointer" onMouseEnter={() => setHover(c.code)} onMouseLeave={() => setHover((h) => (h === c.code ? null : h))} onClick={() => onSelect(c.code)}>
               <title>{c.name}: {c.papers}</title>
             </circle>
