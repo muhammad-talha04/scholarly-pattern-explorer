@@ -1,6 +1,12 @@
 # Project status (read this first)
 
-Last updated: 2026-10-22 by cursor: 2D galaxy card stays on one paper and follows that dot (see below). Earlier, 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a month)` workflow and fixed country growth. Earlier, 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md`. Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+Last updated: 2026-10-22 by cursor: 2D galaxy card stays on one paper and follows that dot (see below). Earlier, 2026-10-22 ~22:25 PKT by olister: PR #43 merged main, publication_date survives re-embed, bge floor 0.65 via `ML_MIN_SCORE` (highest precedence, safely parsed). Earlier, 2026-10-22 by lura (halfvec + bulk ingest); 2026-10-16 ~17:00 PKT by bob (embedding evaluation and fastembed bge backend). Earlier, 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a month)` workflow and fixed country growth. Earlier, 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md`. Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+
+## 2026-10-22 (olister): PR #43 follow-ups for the bge switch
+- Merged `main` (halfvec, bulk loader, backfill-dates) into `bob/fastembed-bge`; STATUS entries from both kept.
+- **publication_date survives `index --reembed`.** `ml/export_corpus.meta_to_v2` keeps `publication_date` (including an explicit `null` from `backfill-dates`, so it isn't re-asked) and passes every other unmodelled meta key via `meta_extra`; `Paper` gained `publication_date` + `extra` and `to_dict()` writes them back. Test: `ml/tests/test_reembed_meta.py` (export -> reembed round trip, meta identical).
+- **bge no-match floor 0.68 -> 0.65**, pending chris's post-re-embed benchmark. New env `ML_MIN_SCORE` (read on every search; 0 = off). Precedence (updated ~22:25 PKT after lura's review): `ML_MIN_SCORE` > `SEARCH_MIN_SCORE` > `ML_SEARCH_MIN_SCORE` > per-model default. Values are parsed safely: not a number, nan/inf, or outside [0, 1] logs a warning (`spe.embeddings`) and uses the per-model default; it does not fall through to the next variable. Added to `render.yaml` (sync: false).
+- Runbooks (`docs/EMBEDDER_SWITCH.md`, `docs/WORKFLOW.md`): re-embed uses `--max-db-mb 350` (was 430); count `meta ? 'publication_date'` before and after the re-embed, must match.
 
 ## 2026-10-22 (lura): halfvec + 70k bulk ingest (prepared, not run)
 - `db/migrations/005_halfvec_embeddings.sql`: `embedding` -> `halfvec(384)`, HNSW `halfvec_cosine_ops` (same index name). 001's index is now guarded so re-applying never fails.
@@ -13,6 +19,19 @@ Last updated: 2026-10-22 by cursor: 2D galaxy card stays on one paper and follow
 
 ## 2026-10-22 (cursor): 2D galaxy hover
 - **Paper cards follow the dot.** Desktop 2D hover re-picked a node on every `pointermove`, including zero-movement events, and a nearer filler dot cleared the card. The info card was the fixed glass panel at the top right. The hit test now uses paper nodes only. A zero-movement `pointermove` keeps the current paper while the band drifts. The card sits beside that node and moves with it. A touch tap pins the card; a tap on empty space clears it. The plexus drawing, the 600-node sample, and the 2D/3D toggle are unchanged. Test: `apps/web/src/__tests__/galaxy-hover.test.tsx`.
+
+## 2026-10-16 (bob): embedding evaluation (council roadmap 6) and fastembed bge backend
+- **Evaluation** (`eval/embedder-2026-10-16/REPORT.md`). Run on the exact live corpus: all 14,159 papers, titles and abstracts read from Supabase `paper_embeddings.meta` with SELECT only. 20 queries (10 exact-term, 10 paraphrases, including the council's six) plus 5 off-topic calibration queries; 600 strict top-10 judgments. In-corpus queries with top-5 mostly relevant (≥3/5), of 18: **hash 9** (0/9 paraphrases), **bge-small-en-v1.5 (fastembed) 18**, **MiniLM (fastembed) 16**. Council tumour query, top 5: 0/5, 4/5, 2/5. Mean P@10: 0.48 / 0.88 / 0.88.
+- **Decision: fastembed `BAAI/bge-small-en-v1.5`.** Peak RSS inside the API is 294 MB (MiniLM 242 MB, hash 63 MB), and warm query embedding takes ~5 ms on one core. Re-embedding on the shared 8-vCPU box runs at 18 papers/s: ~13 min for 14k, ~64 min for 70k (MiniLM is 6× faster).
+- **No-match floor per model:** hash off, MiniLM 0.38, bge 0.68 (lowered to 0.65 on 2026-10-22, see olister above). `SEARCH_MIN_SCORE` (or `ML_SEARCH_MIN_SCORE`) overrides it, and 0 turns it off. Uncalibrated models have no floor. The bge margin is thin (off-topic max 0.649, weakest relevant hit 0.673), so recheck after the re-embed.
+- **fastembed backend fixes (supersedes #30):**
+  - `FastEmbedder` passes `batch_size` (default 32, `ML_EMBED_BATCH_SIZE`). fastembed's default of 256 hit 8.6 GB RSS in the indexer.
+  - Labels are `fastembed:<model>@fastembed-<version>` (or `@$ML_EMBED_MODEL_REVISION`), so the indexer's mixed-model guard keeps fastembed (Qdrant's quantized ONNX export) apart from torch vectors.
+  - The model cache is `<repo>/.cache/fastembed` (`FASTEMBED_CACHE_PATH`), and the Render build now runs `python -m ml.prefetch_model`.
+  - `fastembed==0.9.0` is pinned.
+- **Production is unchanged.** `render.yaml` pins `ML_EMBEDDER=hash` until the bge re-embed. `v2-ingest.yml` was not edited and must set `ML_EMBEDDER=fastembed` and `ML_EMBED_MODEL=BAAI/bge-small-en-v1.5` before it is re-enabled.
+- **Production switch runbook:** `docs/EMBEDDER_SWITCH.md`. Flip Render to bge first, then `ml.cli index --reembed` from `python -m ml.export_corpus`, then `galaxy --refit` and `discover`. Not run yet.
+- **Release `data-store/works_v2.jsonl` is not the live corpus.** It holds 50,000 works, all published 2025-10 or later, and only 2,999 of the live 14,159.
 
 ## 2026-10-16 (olli)
 - **Ingest paused.** The `v2 ingest (twice a month)` GitHub Actions workflow is disabled (state `disabled_manually`), so the 1 Nov 08:00 PKT run will not mix a new embedding model into the hash-embedded corpus. Re-enable only after the embedding model is chosen and set in the workflow config. Workflow files were not edited.
@@ -132,7 +151,11 @@ Set these in the Render dashboard. `render.yaml` lists them as `sync: false`.
 |---|---|---|
 | `DATABASE_URL` | No | Postgres connection string (pgvector). Unset uses files under `ML_DATA_DIR`. Required for an index that survives a free-tier restart. |
 | `ML_VECTOR_BACKEND` | No | `local` forces files even when `DATABASE_URL` is set. `pgvector` forces Postgres and then `DATABASE_URL` is required. Unset follows `DATABASE_URL`. |
-| `ML_EMBEDDER` | No | `hash` boots without a model download. Unset loads `sentence-transformers` on the first encode. That package is not in `apps/api/requirements.txt`, so set `hash` on the free tier unless you install it. |
+| `ML_EMBEDDER` | No | `hash` boots without a model download (production today; `render.yaml` pins it). `fastembed` uses the ONNX backend with `ML_EMBED_MODEL` (chosen: `BAAI/bge-small-en-v1.5`); switch only after the corpus is re-embedded with it. Unset loads `sentence-transformers` on the first encode, which isn't in `apps/api/requirements.txt`. |
+| `SEARCH_MIN_SCORE` | No | Second in precedence after `ML_MIN_SCORE`. Overrides the per-model "no close matches" cosine floor (hash off, MiniLM 0.38, bge 0.65). `0` turns it off. |
+| `ML_MIN_SCORE` | No | Same floor override, read on every search (default bge 0.65, pending chris's benchmark). Highest precedence: beats `SEARCH_MIN_SCORE` and `ML_SEARCH_MIN_SCORE`. Must be in [0, 1]; invalid values (text, nan, inf, out of range) log a warning and the per-model default is used. `0` turns it off. |
+| `ML_EMBED_MODEL_REVISION` | No | Overrides the version part of `paper_embeddings.model` (default `main`, or `fastembed-<version>` for fastembed). |
+| `ML_EMBED_BATCH_SIZE` / `FASTEMBED_CACHE_PATH` | No | fastembed batch (default 32) and model cache (default `<repo>/.cache/fastembed`, filled by `python -m ml.prefetch_model` at build). |
 | `ML_EMBED_MODEL` | No | Sentence-transformer id. Default `sentence-transformers/all-MiniLM-L6-v2`. |
 | `ML_DATA_DIR` | No | File-backend directory. Default `data/ml`. |
 | `ML_WORKS_PATH` | No | Corpus JSONL. Default `data/works_v2.jsonl` when that file exists. |
