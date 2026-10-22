@@ -10,9 +10,8 @@ Order matters. Each step writes to live Supabase once; do not reorder.
 3. **Apply migration 005** — `DATABASE_URL=... python -m db.apply`. Converts
    `embedding` to `halfvec(384)` and rebuilds `paper_embeddings_hnsw` with
    `halfvec_cosine_ops`. Rewrites the table (~15k rows: seconds). Deploy the
-   API from this branch at the same time: the new code casts to `::halfvec`.
-   (Old code's `::vector` params still work against halfvec via implicit casts
-   for writes, but deploy together to be safe.)
+   API from this branch in the same window: the old code's `embedding <=> %s::vector`
+   search fails against a halfvec column, so search is down until the new API is live.
 4. **Load** — with the same `ML_EMBEDDER`:
 
        python -m ml.cli bulk --target 55841 --start 2015-01 --index --max-db-mb 300
