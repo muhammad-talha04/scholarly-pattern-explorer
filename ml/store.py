@@ -137,6 +137,36 @@ class LocalStore:
     def database_size(self) -> int | None:
         return None
 
+    def month_counts(self) -> dict[str, int]:
+        """Stored papers per publication month 'YYYY-MM' (from meta.created)."""
+        out: dict[str, int] = {}
+        for wid in self.ids:
+            m = _month_of(self.meta.get(wid))
+            if m:
+                out[m] = out.get(m, 0) + 1
+        return out
+
+    def put_sampling_rate(self, month: str, openalex_total: int, sampled: int, filter: str) -> None:
+        """File fallback for the sampling_rates table: <path>/sampling_rates.json."""
+        if not self.path:
+            self._rates = getattr(self, "_rates", {})
+            rates = self._rates
+        else:
+            f = self.path / "sampling_rates.json"
+            rates = json.loads(f.read_text()) if f.exists() else {}
+        from datetime import datetime, timezone
+        rates[month] = {"openalex_total": int(openalex_total), "sampled": int(sampled),
+                        "filter": filter, "fetched_at": datetime.now(timezone.utc).isoformat()}
+        if self.path:
+            self.path.mkdir(parents=True, exist_ok=True)
+            (self.path / "sampling_rates.json").write_text(json.dumps(rates, indent=1, sort_keys=True))
+
+    def sampling_rates(self) -> dict[str, dict]:
+        if not self.path:
+            return dict(getattr(self, "_rates", {}))
+        f = self.path / "sampling_rates.json"
+        return json.loads(f.read_text()) if f.exists() else {}
+
     def upsert(self, ids, vectors, meta, model: str | None = None):
         for wid in ids:
             self.models[wid] = model
@@ -213,6 +243,24 @@ class LocalStore:
         if payload is None:
             return None
         return json.loads(json.dumps(payload))
+
+
+def hnsw_ef_search() -> int:
+    """HNSW candidate list size for search (ML_HNSW_EF_SEARCH, default 100, 1..1000).
+
+    pgvector's default of 40 missed exact self-matches in testing; 100 keeps
+    recall high at 70k rows for a few ms more per query.
+    """
+    try:
+        ef = int(os.getenv("ML_HNSW_EF_SEARCH", "100"))
+    except ValueError:
+        ef = 100
+    return max(1, min(ef, 1000))
+
+
+def _month_of(meta: dict) -> str | None:
+    d = (meta or {}).get("created")
+    return d[:7] if isinstance(d, str) and re.match(r"^\d{4}-\d{2}", d) else None
 
 
 def _vec_literal(v) -> str:
@@ -376,6 +424,31 @@ class PgVectorStore:
             return int(row[0]) if row and row[0] is not None else None
         return self._run(q)
 
+    def month_counts(self) -> dict[str, int]:
+        """Stored papers per publication month 'YYYY-MM' (from meta->>'created')."""
+        def q(cur):
+            cur.execute("SELECT substr(meta->>'created', 1, 7) m, count(*) FROM paper_embeddings "
+                        "WHERE meta->>'created' ~ '^[0-9]{4}-[0-9]{2}' GROUP BY 1")
+            return {m: int(n) for m, n in cur.fetchall()}
+        return self._run(q)
+
+    def put_sampling_rate(self, month: str, openalex_total: int, sampled: int, filter: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                "INSERT INTO sampling_rates (month, openalex_total, sampled, filter, fetched_at) "
+                "VALUES (%s::date, %s, %s, %s, now()) ON CONFLICT (month) DO UPDATE SET "
+                "openalex_total = EXCLUDED.openalex_total, sampled = EXCLUDED.sampled, "
+                "filter = EXCLUDED.filter, fetched_at = now()",
+                (f"{month}-01", int(openalex_total), int(sampled), filter))
+
+    def sampling_rates(self) -> dict[str, dict]:
+        def q(cur):
+            cur.execute("SELECT to_char(month, 'YYYY-MM'), openalex_total, sampled, filter, "
+                        "fetched_at FROM sampling_rates")
+            return cur.fetchall()
+        return {m: {"openalex_total": t, "sampled": n, "filter": f, "fetched_at": str(at)}
+                for m, t, n, f, at in self._run(q)}
+
     def database_size(self) -> int:
         def q(cur):
             cur.execute("SELECT pg_database_size(current_database())")
@@ -386,12 +459,19 @@ class PgVectorStore:
     def search(self, query, k=10):
         lit = _vec_literal(query)
 
+        ef = hnsw_ef_search()
+
         def q(cur):
-            cur.execute(
-                "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, meta "
-                "FROM paper_embeddings ORDER BY embedding <=> %s::halfvec LIMIT %s",
-                (lit, lit, k))
-            return cur.fetchall()
+            conn = getattr(cur, "connection", None)
+            tx = conn.transaction() if conn is not None and hasattr(conn, "transaction") \
+                else contextlib.nullcontext()
+            with tx:   # SET LOCAL only lasts inside a transaction
+                cur.execute(f"SET LOCAL hnsw.ef_search = {ef}")
+                cur.execute(
+                    "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, meta "
+                    "FROM paper_embeddings ORDER BY embedding <=> %s::halfvec LIMIT %s",
+                    (lit, lit, k))
+                return cur.fetchall()
         rows = self._run(q)
         return [(w, float(s), m if isinstance(m, dict) else json.loads(m)) for w, s, m in rows]
 

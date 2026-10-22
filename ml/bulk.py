@@ -4,16 +4,18 @@
     python -m ml.cli bulk --target 70000 --index          # fetch (resumes), then embed + upsert
 
 Rules
-- Even spread: the target is split evenly over every calendar month in
-  [start, end]; leftovers go to the earliest months. Each month is fetched with
+- Even spread: new papers are assigned per calendar month in [start, end] so that
+  stored + new is as even as possible (months already well covered get fewer). Each month is fetched with
   ``from/to_publication_date`` + ``has_abstract:true`` and a seeded random
   ``sample`` so the month is not dominated by the most-cited papers.
 - Dedupe against ``exclude_ids`` (the work_ids already stored) and against
   everything already in the output file, so re-runs and resumes never double up.
 - Polite: ``OPENALEX_API_KEY`` (or ``mailto`` via ``OPENALEX_EMAIL``), a minimum
   gap between requests, exponential backoff on 429 / 5xx / network errors.
-- Resumable: works are appended to ``out`` as JSONL (v2 rows, no ``raw``) and the
-  finished months are recorded in ``state``; a restart skips finished months.
+- Only abstracts of at least ``min_abstract_chars`` (default 200) characters.
+- Resumable: works are appended to ``out`` as JSONL (v2 rows, no ``raw``); per-month
+  fetched/quota is kept in ``state``; a restart skips full months and tops up short ones.
+- Sampling rate per month (OpenAlex total vs papers held) goes to ``sampling_rates``.
 - Embedding is not done here; ``ml.indexer.index`` does it with the ML_EMBEDDER
   model and its ModelMismatch guard.
 """
@@ -47,9 +49,30 @@ def months(start: str, end: str | None = None) -> list[str]:
     return out
 
 
-def quotas(month_list: list[str], target: int) -> dict[str, int]:
-    base, extra = divmod(target, len(month_list))
-    return {mo: base + (1 if i < extra else 0) for i, mo in enumerate(month_list)}
+def quotas(month_list: list[str], target: int, existing: dict[str, int] | None = None) -> dict[str, int]:
+    """New papers to fetch per month so the *total* per month ends up as even as possible.
+
+    Water-filling: find the level L where sum(max(0, L - existing[m])) == target;
+    months already above L get 0. Leftover units go to the emptiest months first.
+    """
+    ex = {m: int((existing or {}).get(m, 0)) for m in month_list}
+    if target <= 0:
+        return {m: 0 for m in month_list}
+    lo, hi = 0, max(ex.values()) + target
+    while lo < hi:   # largest L with fill(L) <= target
+        mid = (lo + hi + 1) // 2
+        if sum(max(0, mid - e) for e in ex.values()) <= target:
+            lo = mid
+        else:
+            hi = mid - 1
+    q = {m: max(0, lo - e) for m, e in ex.items()}
+    left = target - sum(q.values())
+    for m in sorted(month_list, key=lambda m: (ex[m] + q[m], m)):
+        if left <= 0:
+            break
+        q[m] += 1
+        left -= 1
+    return q
 
 
 def month_bounds(mo: str) -> tuple[str, str]:
@@ -114,7 +137,7 @@ class OpenAlexClient:
 
 
 def _load_state(path: Path) -> dict:
-    return json.loads(path.read_text()) if path.exists() else {"done": {}}
+    return json.loads(path.read_text()) if path.exists() else {}
 
 
 def _read_ids(path: Path) -> set[str]:
@@ -127,55 +150,80 @@ def _read_ids(path: Path) -> set[str]:
     return ids
 
 
+FILTER = "from_publication_date:{lo},to_publication_date:{hi},has_abstract:true"
+
+
 def fetch(target: int, out: str | Path, state: str | Path | None = None, start: str = "2015-01",
           end: str | None = None, exclude_ids: set[str] | None = None, client: OpenAlexClient | None = None,
-          seed: int = 42, oversample: float = 1.3) -> FetchResult:
-    """Fetch about ``target`` new works with abstracts, evenly per month. Resumable."""
+          seed: int = 42, oversample: float = 1.3, existing_by_month: dict[str, int] | None = None,
+          min_abstract_chars: int = 200, rates_sink=None) -> FetchResult:
+    """Fetch about ``target`` new works with abstracts so each month's total is even. Resumable.
+
+    State file: ``{"quota": {month: n}, "months": {month: {"fetched", "quota", "attempts",
+    "openalex_total"}}}``. Quotas are fixed on the first run (so loading papers between
+    runs does not shift them). A month is done only when fetched >= quota; a short
+    month is topped up on the next run with a new sample seed. ``rates_sink(month,
+    openalex_total, sampled, filter)`` records the per-month sampling rate.
+    """
     from pipeline.ingest import SELECT, normalize
 
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     state_path = Path(state) if state else out.with_suffix(".state.json")
     st = _load_state(state_path)
+    st.pop("done", None)   # pre-review state format
     client = client or OpenAlexClient()
     exclude = {i.rsplit("/", 1)[-1] for i in (exclude_ids or set())}
     have = _read_ids(out)
+    existing_by_month = existing_by_month or {}
+    if not st.get("quota"):
+        st["quota"] = quotas(months(start, end), target, existing_by_month)
+    st.setdefault("months", {})
     res = FetchResult()
-    q = quotas(months(start, end), target)
     with open(out, "a", encoding="utf-8") as fh:
-        for mo, want in q.items():
-            if mo in st["done"]:
+        for mo, want in st["quota"].items():
+            ms = st["months"].setdefault(mo, {"fetched": 0, "quota": want, "attempts": 0})
+            if ms["fetched"] >= want:
                 res.months_done += 1
                 continue
             lo, hi = month_bounds(mo)
+            flt = FILTER.format(lo=lo, hi=hi)
+            if ms.get("openalex_total") is None:
+                meta = client.get({"filter": flt, "per-page": 1, "select": "id"}).get("meta") or {}
+                ms["openalex_total"] = int(meta.get("count") or 0)
+            need = want - ms["fetched"]
             got, page = 0, 1
-            sample = min(MAX_SAMPLE, max(want, int(want * oversample) + len(exclude) // len(q)))
-            while got < want:
-                data = client.get({
-                    "filter": f"from_publication_date:{lo},to_publication_date:{hi},has_abstract:true",
-                    "sample": sample, "seed": seed, "per-page": PER_PAGE, "page": page,
-                    "select": SELECT})
+            sample = min(MAX_SAMPLE, max(need, int(need * oversample) + len(exclude) // len(st["quota"]) + 1))
+            while got < need:
+                data = client.get({"filter": flt, "sample": sample, "seed": seed + ms["attempts"],
+                                   "per-page": PER_PAGE, "page": page, "select": SELECT})
                 results = data.get("results") or []
                 for w in results:
                     row = normalize(w)
                     row.pop("raw", None)
-                    if not row.get("abstract") or row["id"] in exclude or row["id"] in have:
+                    ab = row.get("abstract") or ""
+                    if len(ab.strip()) < min_abstract_chars or row["id"] in exclude or row["id"] in have:
                         continue
                     have.add(row["id"])
                     fh.write(json.dumps(row, ensure_ascii=False) + "\n")
                     got += 1
-                    if got >= want:
+                    if got >= need:
                         break
                 if len(results) < PER_PAGE or page * PER_PAGE >= sample:
                     break
                 page += 1
             fh.flush()
-            if got < want:
-                res.short_months[mo] = want - got
+            ms["fetched"] += got
+            ms["attempts"] += 1
+            if ms["fetched"] < want:
+                res.short_months[mo] = want - ms["fetched"]
+            else:
+                res.months_done += 1
             res.fetched += got
-            res.months_done += 1
-            st["done"][mo] = got
+            if rates_sink is not None:
+                rates_sink(mo, ms["openalex_total"], existing_by_month.get(mo, 0) + ms["fetched"],
+                           flt + f",min_abstract_chars:{min_abstract_chars}")
             state_path.write_text(json.dumps(st, indent=1))
-            log.info("%s: %d/%d", mo, got, want)
+            log.info("%s: %d/%d (OpenAlex total %d)", mo, ms["fetched"], want, ms["openalex_total"])
     res.requests = client.requests
     return res

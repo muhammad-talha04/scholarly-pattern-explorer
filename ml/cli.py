@@ -41,7 +41,7 @@ def main(argv=None):
     ap.add_argument("--no-resume", dest="resume", action="store_false")
     ap.add_argument("--reembed", action="store_true",
                     help="delete every stored vector and re-embed all with the current model")
-    ap.add_argument("--max-db-mb", type=float, default=430,
+    ap.add_argument("--max-db-mb", type=float, default=300,
                     help="stop before a batch once pg_database_size reaches this (0 = off)")
     ap.add_argument("--galaxy", action="store_true", help="index: rebuild the galaxy afterwards")
     ap.add_argument("--target", type=int, default=70000, help="bulk: papers to fetch")
@@ -49,6 +49,7 @@ def main(argv=None):
     ap.add_argument("--end", default=None, help="bulk: last month YYYY-MM (default now)")
     ap.add_argument("--out", default="data/bulk_works.jsonl", help="bulk: JSONL checkpoint")
     ap.add_argument("--index", action="store_true", help="bulk: embed + upsert after fetching")
+    ap.add_argument("--min-abstract-chars", type=int, default=200, help="bulk: skip shorter abstracts")
     a = ap.parse_args(argv)
     if a.cmd == "bulk":
         import logging
@@ -64,7 +65,9 @@ def main(argv=None):
                 check_models(store, model_label(embedder))
             except ModelMismatch as exc:
                 raise SystemExit(str(exc))
-        r = fetch(a.target, a.out, start=a.start, end=a.end, exclude_ids=store.existing_ids())
+        r = fetch(a.target, a.out, start=a.start, end=a.end, exclude_ids=store.existing_ids(),
+                  existing_by_month=store.month_counts(), min_abstract_chars=a.min_abstract_chars,
+                  rates_sink=store.put_sampling_rate)
         print(f"fetched {r.fetched} new papers in {r.requests} requests; short months: {len(r.short_months)}")
         if a.index:
             try:

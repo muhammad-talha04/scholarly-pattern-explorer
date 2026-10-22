@@ -7,16 +7,23 @@ Order matters. Each step writes to live Supabase once; do not reorder.
 2. **Model switch / re-embed** — set `ML_EMBEDDER` to the new model everywhere
    (Render, Actions, local), then `python -m ml.cli index --reembed`.
    Afterwards `VACUUM (FULL, ANALYZE) paper_embeddings;` to drop dead tuples.
-3. **Apply migration 005** — `DATABASE_URL=... python -m db.apply`. Converts
+3. **Apply migrations 005 + 006 and deploy the API together** — `DATABASE_URL=... python -m db.apply`. 005 converts
    `embedding` to `halfvec(384)` and rebuilds `paper_embeddings_hnsw` with
    `halfvec_cosine_ops`. Rewrites the table (~15k rows: seconds). Deploy the
    API from this branch in the same window: the old code's `embedding <=> %s::vector`
    search fails against a halfvec column, so search is down until the new API is live.
+   **Migration and API deploy are one step**: apply, then immediately redeploy Render
+   from the merged main; verify `/search` before continuing. 006 adds `sampling_rates`.
+   Search sets `SET LOCAL hnsw.ef_search` per query (`ML_HNSW_EF_SEARCH`, default 100).
 4. **Load** — with the same `ML_EMBEDDER`:
 
        python -m ml.cli bulk --target 55841 --start 2015-01 --index --max-db-mb 300
 
    `--target` counts *new* papers: 55,841 + the 14,159 stored = 70,000 total.
+   Quotas are per publication month and subtract what is already stored that month,
+   so the totals end up even. Abstracts shorter than `--min-abstract-chars` (200) are
+   skipped. Short months are not marked done; re-running tops them up with a new seed.
+   `--max-db-mb` now defaults to 300 everywhere.
    Fetch is resumable (`data/bulk_works.jsonl` + `.state.json`); re-run the same
    command after any failure. Refuses up front if stored rows are from another
    model (ModelMismatch). The size guard stops cleanly at 300 MB.
@@ -24,3 +31,13 @@ Order matters. Each step writes to live Supabase once; do not reorder.
 
 Check after each step: `select model, count(*) from paper_embeddings group by 1;`
 and `select pg_size_pretty(pg_database_size(current_database()));`
+
+## Sampling rates (for gap / emerging scaling)
+
+`sampling_rates(month date pk, openalex_total int, sampled int, filter text, fetched_at)`
+is written by `ml.cli bulk` per month (LocalStore: `<ML_DATA_DIR>/vectors/sampling_rates.json`).
+`openalex_total` is OpenAlex `meta.count` for that month with `has_abstract:true`;
+`sampled` is papers we hold for that month (stored before + fetched). To compare with
+OpenAlex totals, scale a month's count by `openalex_total / sampled`. The min-abstract
+filter is applied on our side only, so `openalex_total` slightly over-counts eligible works.
+Stored-per-month comes from `meta.created`, which is the publication date for v2 rows.
