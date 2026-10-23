@@ -1,59 +1,81 @@
-import { createHoverLock, HOVER_DWELL_MS, pickClosestPaper, reduceHover, type HoverLock } from "@/features/galaxy/hoverLock";
+import { cardBoxBeside, createHoverLock, pickClosestPaper, reduceHover, type HoverInput, type HoverLock } from "@/features/galaxy/hoverLock";
 
-function move(state: HoverLock, now: number, hitId: string | null, overCard = false) {
-  return reduceHover(state, { now, moving: true, hitId, overCard });
+const card = cardBoxBeside({ x: 100, y: 100 }, { width: 800, height: 600 }, 208, 96);
+
+function sample(over: Partial<HoverInput> & Pick<HoverInput, "hitId">): HoverInput {
+  return {
+    moving: true,
+    hitAt: over.hitId ? { x: 400, y: 300 } : null,
+    pointer: over.hitId ? { x: 400, y: 300 } : { x: 10, y: 10 },
+    movement: { x: 12, y: 0 },
+    overCard: false,
+    nextCard: card,
+    ...over,
+  };
 }
 
-function dwell(state: HoverLock, now: number, hitId: string | null, overCard = false) {
-  return reduceHover(state, { now, moving: false, hitId, overCard });
+function move(state: HoverLock, hitId: string | null, extra: Partial<HoverInput> = {}) {
+  return reduceHover(state, sample({ hitId, ...extra }));
 }
 
-it("opens on the first paper the pointer moves onto and ignores filler dots", () => {
-  const opened = move(createHoverLock(), 1_000, "Paper A");
+it("opens the moment the pointer touches a paper and ignores empty space", () => {
+  const opened = move(createHoverLock(), "Paper A", { hitAt: { x: 100, y: 100 }, pointer: { x: 100, y: 100 } });
   expect(opened.id).toBe("Paper A");
+  expect(opened.anchor).toEqual({ x: 100, y: 100 });
 
-  const missed = move(createHoverLock(), 1_000, null);
+  const missed = move(createHoverLock(), null);
   expect(missed.id).toBeNull();
 });
 
-it("does not switch papers while the pointer is traveling toward the card", () => {
-  const opened = move(createHoverLock(), 1_000, "Paper A");
-  const traveling = move(opened, 1_040, "Paper B");
-  expect(traveling.id).toBe("Paper A");
-  const acrossEmpty = move(traveling, 1_080, null);
-  expect(acrossEmpty.id).toBe("Paper A");
+it("replaces the card as soon as the pointer touches a different paper", () => {
+  const opened = move(createHoverLock(), "Paper A", { hitAt: { x: 100, y: 100 }, pointer: { x: 100, y: 100 } });
+  const next = move(opened, "Paper B", { hitAt: { x: 400, y: 280 }, pointer: { x: 400, y: 280 }, movement: { x: 20, y: 4 } });
+  expect(next.id).toBe("Paper B");
+  expect(next.anchor).toEqual({ x: 400, y: 280 });
 });
 
-it("keeps the card while the pointer is over it, even if a paper is underneath", () => {
-  const opened = move(createHoverLock(), 1_000, "Paper A");
-  const over = move(opened, 1_200, "Paper B", true);
+it("keeps the card while the pointer crosses empty space", () => {
+  const opened = move(createHoverLock(), "Paper A", { hitAt: { x: 100, y: 100 }, pointer: { x: 100, y: 100 } });
+  const gap = move(opened, null, { pointer: { x: 160, y: 140 }, movement: { x: 8, y: 2 } });
+  expect(gap.id).toBe("Paper A");
+});
+
+it("keeps the card while the pointer is still, even if another paper drifts underneath", () => {
+  const opened = move(createHoverLock(), "Paper A", { hitAt: { x: 100, y: 100 }, pointer: { x: 100, y: 100 } });
+  const still = reduceHover(opened, sample({
+    moving: false,
+    hitId: "Paper B",
+    hitAt: { x: 100, y: 100 },
+    pointer: { x: 100, y: 100 },
+    movement: { x: 0, y: 0 },
+  }));
+  expect(still.id).toBe("Paper A");
+});
+
+it("locks the paper while the pointer is over the card", () => {
+  const opened = move(createHoverLock(), "Paper A", { hitAt: { x: 100, y: 100 }, pointer: { x: 100, y: 100 } });
+  const over = move(opened, "Paper B", { overCard: true, pointer: { x: 140, y: 80 }, movement: { x: 6, y: -2 } });
   expect(over.id).toBe("Paper A");
-  const rested = dwell(over, 1_200 + HOVER_DWELL_MS, "Paper B", true);
-  expect(rested.id).toBe("Paper A");
 });
 
-it("switches only after the pointer rests on another paper", () => {
-  const opened = move(createHoverLock(), 1_000, "Paper A");
-  const arrived = move(opened, 1_500, "Paper B");
-  const early = dwell(arrived, 1_500 + HOVER_DWELL_MS - 1, "Paper B");
-  expect(early.id).toBe("Paper A");
-  const rested = dwell(arrived, 1_500 + HOVER_DWELL_MS, "Paper B");
-  expect(rested.id).toBe("Paper B");
+it("ignores a paper that sits on the path into the card", () => {
+  const opened = move(createHoverLock(), "Paper A", { hitAt: { x: 100, y: 100 }, pointer: { x: 100, y: 100 } });
+  const along = move(opened, "Paper B", {
+    hitAt: { x: 130, y: 90 },
+    pointer: { x: 128, y: 92 },
+    movement: { x: 10, y: -2 },
+  });
+  expect(along.id).toBe("Paper A");
 });
 
-it("does not switch when a different paper drifts under a pointer that already stopped", () => {
-  const opened = move(createHoverLock(), 1_000, "Paper A");
-  const stopped = move(opened, 1_400, null);
-  const drifted = dwell(stopped, 1_400 + HOVER_DWELL_MS, "Paper B");
-  expect(drifted.id).toBe("Paper A");
-});
-
-it("drops a pending switch when the pointer is no longer on that paper", () => {
-  const opened = move(createHoverLock(), 1_000, "Paper A");
-  const towardB = move(opened, 1_400, "Paper B");
-  const left = dwell(towardB, 1_400 + HOVER_DWELL_MS, null);
-  expect(left.id).toBe("Paper A");
-  expect(left.pendingId).toBeNull();
+it("still switches when a paper is off to the side of that path", () => {
+  const opened = move(createHoverLock(), "Paper A", { hitAt: { x: 100, y: 100 }, pointer: { x: 100, y: 100 } });
+  const aside = move(opened, "Paper C", {
+    hitAt: { x: 100, y: 220 },
+    pointer: { x: 100, y: 220 },
+    movement: { x: 0, y: 14 },
+  });
+  expect(aside.id).toBe("Paper C");
 });
 
 it("picks the nearest paper and never a closer non-paper dot", () => {
@@ -65,4 +87,11 @@ it("picks the nearest paper and never a closer non-paper dot", () => {
   expect(pickClosestPaper(points, 0, 0, 12)).toBe("Paper A");
   expect(pickClosestPaper(points, 100, 100, 12)).toBeNull();
   expect(pickClosestPaper(points, 40, 0, 12)).toBe("Paper B");
+});
+
+it("places the card beside the node and flips it back onto the canvas", () => {
+  const beside = cardBoxBeside({ x: 100, y: 200 }, { width: 800, height: 600 }, 208, 96);
+  expect(beside.left).toBe(114);
+  const flipped = cardBoxBeside({ x: 760, y: 200 }, { width: 800, height: 600 }, 208, 96);
+  expect(flipped.left).toBe(760 - 208 - 14);
 });

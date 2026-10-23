@@ -7,14 +7,22 @@ import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
 import { accent, gap as gapColor, ink, plexusGold } from "@/lib/theme";
-import { createHoverLock, HOVER_DWELL_MS, pickClosestPaper, reduceHover } from "./hoverLock";
-import { breathAmount, DRIFT_HZ, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, TWINKLE_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
+import { cardBoxBeside, createHoverLock, pickClosestPaperAt, reduceHover } from "./hoverLock";
+import { DRIFT_HZ, heroVolume, neighborIds, networkLinks, plexusCore, plexusDrift, plexusTint, TWINKLE_HZ, WIDE_CANVAS, type PlexusPose, type Star } from "./stars";
 
-/** Nearly overhead so the XZ diagonal reads lower-left to upper-right, with a little parallax. */
-const CAMERA_POS = new Vector3(0.2, 22.5, 2.8);
-const CAMERA_FOV = 46;
+/** Oblique view of the cloud. Distance is fixed so drag orbits without a zoom dolly. */
+const CLOUD_SHIFT = 3.6;
+const CAM_DELTA = new Vector3(7.4, 5.2, 12.2);
+const CAM_DIST = CAM_DELTA.length();
+const CAMERA_FOV = 42;
+/** Reference depth for point size. Near nodes grow; far nodes shrink. */
+const FOCAL = 32;
+const FOG_NEAR = 8;
+const FOG_FAR = 24;
 /** Screen radius for a paper hit. Non-paper dots are not targets. */
 const HIT_PX = 15;
+const CARD_W = 192;
+const CARD_H = 96;
 
 const DRIFT = `
 vec3 bandDrift(float phase) {
@@ -44,13 +52,15 @@ varying vec3 vTint;
 varying vec3 vCore;
 uniform float uTime;
 uniform float uMotion;
-uniform float uZoom;
+uniform float uFocal;
+varying float vDist;
 ${DRIFT}
 void main() {
   vec3 drifted = position + bandDrift(aPhase);
-  vec4 world = modelMatrix * vec4(drifted, 1.0);
-  gl_Position = projectionMatrix * viewMatrix * world;
-  gl_PointSize = aWash > 0.5 ? aSize * uZoom : aSize;
+  vec4 viewPos = viewMatrix * modelMatrix * vec4(drifted, 1.0);
+  gl_Position = projectionMatrix * viewPos;
+  vDist = max(-viewPos.z, 0.8);
+  gl_PointSize = clamp(aSize * uFocal / vDist, 1.2, 40.0);
   vPhase = aPhase;
   vFade = aFade;
   vWash = aWash;
@@ -72,14 +82,20 @@ varying vec3 vTint;
 varying vec3 vCore;
 uniform float uTime;
 uniform float uMotion;
+uniform vec3 uFog;
+uniform float uFogNear;
+uniform float uFogFar;
+varying float vDist;
 void main() {
   vec2 p = gl_PointCoord * 2.0 - 1.0;
   float d = length(p);
   if (d > 1.0) discard;
+  float fog = smoothstep(uFogNear, uFogFar, vDist);
+  float depthShade = mix(1.28, 0.32, fog);
   vec4 outc;
   if (vWash > 0.5) {
-    float a = exp(-2.6 * d * d) * 0.075;
-    outc = vec4(vTint, a);
+    float a = exp(-2.6 * d * d) * 0.07 * mix(1.0, 0.2, fog);
+    outc = vec4(mix(vTint, uFog, fog * 0.65), a);
   } else {
     float core = smoothstep(0.48, 0.06, d);
     float glow = exp(-4.6 * d * d) * 0.34;
@@ -87,8 +103,9 @@ void main() {
     float lit = clamp(vGlow, 0.0, 1.0);
     vec3 col = mix(vTint, vCore, 0.12 + 0.88 * core);
     col = mix(col, vec3(1.0), core * 0.22 + lit * 0.35 + tw);
+    col = mix(col * depthShade, uFog, fog * 0.78);
     float alpha = max(core * (0.7 + 0.3 * vFade), glow * vFade);
-    alpha = clamp(alpha * (1.0 + lit) + tw, 0.0, 1.0);
+    alpha = clamp(alpha * (1.0 + lit) + tw, 0.0, 1.0) * mix(1.0, 0.14, fog);
     outc = vec4(col, alpha);
   }
   if (outc.a < 0.012) discard;
@@ -105,12 +122,15 @@ attribute float aGlow;
 varying vec3 vColor;
 varying float vAlpha;
 varying float vGlow;
+varying float vDist;
 uniform float uTime;
 uniform float uMotion;
 ${DRIFT}
 void main() {
   vec3 drifted = position + bandDrift(aPhase);
-  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(drifted, 1.0);
+  vec4 viewPos = viewMatrix * modelMatrix * vec4(drifted, 1.0);
+  gl_Position = projectionMatrix * viewPos;
+  vDist = max(-viewPos.z, 0.8);
   vColor = aColor;
   vAlpha = aAlpha;
   vGlow = aGlow;
@@ -122,8 +142,15 @@ precision highp float;
 varying vec3 vColor;
 varying float vAlpha;
 varying float vGlow;
+varying float vDist;
+uniform vec3 uFog;
+uniform float uFogNear;
+uniform float uFogFar;
 void main() {
-  gl_FragColor = vec4(vColor, clamp(vAlpha * (1.0 + vGlow * 1.5), 0.0, 0.8));
+  float fog = smoothstep(uFogNear, uFogFar, vDist);
+  vec3 col = mix(vColor * mix(1.15, 0.35, fog), uFog, fog * 0.8);
+  float alpha = clamp(vAlpha * (1.0 + vGlow * 1.5), 0.0, 0.8) * mix(1.0, 0.08, fog);
+  gl_FragColor = vec4(col, alpha);
   #include <colorspace_fragment>
 }
 `;
@@ -137,19 +164,23 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
   const lockRef = useRef(createHoverLock());
   const pointerInsideRef = useRef(false);
   const overCardRef = useRef(false);
-  const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPtr = useRef({ x: 0, y: 0 });
-  const net = useMemo(() => heroNetwork(catalogue), [catalogue]);
+  const shownIdRef = useRef<string | null>(null);
+  const [cardShift, setCardShift] = useState({ x: 14, y: -34 });
+  const net = useMemo(() => heroVolume(catalogue), [catalogue]);
   const nodes = net.nodes;
-  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uMotion: { value: reduce || pose ? 0 : 1 }, uZoom: { value: pose === "in" ? zoomScale(1) : 1 } }), [reduce, pose]);
-  const intro = useRef(reduce || pose ? 1 : 0);
-  const fromV = useRef(new Vector3(0.2, 28, 4.2));
-  const restV = useRef(new Vector3());
-  const posedV = useRef(new Vector3());
-  const lookV = useRef(new Vector3());
-  const offsetV = useRef(new Vector3());
-  const goalV = useRef(new Vector3());
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uMotion: { value: reduce || pose ? 0 : 1 },
+    uFocal: { value: FOCAL },
+    uFog: { value: new Color(ink) },
+    uFogNear: { value: FOG_NEAR },
+    uFogFar: { value: FOG_FAR },
+  }), [reduce, pose]);
+  const camReady = useRef(false);
+  const draggingRef = useRef(false);
+  const tilt = useRef({ x: 0, z: 0 });
+  const tiltGoal = useRef({ x: 0, z: 0 });
 
   const geo = useMemo(() => {
     const color = new Color();
@@ -165,7 +196,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
     const core = new Float32Array((n + 1) * 3);
     const hub = net.hub;
     positions[0] = hub[0]; positions[1] = hub[1]; positions[2] = hub[2];
-    sizes[0] = 150;
+    sizes[0] = 16;
     wash[0] = 1;
     fades[0] = 1;
     color.set(accent);
@@ -176,7 +207,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
     nodes.forEach((node, i) => {
       const o = i + 1;
       positions[o * 3] = node.pos[0]; positions[o * 3 + 1] = node.pos[1]; positions[o * 3 + 2] = node.pos[2];
-      sizes[o] = 7.5;
+      sizes[o] = node.paper ? 9.2 : 5.6;
       phases[o] = node.phase;
       fades[o] = node.fade;
       twinkle[o] = node.twinkle;
@@ -251,7 +282,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
 
   useEffect(() => {
     const el = gl.domElement;
-    const hitPaper = (clientX: number, clientY: number) => {
+    const projectPapers = () => {
       const rect = el.getBoundingClientRect();
       spin.current?.updateWorldMatrix(true, false);
       const v = new Vector3();
@@ -268,49 +299,76 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
           y: (-v.y * 0.5 + 0.5) * rect.height,
         };
       });
-      return pickClosestPaper(points, clientX - rect.left, clientY - rect.top, HIT_PX);
+      return { rect, points };
     };
-    const publish = (id: string | null) => {
+    const hitPaper = (clientX: number, clientY: number) => {
+      const { rect, points } = projectPapers();
+      return { rect, hit: pickClosestPaperAt(points, clientX - rect.left, clientY - rect.top, HIT_PX) };
+    };
+    const publish = (id: string | null, at?: { x: number; y: number } | null, rect?: DOMRect) => {
       if (!id) {
-        setHover(null);
+        if (shownIdRef.current !== null) {
+          shownIdRef.current = null;
+          setHover(null);
+        }
         return;
+      }
+      if (shownIdRef.current === id) return;
+      shownIdRef.current = id;
+      if (at && rect) {
+        const box = lockRef.current.card ?? cardBoxBeside(at, { width: rect.width, height: rect.height }, CARD_W, CARD_H);
+        // drei's Html overwrites the wrapper transform with the node's screen point, so the
+        // card's top-left is that point plus this translate. It matches cardBoxBeside.
+        setCardShift({ x: box.left - at.x, y: box.top - at.y });
       }
       const idx = nodes.findIndex((node) => node.paper && node.id === id);
       setHover(idx >= 0 ? idx : null);
     };
-    const armDwell = () => {
-      if (dwellRef.current) clearTimeout(dwellRef.current);
-      dwellRef.current = setTimeout(() => {
-        const next = reduceHover(lockRef.current, {
-          now: performance.now(),
-          moving: false,
-          hitId: hitPaper(lastPtr.current.x, lastPtr.current.y),
-          overCard: overCardRef.current,
-        });
-        lockRef.current = next;
-        publish(next.id);
-      }, HOVER_DWELL_MS);
-    };
     const move = (ev: PointerEvent) => {
+      if (ev.pointerType === "touch") return;
       pointerInsideRef.current = true;
       if (leaveRef.current) clearTimeout(leaveRef.current);
-      lastPtr.current = { x: ev.clientX, y: ev.clientY };
+      if (ev.buttons) {
+        draggingRef.current = true;
+        return;
+      }
       if (ev.movementX === 0 && ev.movementY === 0) return;
+      const { rect, hit } = hitPaper(ev.clientX, ev.clientY);
+      const nextCard = hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H) : null;
       const next = reduceHover(lockRef.current, {
-        now: performance.now(),
         moving: true,
-        hitId: hitPaper(ev.clientX, ev.clientY),
+        hitId: hit?.id ?? null,
+        hitAt: hit ? { x: hit.x, y: hit.y } : null,
+        pointer: { x: ev.clientX - rect.left, y: ev.clientY - rect.top },
+        movement: { x: ev.movementX, y: ev.movementY },
         overCard: overCardRef.current,
+        nextCard,
       });
       lockRef.current = next;
-      publish(next.id);
-      armDwell();
+      const shown = next.id ? (next.id === hit?.id ? hit : null) : null;
+      publish(next.id, shown ?? next.anchor, rect);
+    };
+    const up = (ev: PointerEvent) => {
+      draggingRef.current = false;
+      if (ev.pointerType !== "touch") return;
+      const { rect, hit } = hitPaper(ev.clientX, ev.clientY);
+      const id = hit?.id ?? null;
+      lockRef.current = {
+        id,
+        anchor: hit ? { x: hit.x, y: hit.y } : null,
+        card: hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H) : null,
+      };
+      publish(id, hit, rect);
     };
     const enter = () => {
       pointerInsideRef.current = true;
       if (leaveRef.current) clearTimeout(leaveRef.current);
     };
     const leave = (ev: PointerEvent) => {
+      if (ev.pointerType === "touch") {
+        pointerInsideRef.current = false;
+        return;
+      }
       const next = ev.relatedTarget;
       if (next instanceof Element && next.closest("[data-galaxy-card]")) {
         overCardRef.current = true;
@@ -321,13 +379,13 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       if (leaveRef.current) clearTimeout(leaveRef.current);
       leaveRef.current = setTimeout(() => {
         if (overCardRef.current || pointerInsideRef.current) return;
-        if (dwellRef.current) clearTimeout(dwellRef.current);
         lockRef.current = createHoverLock();
+        shownIdRef.current = null;
         setHover(null);
       }, 48);
     };
     const click = (ev: MouseEvent) => {
-      const id = hitPaper(ev.clientX, ev.clientY);
+      const id = hitPaper(ev.clientX, ev.clientY).hit?.id ?? null;
       const node = id ? nodes.find((item) => item.id === id && item.paper) : null;
       if (!node) return;
       onFocus?.(node.id);
@@ -335,64 +393,67 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
     };
     el.addEventListener("pointerenter", enter);
     el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
     el.addEventListener("pointerleave", leave);
     el.addEventListener("click", click);
     return () => {
       el.removeEventListener("pointerenter", enter);
       el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
       el.removeEventListener("pointerleave", leave);
       el.removeEventListener("click", click);
-      if (dwellRef.current) clearTimeout(dwellRef.current);
       if (leaveRef.current) clearTimeout(leaveRef.current);
     };
   }, [camera, gl, nodes, onFocus, onHighlight, pose, reduce]);
 
-  const look = useMemo(() => {
-    const picked = highlight && highlight.size ? nodes.filter((n) => highlight.has(n.id)) : [];
-    if (picked.length) return centroidOf(picked);
-    const focused = nodes.find((n) => n.id === focus);
-    return focused ? focused.pos : net.hub;
-  }, [highlight, focus, nodes, net.hub]);
+  useEffect(() => {
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerType === "touch") return;
+      if (pointerInsideRef.current || overCardRef.current || draggingRef.current) return;
+      tiltGoal.current.x = (ev.clientY / window.innerHeight - 0.5) * 0.16;
+      tiltGoal.current.z = (0.5 - ev.clientX / window.innerWidth) * 0.12;
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => window.removeEventListener("pointermove", onMove);
+  }, []);
 
   useFrame((_, dt) => {
     if (document.hidden) return;
-    const pinned = pose === "in" ? 1 : pose === "out" ? 0 : null;
+    const pinned = pose === "in" || pose === "out";
     const hoverFreeze = pointerInsideRef.current || overCardRef.current;
-    const paused = reduce || pinned != null;
+    const paused = reduce || pinned;
     const step = Math.min(dt, 0.05);
     if (!paused && !hoverFreeze) time.current += step;
-    const t = time.current;
-    uniforms.uTime.value = t;
-    // Keep the drift amplitude while hovering so dots don't snap back to the origin of the drift.
+    uniforms.uTime.value = time.current;
+    // Keep the drift amplitude while hovering so dots don't snap back.
     // Time is held, so the field and the card stay where the pointer found them.
     uniforms.uMotion.value = paused ? 0 : 1;
-    const breath = reduce ? 0 : (pinned ?? breathAmount(t));
-    uniforms.uZoom.value = zoomScale(breath);
+    const shift = size.width >= WIDE_CANVAS ? CLOUD_SHIFT : 0;
+    if (!hoverFreeze && !paused && !draggingRef.current) {
+      tilt.current.x += (tiltGoal.current.x - tilt.current.x) * 0.06;
+      tilt.current.z += (tiltGoal.current.z - tilt.current.z) * 0.06;
+    }
     if (spin.current) {
-      const wide = size.width >= WIDE_CANVAS;
-      spin.current.position.x = wide ? REST_SHIFT * (1 - breath) : 0;
+      spin.current.position.x = shift;
       if (paused) spin.current.rotation.set(0, 0, 0);
-      else if (!hoverFreeze) {
-        spin.current.rotation.y = t * ORBIT_SPEED;
-        spin.current.rotation.x = Math.sin(t * ROCK_X_HZ + 0.7) * 0.045;
-        spin.current.rotation.z = Math.sin(t * ROCK_Z_HZ + 1.4) * 0.03;
+      else {
+        spin.current.rotation.y = 0;
+        spin.current.rotation.x = tilt.current.x;
+        spin.current.rotation.z = tilt.current.z;
       }
     }
-    lookV.current.set(look[0], look[1], look[2]);
-    if (!paused && !hoverFreeze) intro.current = Math.min(1, intro.current + step * 1.15);
-    restV.current.set(look[0] * 0.12 + CAMERA_POS.x, look[1] + CAMERA_POS.y, look[2] + CAMERA_POS.z);
-    posedV.current.copy(fromV.current).lerp(restV.current, paused ? 1 : intro.current);
-    offsetV.current.copy(posedV.current).sub(lookV.current);
-    const restDist = Math.max(1e-4, offsetV.current.length());
-    const dist = restDist / zoomScale(breath);
-    offsetV.current.multiplyScalar(dist / restDist);
-    goalV.current.copy(lookV.current).add(offsetV.current);
-    if (paused || intro.current >= 1) camera.position.copy(goalV.current);
-    else camera.position.lerp(goalV.current, 1 - Math.exp(-step * 2.4));
-    if (controls.current) {
-      controls.current.target.copy(lookV.current);
-      controls.current.update();
+    const controlsNow = controls.current;
+    if (!controlsNow) return;
+    if (!camReady.current && size.width > 0) {
+      controlsNow.target.set(shift, 0, 0);
+      camera.position.set(shift + CAM_DELTA.x, CAM_DELTA.y, CAM_DELTA.z);
+      camera.lookAt(shift, 0, 0);
+      controlsNow.update();
+      camReady.current = true;
+    } else if (controlsNow.target.x !== shift) {
+      controlsNow.target.x = shift;
     }
+    controlsNow.autoRotate = !paused && !hoverFreeze && !draggingRef.current;
   });
 
   const hovered = hover == null ? null : nodes[hover];
@@ -408,9 +469,10 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
           <shaderMaterial args={[{ uniforms, vertexShader: POINT_VERT, fragmentShader: POINT_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </points>
         {tip && (
-          <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
+          <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "none" }}>
             <div
-              className="glass w-48 p-2.5 text-left text-xs"
+              className="glass pointer-events-auto w-48 p-2.5 text-left text-xs"
+              style={{ transform: `translate(${cardShift.x}px, ${cardShift.y}px)` }}
               data-testid="galaxy-paper-card"
               data-galaxy-card=""
               onPointerEnter={() => {
@@ -424,8 +486,8 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
                   pointerInsideRef.current = true;
                   return;
                 }
-                if (dwellRef.current) clearTimeout(dwellRef.current);
                 lockRef.current = createHoverLock();
+                shownIdRef.current = null;
                 setHover(null);
               }}
               onPointerDown={(e) => e.stopPropagation()}
@@ -438,14 +500,22 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
           </Html>
         )}
       </group>
-      <OrbitControls ref={controls} enablePan={false} enableZoom={false} />
+      <OrbitControls
+        ref={controls}
+        enablePan={false}
+        enableZoom={false}
+        enableDamping
+        dampingFactor={0.08}
+        rotateSpeed={0.55}
+        autoRotate
+        autoRotateSpeed={2.4}
+        minDistance={CAM_DIST}
+        maxDistance={CAM_DIST}
+        minPolarAngle={0.45}
+        maxPolarAngle={Math.PI - 0.45}
+      />
     </>
   );
-}
-
-function centroidOf(nodes: { pos: [number, number, number] }[]): [number, number, number] {
-  const c = nodes.reduce((a, n) => [a[0] + n.pos[0], a[1] + n.pos[1], a[2] + n.pos[2]] as [number, number, number], [0, 0, 0]);
-  return [c[0] / nodes.length, c[1] / nodes.length, c[2] / nodes.length];
 }
 
 interface Props {
@@ -466,7 +536,7 @@ export default function Galaxy3D(p: Props) {
   return (
     <Canvas
       frameloop={hidden ? "never" : "always"}
-      camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: CAMERA_FOV }}
+      camera={{ position: [CLOUD_SHIFT + CAM_DELTA.x, CAM_DELTA.y, CAM_DELTA.z], fov: CAMERA_FOV }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, toneMapping: NoToneMapping }}
     >
