@@ -8,7 +8,7 @@ Last updated: 2026-10-23 ~18:00 PKT by lura: team status after the 80k sizing de
 - **Search cutoff is 0.68** (`ML_MIN_SCORE=0.68` live on Render), not 0.65 as the 2026-10-22 entries say.
 - **Sizing (Taha):** ~80k papers with full abstracts, no truncation. `estimated_total` for a month = `openalex_total` (anglina).
 - **In progress:**
-  - Load to ~80k (~66k new, 2015..now, full abstracts), stops at 330 MB (hard cap 350 MB of 500). Checks bge-small embedding, fills `sampling_rates` for every month, reports per-year counts (lura).
+  - Load is back on (resumed Oct 23): target ~80k papers with full abstracts, stops at 330 MB (hard cap 350 MB of 500). Date range is 2015 onwards, spread evenly by month, the plan Taha originally approved; Taha can still reverse it. Checks bge-small embedding, fills `sampling_rates` for every month, reports per-year counts (lura).
   - [#58](https://github.com/muhammad-talha04/scholarly-pattern-explorer/pull/58) `/aggregates/{publications,topics,countries}`, open, awaiting caster's review; totals cached ~5 min (lura).
   - [#57](https://github.com/muhammad-talha04/scholarly-pattern-explorer/pull/57) charts from precomputed totals: `estimated_total` timeline, shares for topics/countries; merges with #58 (caster).
   - Galaxy hover rebuild (#55 merged, but not done): card switches instantly on a new paper, its button is clickable and opens the full paper, real 3D layout; recordings before merge (caster).
