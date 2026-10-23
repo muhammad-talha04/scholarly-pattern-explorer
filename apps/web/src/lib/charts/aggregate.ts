@@ -74,13 +74,26 @@ export function countryChartFromStats(rows: CountryStats[], opts: { top?: number
   return { counting, year, top, items, other };
 }
 
-/** Insert a zero bucket for every calendar month the payload left out. Does not drop months that are already zero. */
+/** Insert every calendar month the payload left out. A missing month is unknown (null), not a measured zero. */
 export function fillMonthBuckets(year: number, buckets: TimeBucket[]): TimeBucket[] {
   const by = new Map(buckets.map((b) => [b.key, b]));
   return monthKeys(year).map((key) => {
     const hit = by.get(key);
-    return { key, sampled: hit?.sampled ?? 0, estimated_total: hit?.estimated_total ?? 0 };
+    return hit
+      ? { key, sampled: hit.sampled, estimated_total: hit.estimated_total }
+      : { key, sampled: 0, estimated_total: null };
   });
+}
+
+/**
+ * Sum of known OpenAlex totals. Null when a bucket we sampled has no rate, and
+ * null when every bucket is unknown. Empty months with a null estimate do not
+ * blank out the months that do have a rate.
+ */
+export function rollupEstimate(buckets: { sampled: number; estimated_total: number | null }[]): number | null {
+  if (!buckets.length || buckets.every((b) => b.estimated_total == null)) return null;
+  if (buckets.some((b) => b.sampled > 0 && b.estimated_total == null)) return null;
+  return buckets.reduce((s, b) => s + (b.estimated_total ?? 0), 0);
 }
 
 export function normalizePublication(agg: PublicationAggregate): PublicationAggregate {
@@ -137,17 +150,17 @@ export function parsePublication(raw: unknown): PublicationAggregate | null {
     if (!b || typeof b !== "object" || Array.isArray(b)) continue;
     const row = b as Record<string, unknown>;
     const key = text(row.key);
-    const sampled = num(row.sampled);
-    const estimated_total = num(row.estimated_total);
-    if (!key || sampled == null || sampled < 0 || estimated_total == null || estimated_total < 0) continue;
+    const sampled = num(row.sampled) ?? num(row.paper_count);
+    const estimated_total = row.estimated_total == null ? null : num(row.estimated_total);
+    if (!key || sampled == null || sampled < 0 || (estimated_total != null && estimated_total < 0)) continue;
     buckets.push({ key, sampled, estimated_total });
   }
   const year = num(rec.year);
-  const normalized = normalizePublication({ grain, year: year == null ? null : year, sampled: 0, estimated_total: 0, buckets });
+  const normalized = normalizePublication({ grain, year: year == null ? null : year, sampled: 0, estimated_total: null, buckets });
   return {
     ...normalized,
     sampled: normalized.buckets.reduce((s, b) => s + b.sampled, 0),
-    estimated_total: normalized.buckets.reduce((s, b) => s + b.estimated_total, 0),
+    estimated_total: rollupEstimate(normalized.buckets),
   };
 }
 
@@ -156,7 +169,18 @@ export function parseTopicAggregate(raw: unknown): TopicAggregate | null {
   const rec = raw as Record<string, unknown>;
   const grain: TimeGrain | null = rec.grain === "month" || rec.grain === "year" ? rec.grain : null;
   if (!grain || !Array.isArray(rec.series)) return null;
+  const periodSampled = new Map<string, number>();
+  if (Array.isArray(rec.period)) {
+    for (const row of rec.period) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+      const period = row as Record<string, unknown>;
+      const key = text(period.key);
+      const sampled = num(period.sampled);
+      if (key && sampled != null && sampled >= 0) periodSampled.set(key, sampled);
+    }
+  }
   const series: TopicAggregateSeries[] = [];
+  const pending: { name: string; points: { key: string; share: number | null; value: number | null }[] }[] = [];
   for (const s of rec.series) {
     if (!s || typeof s !== "object" || Array.isArray(s)) continue;
     const row = s as Record<string, unknown>;
@@ -167,11 +191,34 @@ export function parseTopicAggregate(raw: unknown): TopicAggregate | null {
       if (!p || typeof p !== "object" || Array.isArray(p)) continue;
       const pt = p as Record<string, unknown>;
       const key = text(pt.key);
+      if (!key) continue;
       const share = num(pt.share);
-      if (!key || share == null || share < 0) continue;
-      points.push({ key, share });
+      const value = num(pt.value);
+      if ((share == null || share < 0) && (value == null || value < 0)) continue;
+      points.push({
+        key,
+        share: share != null && share >= 0 ? share : null,
+        value: value != null && value >= 0 ? value : null,
+      });
     }
-    series.push({ name, points });
+    pending.push({ name, points });
+  }
+  const columnValue = new Map<string, number>();
+  for (const s of pending) {
+    for (const p of s.points) {
+      if (p.share == null && p.value != null) columnValue.set(p.key, (columnValue.get(p.key) ?? 0) + p.value);
+    }
+  }
+  for (const s of pending) {
+    series.push({
+      name: s.name,
+      points: s.points.map((p) => {
+        if (p.share != null) return { key: p.key, share: p.share };
+        const denom = periodSampled.get(p.key) ?? columnValue.get(p.key) ?? 0;
+        const share = denom > 0 && p.value != null ? (p.value / denom) * 100 : 0;
+        return { key: p.key, share };
+      }),
+    });
   }
   const year = num(rec.year);
   const top = num(rec.top);

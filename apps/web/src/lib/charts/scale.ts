@@ -93,7 +93,7 @@ export function publicationAggregate(q: { grain?: TimeGrain; year?: number | nul
       grain: "month",
       year,
       sampled: buckets.reduce((s, b) => s + b.sampled, 0),
-      estimated_total: buckets.reduce((s, b) => s + b.estimated_total, 0),
+      estimated_total: buckets.reduce((s, b) => s + (b.estimated_total ?? 0), 0),
       buckets,
     };
   }
@@ -109,7 +109,7 @@ export function publicationAggregate(q: { grain?: TimeGrain; year?: number | nul
     grain: "year",
     year: null,
     sampled: buckets.reduce((s, b) => s + b.sampled, 0),
-    estimated_total: buckets.reduce((s, b) => s + b.estimated_total, 0),
+    estimated_total: buckets.reduce((s, b) => s + (b.estimated_total ?? 0), 0),
     buckets,
   };
 }

@@ -40,7 +40,7 @@ export function TimelinePage({ scale = "sample", initialYear = null }: { scale?:
             <p className="mt-1 text-sm text-mist">
               Papers are sampled evenly each month, so a raw count looks flat. Bars are the estimated total
               {year == null ? " by year" : ` by month in ${year}`}.
-              {pubs.data ? ` ${pubs.data.estimated_total.toLocaleString("en-US")} estimated · ${pubs.data.sampled.toLocaleString("en-US")} sampled.` : ""}
+              {pubs.data ? ` ${pubs.data.estimated_total == null ? "estimate unavailable" : `${pubs.data.estimated_total.toLocaleString("en-US")} estimated`} · ${pubs.data.sampled.toLocaleString("en-US")} sampled.` : ""}
             </p>
           </div>
           {year != null && (

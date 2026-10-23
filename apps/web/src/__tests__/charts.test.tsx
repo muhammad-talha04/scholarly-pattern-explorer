@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { compactCount, monthKeys, ticksOverlap, tickLabel, visibleTickIndexes } from "@/lib/charts/axis";
-import { countryChartFromStats, fillMonthBuckets, parseCountryChart, parsePublication, percentShares, seriesFromTopicAggregate } from "@/lib/charts/aggregate";
+import { countryChartFromStats, fillMonthBuckets, parseCountryChart, parsePublication, parseTopicAggregate, percentShares, seriesFromTopicAggregate } from "@/lib/charts/aggregate";
 import { countriesAtScale, publicationAggregate, topicAggregate } from "@/lib/charts/scale";
 import { countries } from "@/lib/api/mock";
 import { VolumeChart } from "@/features/timeline/VolumeChart";
@@ -30,7 +30,7 @@ it("fills every month, including ones the payload omitted, with zero", () => {
     { key: "2025-03", sampled: 4, estimated_total: 12 },
   ]);
   expect(filled.map((b) => b.key)).toEqual(monthKeys(2025));
-  expect(filled[1]).toEqual({ key: "2025-02", sampled: 0, estimated_total: 0 });
+  expect(filled[1]).toEqual({ key: "2025-02", sampled: 0, estimated_total: null });
   expect(filled[0].sampled).toBe(10);
   expect(filled[0].estimated_total).toBe(40);
   const parsed = parsePublication({
@@ -41,9 +41,44 @@ it("fills every month, including ones the payload omitted, with zero", () => {
     buckets: [{ key: "2024-11", sampled: 3, estimated_total: 9 }],
   });
   expect(parsed?.buckets).toHaveLength(12);
-  expect(parsed?.buckets.filter((b) => b.sampled === 0 && b.estimated_total === 0)).toHaveLength(11);
+  expect(parsed?.buckets.filter((b) => b.sampled === 0 && b.estimated_total == null)).toHaveLength(11);
   expect(parsed?.sampled).toBe(3);
   expect(parsed?.estimated_total).toBe(9);
+});
+
+it("keeps a null OpenAlex total from the live publication payload", () => {
+  const year = parsePublication({
+    grain: "year",
+    year: null,
+    total: 5,
+    buckets: [
+      { key: "2023", paper_count: 1, sampled: 1, estimated_total: null },
+      { key: "2024", paper_count: 1, sampled: 1, estimated_total: null },
+      { key: "2025", paper_count: 3, sampled: 3, estimated_total: 1500 },
+    ],
+  });
+  expect(year?.sampled).toBe(5);
+  expect(year?.estimated_total).toBeNull();
+  expect(year?.buckets.map((b) => b.estimated_total)).toEqual([null, null, 1500]);
+
+  const month = parsePublication({
+    grain: "month",
+    year: 2025,
+    total: 3,
+    buckets: [
+      { key: "2025-01", paper_count: 2, sampled: 2, estimated_total: 1000 },
+      { key: "2025-02", paper_count: 0, sampled: 0, estimated_total: null },
+      { key: "2025-03", paper_count: 1, sampled: 1, estimated_total: 500 },
+    ],
+  });
+  expect(month?.buckets).toHaveLength(12);
+  expect(month?.buckets[1]).toEqual({ key: "2025-02", sampled: 0, estimated_total: null });
+  expect(month?.sampled).toBe(3);
+  expect(month?.estimated_total).toBe(1500);
+  const { unmount } = render(<VolumeChart data={year!} />);
+  expect(screen.getAllByTestId("unknown-estimate").length).toBe(2);
+  expect(screen.getAllByText("unknown").length).toBeGreaterThan(0);
+  unmount();
 });
 
 it("splits shares to a tenth of a percent that sums to 100", () => {
@@ -61,7 +96,7 @@ it("builds an 80k publication aggregate with an even sample and an uneven estima
   expect(pub.buckets.reduce((s, b) => s + b.sampled, 0)).toBe(80_000);
   expect(pub.buckets.map((b) => b.key)).toEqual(years);
   expect(pub.buckets.length).toBeLessThan(20);
-  expect(pub.buckets[pub.buckets.length - 1].estimated_total).toBeGreaterThan(pub.buckets[0].estimated_total * 2);
+  expect(pub.buckets[pub.buckets.length - 1].estimated_total ?? 0).toBeGreaterThan((pub.buckets[0].estimated_total ?? 0) * 2);
 
   const active = years.flatMap((year) => publicationAggregate({ grain: "month", year: Number(year), scale: "80k" }).buckets)
     .filter((b) => b.sampled > 0);
@@ -83,7 +118,7 @@ it("builds an 80k publication aggregate with an even sample and an uneven estima
 
   const season = publicationAggregate({ grain: "month", year: 2025, scale: "80k" });
   const seasonActive = season.buckets.filter((b) => b.sampled > 0);
-  const estimates = seasonActive.map((b) => b.estimated_total);
+  const estimates = seasonActive.map((b) => b.estimated_total ?? 0);
   expect(Math.max(...estimates) / Math.min(...estimates)).toBeGreaterThan(1.5);
   expect(Math.max(...seasonActive.map((b) => b.sampled)) - Math.min(...seasonActive.map((b) => b.sampled))).toBeLessThanOrEqual(1);
 
@@ -157,6 +192,37 @@ it("topic shares are the percent of that period, and empty months stay at zero",
   const series = seriesFromTopicAggregate(month);
   expect(series[0].keys).toHaveLength(12);
   expect(series[0].values[0]).toBe(0);
+
+  const live = parseTopicAggregate({
+    grain: "month",
+    year: 2025,
+    top: 1,
+    series: [
+      { name: "LLM", points: [{ key: "2025-01", value: 1.5 }, { key: "2025-02", value: 0 }] },
+      { name: "Other", points: [{ key: "2025-01", value: 0.5 }, { key: "2025-02", value: 0 }] },
+    ],
+    period: [
+      { key: "2025-01", sampled: 2, estimated_total: 1000 },
+      { key: "2025-02", sampled: 0, estimated_total: null },
+    ],
+  });
+  expect(live?.series.map((s) => s.points[0].share)).toEqual([75, 25]);
+  expect(live?.series.every((s) => s.points[1].share === 0)).toBe(true);
+
+  const countries = parseCountryChart({
+    counting: "fractional",
+    year: null,
+    top: 2,
+    total: 5,
+    items: [
+      { code: "CN", name: "China", papers: 5 },
+      { code: "US", name: "United States", papers: 3 },
+    ],
+    other: { papers: 1.5, countries: 2 },
+    period: [{ key: "2025", sampled: 5, estimated_total: 1500 }],
+  });
+  expect(countries?.items.map((c) => c.share)).toEqual([52.6, 31.6]);
+  expect(countries?.other).toEqual({ share: 15.8, countries: 2 });
 });
 
 it("draws empty months and drills from a year bar", () => {

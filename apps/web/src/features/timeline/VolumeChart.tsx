@@ -20,7 +20,8 @@ export function VolumeChart({ data, onDrill }: { data: PublicationAggregate; onD
   const inner = W - padL - padR;
   const slot = inner / n;
   const barW = Math.max(2, slot * 0.62);
-  const max = Math.max(...buckets.map((b) => b.estimated_total), 1);
+  const known = buckets.map((b) => b.estimated_total).filter((n): n is number => n != null);
+  const max = Math.max(...known, 1);
   const x = (i: number) => padL + slot * i + slot / 2;
   const y = (v: number) => H - padB - (v / max) * (H - padT - padB);
   const base = H - padB;
@@ -31,8 +32,8 @@ export function VolumeChart({ data, onDrill }: { data: PublicationAggregate; onD
   const cur = buckets[active];
   const grain = data.grain;
   const ticks = [0, max / 2, max];
-  const tip = (label: string, estimated: number, sampled: number) =>
-    `${label}: Estimated OpenAlex output ${fmt(estimated)}. Sampled ${fmt(sampled)}.`;
+  const tip = (label: string, estimated: number | null, sampled: number) =>
+    `${label}: Estimated OpenAlex output ${estimated == null ? "unknown" : fmt(estimated)}. Sampled ${fmt(sampled)}.`;
   return (
     <div data-testid="publication-chart">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-64 w-full" role="img" aria-label={grain === "month" ? `Estimated OpenAlex output by month in ${data.year}` : "Estimated OpenAlex output by year"}>
@@ -44,28 +45,32 @@ export function VolumeChart({ data, onDrill }: { data: PublicationAggregate; onD
           </g>
         ))}
         {buckets.map((b, i) => {
-          const h = Math.max(0, base - y(b.estimated_total));
-          const zero = b.estimated_total === 0 && b.sampled === 0;
+          const knownEstimate = b.estimated_total;
+          const h = knownEstimate == null ? 0 : Math.max(0, base - y(knownEstimate));
+          const unknown = knownEstimate == null && b.sampled > 0;
+          const empty = b.sampled === 0 && (knownEstimate == null || knownEstimate === 0);
           const label = tickLabel(b.key);
           const year = Number(b.key.slice(0, 4));
           const drill = grain === "year" && onDrill;
           return (
-            <g key={b.key} data-testid={zero ? "empty-month" : `bucket-${b.key}`}
+            <g key={b.key} data-testid={unknown ? "unknown-estimate" : empty ? "empty-month" : `bucket-${b.key}`}
               onMouseEnter={() => setHi(i)} onMouseLeave={() => setHi(null)}
               onFocus={() => setHi(i)} onBlur={() => setHi(null)}>
               {drill ? (
                 <rect x={x(i) - slot / 2} y={padT} width={slot} height={base - padT} fill="transparent" role="button" tabIndex={0}
-                  aria-label={`${b.key}: Estimated OpenAlex output ${fmt(b.estimated_total)}. Sampled ${fmt(b.sampled)}. Show months.`}
+                  aria-label={`${tip(b.key, b.estimated_total, b.sampled)} Show months.`}
                   className="cursor-pointer focus:outline-none"
                   onClick={() => onDrill(year)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onDrill(year); } }} />
               ) : (
                 <rect x={x(i) - slot / 2} y={padT} width={slot} height={base - padT} fill="transparent" />
               )}
-              {zero ? (
+              {unknown ? (
+                <rect x={x(i) - barW / 2} y={base - 8} width={barW} height={8} rx={2} fill={mist} opacity={0.85} />
+              ) : empty ? (
                 <rect x={x(i) - barW / 2} y={base - 3} width={barW} height={3} rx={1.5} fill={mist} opacity={0.55} />
               ) : (
-                <rect x={x(i) - barW / 2} y={y(b.estimated_total)} width={barW} height={h} rx={3}
+                <rect x={x(i) - barW / 2} y={y(knownEstimate ?? 0)} width={barW} height={h} rx={3}
                   fill={i === active ? accent : "#C96A22"} opacity={i === active ? 1 : 0.82} />
               )}
               <title>{tip(label, b.estimated_total, b.sampled)}</title>
@@ -79,10 +84,10 @@ export function VolumeChart({ data, onDrill }: { data: PublicationAggregate; onD
       </svg>
       <p className="mt-2 text-xs text-mist" data-testid="publication-caption">
         {grain === "month" ? `${tickLabel(cur.key)} ${data.year}` : cur.key}
-        {` · Estimated OpenAlex output ${fmt(cur.estimated_total)} · sampled ${fmt(cur.sampled)}`}
+        {` · Estimated OpenAlex output ${cur.estimated_total == null ? "unknown" : fmt(cur.estimated_total)} · sampled ${fmt(cur.sampled)}`}
         {grain === "year" ? " · select a year for months" : ""}
       </p>
-      {buckets.some((b) => b.sampled === 0 && b.estimated_total === 0) && (
+      {buckets.some((b) => b.sampled === 0 && (b.estimated_total == null || b.estimated_total === 0)) && (
         <p className="mt-1 text-xs text-mist">Empty months stay on the axis, so a gap is a gap and not a skipped label.</p>
       )}
       <details className="mt-2 text-xs text-mist">
@@ -93,11 +98,11 @@ export function VolumeChart({ data, onDrill }: { data: PublicationAggregate; onD
             <tbody>
               <tr>
                 <th className="p-1 text-left font-medium">Estimated OpenAlex output</th>
-                {buckets.map((b) => <td key={b.key} className="p-1 tabular-nums">{b.estimated_total === 0 && b.sampled === 0 ? "—" : fmt(b.estimated_total)}</td>)}
+                {buckets.map((b) => <td key={b.key} className="p-1 tabular-nums">{b.estimated_total == null ? "unknown" : b.sampled === 0 && b.estimated_total === 0 ? "—" : fmt(b.estimated_total)}</td>)}
               </tr>
               <tr>
                 <th className="p-1 text-left font-medium">Sampled</th>
-                {buckets.map((b) => <td key={b.key} className="p-1 tabular-nums">{b.estimated_total === 0 && b.sampled === 0 ? "—" : fmt(b.sampled)}</td>)}
+                {buckets.map((b) => <td key={b.key} className="p-1 tabular-nums">{b.sampled === 0 && (b.estimated_total == null || b.estimated_total === 0) ? "—" : fmt(b.sampled)}</td>)}
               </tr>
             </tbody>
           </table>
