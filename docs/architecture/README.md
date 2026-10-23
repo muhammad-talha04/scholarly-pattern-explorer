@@ -29,8 +29,8 @@ All routes are under `/api/v1`. Types are defined once in
 |---|---|
 | `GET /health` | liveness |
 | `GET /search?q=&limit=&country=&year_from=` | meaning-based paper search |
-| `GET /papers/{id}` | paper detail, summary, link to the original |
-| `POST /papers/{id}/ask` | question about one paper, answered from its text |
+| `GET /papers/{id}` | paper detail, summary, link to the original. Separate rate limit: `PAPER_RATE_PER_MIN` default 60, `PAPER_RATE_GLOBAL_PER_HOUR` default 2000 |
+| `POST /papers/{id}/ask` | question about one paper, answered from its text. `question` is 1–500 characters. Rate limit: `ASK_RATE_PER_MIN` default 5, `ASK_RATE_GLOBAL_PER_HOUR` default 200 |
 | `GET /papers/{id}/related` | related-papers graph |
 | `GET /patterns?window=` | mined topic patterns for a window |
 | `GET /countries` | per-country whole and fractional counts, growth, and per-year breakdown |

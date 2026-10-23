@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import ValidationError
 
 from .. import ml_bridge as ml
-from ..ratelimit import check_ask
+from ..ratelimit import check_ask, check_paper
 from pipeline import country_api  # repo root is on sys.path via ml_bridge
 from ml.timing import stage  # noqa: E402
 from ..schemas import (AskRequest, AskResponse, Collaboration, CorpusStats, CountingMethod, CountryStats,
@@ -82,7 +82,8 @@ def search(q: str, limit: int = 20, offset: int = 0, country: str | None = None,
 
 
 @router.get("/papers/{paper_id}", response_model=PaperDetail)
-def paper(paper_id: str) -> PaperDetail:
+def paper(paper_id: str, request: Request) -> PaperDetail:
+    check_paper(request)
     svc = ml.get_service()
     meta = svc.get_paper(paper_id)
     if meta is None:
