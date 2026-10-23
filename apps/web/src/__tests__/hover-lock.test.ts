@@ -1,4 +1,4 @@
-import { cardBoxBeside, cardOffsetFromCenter, createHoverLock, pickClosestPaper, reduceHover, type HoverInput, type HoverLock } from "@/features/galaxy/hoverLock";
+import { cardBoxBeside, createHoverLock, pickClosestPaper, reduceHover, type HoverInput, type HoverLock } from "@/features/galaxy/hoverLock";
 
 const card = cardBoxBeside({ x: 100, y: 100 }, { width: 800, height: 600 }, 208, 96);
 
@@ -94,7 +94,4 @@ it("places the card beside the node and flips it back onto the canvas", () => {
   expect(beside.left).toBe(114);
   const flipped = cardBoxBeside({ x: 760, y: 200 }, { width: 800, height: 600 }, 208, 96);
   expect(flipped.left).toBe(760 - 208 - 14);
-  const centered = cardOffsetFromCenter({ x: 100, y: 200 }, beside);
-  expect(centered.x).toBe(beside.left - 100 + beside.width / 2);
-  expect(centered.y).toBe(beside.top - 200 + beside.height / 2);
 });

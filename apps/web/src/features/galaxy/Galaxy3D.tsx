@@ -7,7 +7,7 @@ import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
 import { accent, gap as gapColor, ink, plexusGold } from "@/lib/theme";
-import { cardBoxBeside, cardOffsetFromCenter, createHoverLock, pickClosestPaperAt, reduceHover } from "./hoverLock";
+import { cardBoxBeside, createHoverLock, pickClosestPaperAt, reduceHover } from "./hoverLock";
 import { breathAmount, DRIFT_HZ, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, TWINKLE_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
 
 /** Nearly overhead so the XZ diagonal reads lower-left to upper-right, with a little parallax. */
@@ -288,7 +288,9 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       shownIdRef.current = id;
       if (at && rect) {
         const box = lockRef.current.card ?? cardBoxBeside(at, { width: rect.width, height: rect.height }, CARD_W, CARD_H);
-        setCardShift(cardOffsetFromCenter(at, box));
+        // drei's Html overwrites the wrapper transform with the node's screen point, so the
+        // card's top-left is that point plus this translate. It matches cardBoxBeside.
+        setCardShift({ x: box.left - at.x, y: box.top - at.y });
       }
       const idx = nodes.findIndex((node) => node.paper && node.id === id);
       setHover(idx >= 0 ? idx : null);

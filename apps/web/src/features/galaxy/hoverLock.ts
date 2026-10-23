@@ -84,17 +84,6 @@ function inCorridor(anchor: Vec, target: Vec, point: Vec) {
   return Math.hypot(point.x - px, point.y - py) <= CORRIDOR_PX;
 }
 
-/**
- * CSS translate for a card whose wrapper is centered on the node (the 3D Html).
- * `cardBoxBeside` is a top-left box; centering shifts that box by half its size.
- */
-export function cardOffsetFromCenter(node: Vec, box: CardBox): Vec {
-  return {
-    x: box.left - node.x + box.width / 2,
-    y: box.top - node.y + box.height / 2,
-  };
-}
-
 /** Card rectangle beside a paper, flipped to stay on the canvas. Same box the views draw. */
 export function cardBoxBeside(node: Vec, canvas: { width: number; height: number }, cardW: number, cardH: number): CardBox {
   let left = node.x + 14;
