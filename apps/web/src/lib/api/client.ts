@@ -1,7 +1,8 @@
 import type {
-  AskResponse, Collaboration, CorpusStats, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
-  Pattern, Run, SearchParams, SearchResponse, TopicCountryYear, TopicYearQuery,
+  AskResponse, ChartScale, Collaboration, CorpusStats, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
+  Pattern, Run, SearchParams, SearchResponse, TimeGrain, TopicCountryYear, TopicYearQuery,
 } from "./types";
+import { COUNTRY_AGGREGATE_PATH, COUNTRY_CHART_TOP_N, PUBLICATION_AGGREGATE_PATH, TOPIC_AGGREGATE_PATH, countryChartFromStats, parseCountryChart, parsePublication, parseTopicAggregate } from "@/lib/charts/aggregate";
 import * as mock from "./mock";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
@@ -165,7 +166,15 @@ function qs(params: Record<string, string | number | undefined | null>) {
   return s ? `?${s}` : "";
 }
 
-export interface RequestOpts { notFoundIsMock?: boolean }
+export interface RequestOpts {
+  notFoundIsMock?: boolean;
+  /**
+   * 404 or 501 resolves to null and does not flip the nav badge to mock.
+   * Used by chart aggregates that are not on the API yet, so a missing route
+   * does not paint fixture totals on top of a live corpus.
+   */
+  notFoundIsEmpty?: boolean;
+}
 
 /**
  * Calls /api/v1{path}. Falls back to the mock when the API is unconfigured,
@@ -184,6 +193,7 @@ export async function request<T>(path: string, fallback: () => T, init?: Request
   }
   // A missing optional route (galaxy, topic-country-years) uses fixtures for that
   // call only. It does not flip the nav badge, which tracks the primary API.
+  if (opts?.notFoundIsEmpty && (res.status === 404 || res.status === 501)) return { data: null as T, source: "live" };
   if (opts?.notFoundIsMock && res.status === 404) return { data: fallback(), source: "mock" };
   if (res.status === 501) { report("mock"); return { data: fallback(), source: "mock" }; }
   if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
@@ -203,8 +213,8 @@ export const api = {
   related: (id: string, limit = 6) => request<PaperSummary[]>(`/papers/${encodeURIComponent(id)}/related${qs({ limit })}`, () => mock.related(id, limit)),
   patterns: (opts: { window?: number; trend?: "gap" | "emerging" } = {}) =>
     request<Pattern[]>(`/patterns${qs(opts)}`, () => (opts.trend === "gap" ? mock.gaps() : opts.trend === "emerging" ? mock.emerging() : mock.patterns(opts.window))),
-  countries: (counting: Counting = "fractional") =>
-    request<CountryStats[]>(`/countries${qs({ counting })}`, () => mock.countries(counting)),
+  countries: (counting: Counting = "fractional", scale?: ChartScale) =>
+    request<CountryStats[]>(`/countries${qs({ counting })}`, () => mock.countries(counting, scale)),
   country: (code: string, counting: Counting = "fractional") =>
     request<CountryStats>(`/countries/${encodeURIComponent(code)}${qs({ counting })}`, () => mock.country(code, counting)),
   collaborations: (counting: Counting = "fractional") =>
@@ -219,4 +229,50 @@ export const api = {
   /** Topic × country × year rows. Mock until GET /topic-country-years exists (PR #6). */
   topicCountryYears: (q: TopicYearQuery = {}) =>
     request<TopicCountryYear[]>(`/topic-country-years${qs({ topic_id: q.topic_id, country: q.country, year: q.year, limit: q.limit })}`, () => mock.topicCountryYears(q), undefined, fetch, { notFoundIsMock: true }),
+  /**
+   * Precomputed papers per publication year, or per month inside one year.
+   * `scale` is fixture-only and is not sent on the wire.
+   * A 404/501 (route not shipped) returns null — the page waits, it does not count rows.
+   */
+  publications: async (q: { grain?: TimeGrain; year?: number | null; scale?: ChartScale } = {}) => {
+    const grain = q.grain ?? "year";
+    const result = await request<unknown>(
+      `${PUBLICATION_AGGREGATE_PATH}${qs({ grain, year: grain === "month" ? q.year ?? undefined : undefined })}`,
+      () => mock.publicationAggregate(q),
+      undefined, fetch, { notFoundIsEmpty: true },
+    );
+    if (result.data == null) return { data: null, source: result.source };
+    return { data: parsePublication(result.data), source: result.source };
+  },
+  /** Precomputed topic totals for the streamgraph. Same 404 behavior as publications. */
+  topicVolume: async (q: { grain?: TimeGrain; year?: number | null; top?: number; scale?: ChartScale } = {}) => {
+    const grain = q.grain ?? "year";
+    const result = await request<unknown>(
+      `${TOPIC_AGGREGATE_PATH}${qs({ grain, year: grain === "month" ? q.year ?? undefined : undefined, top: q.top })}`,
+      () => mock.topicVolume(q),
+      undefined, fetch, { notFoundIsEmpty: true },
+    );
+    if (result.data == null) return { data: null, source: result.source };
+    return { data: parseTopicAggregate(result.data), source: result.source };
+  },
+  /**
+   * Top-N countries plus an Other bucket, already summed.
+   * When the route is missing, the chart folds GET /countries totals (also precomputed).
+   * It does not fetch topic-country-year rows.
+   */
+  countryChart: async (q: { counting?: Counting; top?: number; year?: number | null; scale?: ChartScale } = {}) => {
+    const counting = q.counting ?? "fractional";
+    const top = q.top ?? COUNTRY_CHART_TOP_N;
+    const result = await request<unknown>(
+      `${COUNTRY_AGGREGATE_PATH}${qs({ counting, top, year: q.year ?? undefined })}`,
+      () => mock.countryChart({ ...q, counting, top }),
+      undefined, fetch, { notFoundIsEmpty: true },
+    );
+    if (result.data == null) {
+      const cs = await api.countries(counting, q.scale);
+      return { data: countryChartFromStats(cs.data, { top, year: q.year, counting }), source: cs.source };
+    }
+    const parsed = parseCountryChart(result.data);
+    return { data: parsed, source: result.source };
+  },
 };

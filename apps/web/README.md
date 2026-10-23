@@ -31,10 +31,12 @@ A first-run tour starts until it is dismissed (`spe-tour-done`). Replay it from 
 | Client call | Route | Switches to live when |
 |---|---|---|
 | `api.galaxy()` | `GET /galaxy` | the route returns 200. Each node is a paper; cluster color and name are its topic group. Accepts `{ nodes, clusters, links }` and the #8 paper list `{ id, x, y, z, cluster_id, cluster_label, year }`. A paper list becomes nodes and clusters with empty links. Any other body becomes an empty graph, and the landing page shows its empty state. |
-| `api.topicCountryYears()` | `GET /topic-country-years` | the route returns 200. Rows: `topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`. Optional filters: `topic_id`, `country`, `year`, `limit`. This is talha's PR #6. |
-| `api.countries()` / `api.collaborations()` | already on main | a non-empty snapshot. An empty list is an empty state. `per_country` changes collaboration weights; country totals follow the fractional snapshot unless `counting=full`. |
+| `api.topicCountryYears()` | `GET /topic-country-years` | the route returns 200. Rows: `topic_id`, `topic_name`, `country_code`, `year`, `paper_count`, `fractional_count`. Optional filters: `topic_id`, `country`, `year`, `limit`. This is talha's PR #6. The timeline and country charts do not call it. |
+| `api.publications()` / `api.topicVolume()` | `GET /aggregates/publications`, `GET /aggregates/topics` | the route returns 200. Not on the API yet (lura). A 404 leaves the chart waiting. Fixtures, including `?corpus=80k`, stand in until then. |
+| `api.countryChart()` | `GET /aggregates/countries` | the route returns 200 with `items` plus `other`. A 404 folds the precomputed `GET /countries` totals into top 12 + Other. It does not count rows. |
+| `api.countries()` / `api.collaborations()` | already on main | a non-empty snapshot. An empty list is an empty state. `per_country` changes collaboration weights; country totals follow the fractional snapshot unless `counting=full`. The year slider reads `by_year` on that snapshot. |
 
-A 404 on `/galaxy` or `/topic-country-years` uses fixtures for that call only. The year slider and the streamgraph stay off when the rest of the API is live and that table is missing, so fixture rows are not drawn on top of live countries.
+A 404 on `/galaxy` or `/topic-country-years` uses fixtures for that call only. A 404 on `/aggregates/publications` or `/aggregates/topics` leaves those charts waiting, so fixture totals are not drawn on a live corpus. If `/aggregates/countries` is missing, the country chart folds the live `/countries` totals into the top 12 and Other. The year slider reads `by_year` on `/countries`.
 
 ## Structure
 - `src/lib/api/types.ts`: TypeScript mirror of `schemas.py`, plus `GalaxyGraph` and `TopicCountryYear`.

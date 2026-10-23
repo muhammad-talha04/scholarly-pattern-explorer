@@ -125,3 +125,53 @@ export interface GalaxyGraph {
 
 export interface SearchParams { q: string; limit?: number; offset?: number; country?: string; year_from?: number }
 export interface TopicYearQuery { topic_id?: string; country?: string; year?: number; limit?: number }
+
+/**
+ * Chart aggregates. Not in schemas.py yet — the API owner (lura) still needs
+ * to serve these. Shapes the web client already reads:
+ *
+ * GET /api/v1/aggregates/publications?grain=year|month&year=
+ *   { grain, year, total, buckets: [{ key, paper_count }] }
+ *   key is "2025" or "2025-03". Month responses include every month, zeros included.
+ *
+ * GET /api/v1/aggregates/topics?grain=year|month&year=&top=
+ *   { grain, year, top, series: [{ name, points: [{ key, value }] }] }
+ *   values are already summed. "Other" is a series when the tail was folded in.
+ *
+ * GET /api/v1/aggregates/countries?counting=&top=&year=
+ *   { counting, year, top, total, items: [{ code, name, papers }], other: { papers, countries } | null }
+ */
+export type TimeGrain = "year" | "month";
+/** Fixture-only preview. Never sent to a live API. */
+export type ChartScale = "sample" | "80k";
+
+export interface TimeBucket {
+  /** "2025" or "2025-03". */
+  key: string;
+  paper_count: number;
+}
+export interface PublicationAggregate {
+  grain: TimeGrain;
+  year: number | null;
+  /** Papers in this response, already summed. */
+  total: number;
+  buckets: TimeBucket[];
+}
+export interface TopicPoint { key: string; value: number }
+export interface TopicAggregateSeries { name: string; points: TopicPoint[] }
+export interface TopicAggregate {
+  grain: TimeGrain;
+  year: number | null;
+  top: number;
+  series: TopicAggregateSeries[];
+}
+export interface CountryChartItem { code: string; name: string; papers: number }
+export interface CountryChart {
+  counting: Counting;
+  year: number | null;
+  top: number;
+  total: number;
+  items: CountryChartItem[];
+  /** Null when every country is already named in items. */
+  other: { papers: number; countries: number } | null;
+}

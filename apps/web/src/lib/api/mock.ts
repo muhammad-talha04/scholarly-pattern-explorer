@@ -1,6 +1,9 @@
 /** Deterministic fixtures shaped exactly like apps/api/app/schemas.py. */
 import { openAlexSearchUrl } from "../paperLink";
-import type { AskResponse, Collaboration, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchParams, SearchResponse, TopicCountryYear, TopicYearQuery } from "./types";
+import type { AskResponse, ChartScale, Collaboration, Counting, CountryChart, CountryStats, GalaxyGraph, PaperDetail, PaperSummary, Pattern, PublicationAggregate, Run, SearchParams, SearchResponse, TimeGrain, TopicAggregate, TopicCountryYear, TopicYearQuery } from "./types";
+import { countryChartFromStats } from "@/lib/charts/aggregate";
+import { countriesAtScale, publicationAggregate as publicationAtScale, topicAggregate as topicAtScale } from "@/lib/charts/scale";
+import { distribute } from "@/lib/charts/axis";
 
 export const TOPICS = [
   "Large language models", "Graph neural networks", "Federated learning", "Climate modelling",
@@ -124,16 +127,26 @@ export function gaps(): Pattern[] {
     top_countries: [["PK", "IN", "NG"], ["CN", "KR"], ["US", "GB"], ["DE", "SA"]][i],
   }));
 }
-export function countries(counting: Counting = "fractional"): CountryStats[] {
-  return COUNTRY_META.map(([code, name, papers, growth], i) => ({
-    code, name,
-    // per_country changes collaboration weights, not country totals (same as country_api).
-    papers: counting === "full" ? Math.round(papers * 1.38) : papers,
-    growth_pct: growth, top_topics: [TOPICS[i % TOPICS.length], TOPICS[(i + 4) % TOPICS.length], TOPICS[(i + 9) % TOPICS.length]],
-    counting: counting === "full" ? "full" : "fractional",
-    paper_count: Math.round(papers * 1.38),
-    fractional_count: papers,
-  }));
+const SAMPLE_YEAR_WEIGHTS = [4200, 8600, 7100];
+const SAMPLE_YEARS = [2024, 2025, 2026];
+
+export function countries(counting: Counting = "fractional", scale: ChartScale = "sample"): CountryStats[] {
+  if (scale === "80k") return countriesAtScale(counting);
+  return COUNTRY_META.map(([code, name, papers, growth], i) => {
+    const full = Math.round(papers * 1.38);
+    const fracParts = distribute(papers, SAMPLE_YEAR_WEIGHTS);
+    const fullParts = distribute(full, SAMPLE_YEAR_WEIGHTS);
+    return {
+      code, name,
+      // per_country changes collaboration weights, not country totals (same as country_api).
+      papers: counting === "full" ? full : papers,
+      growth_pct: growth, top_topics: [TOPICS[i % TOPICS.length], TOPICS[(i + 4) % TOPICS.length], TOPICS[(i + 9) % TOPICS.length]],
+      counting: counting === "full" ? "full" : "fractional",
+      paper_count: full,
+      fractional_count: papers,
+      by_year: SAMPLE_YEARS.map((year, yi) => ({ year, paper_count: fullParts[yi], fractional_count: fracParts[yi] })),
+    };
+  });
 }
 export function country(code: string, counting: Counting = "fractional"): CountryStats {
   return countries(counting).find((c) => c.code === code) ?? { code, name: code, papers: 0, growth_pct: null, top_topics: [] };
@@ -204,6 +217,20 @@ export function topicCountryYears(q: TopicYearQuery = {}): TopicCountryYear[] {
     (q.year == null || r.year === q.year)
   ).slice(0, q.limit ?? rows.length);
 }
+export function publicationAggregate(q: { grain?: TimeGrain; year?: number | null; scale?: ChartScale } = {}): PublicationAggregate {
+  return publicationAtScale(q);
+}
+
+export function topicVolume(q: { grain?: TimeGrain; year?: number | null; top?: number; scale?: ChartScale } = {}): TopicAggregate {
+  return topicAtScale(q);
+}
+
+/** Chart payload. Built from the precomputed country totals, not from paper rows. */
+export function countryChart(q: { counting?: Counting; top?: number; year?: number | null; scale?: ChartScale } = {}): CountryChart {
+  const counting = q.counting ?? "fractional";
+  return countryChartFromStats(countries(counting, q.scale ?? "sample"), { top: q.top, year: q.year, counting });
+}
+
 export function runs(): Run[] {
   const out: Run[] = [];
   let id = 1;
