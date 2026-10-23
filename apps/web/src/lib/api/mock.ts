@@ -2,7 +2,7 @@
 import { openAlexSearchUrl } from "../paperLink";
 import type { AskResponse, ChartScale, Collaboration, Counting, CountryChart, CountryStats, GalaxyGraph, PaperDetail, PaperSummary, Pattern, PublicationAggregate, Run, SearchParams, SearchResponse, TimeGrain, TopicAggregate, TopicCountryYear, TopicYearQuery } from "./types";
 import { countryChartFromStats } from "@/lib/charts/aggregate";
-import { countriesAtScale, publicationAggregate as publicationAtScale, topicAggregate as topicAtScale } from "@/lib/charts/scale";
+import { countriesAtScale, publicationAggregate as publicationAtScale, sampledByYear, topicAggregate as topicAtScale } from "@/lib/charts/scale";
 import { distribute } from "@/lib/charts/axis";
 
 export const TOPICS = [
@@ -127,15 +127,15 @@ export function gaps(): Pattern[] {
     top_countries: [["PK", "IN", "NG"], ["CN", "KR"], ["US", "GB"], ["DE", "SA"]][i],
   }));
 }
-const SAMPLE_YEAR_WEIGHTS = [4200, 8600, 7100];
-const SAMPLE_YEARS = [2024, 2025, 2026];
-
 export function countries(counting: Counting = "fractional", scale: ChartScale = "sample"): CountryStats[] {
   if (scale === "80k") return countriesAtScale(counting);
+  const byYear = sampledByYear("sample");
+  const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+  const weights = years.map((year) => byYear[year]);
   return COUNTRY_META.map(([code, name, papers, growth], i) => {
     const full = Math.round(papers * 1.38);
-    const fracParts = distribute(papers, SAMPLE_YEAR_WEIGHTS);
-    const fullParts = distribute(full, SAMPLE_YEAR_WEIGHTS);
+    const fracParts = distribute(papers, weights);
+    const fullParts = distribute(full, weights);
     return {
       code, name,
       // per_country changes collaboration weights, not country totals (same as country_api).
@@ -144,7 +144,7 @@ export function countries(counting: Counting = "fractional", scale: ChartScale =
       counting: counting === "full" ? "full" : "fractional",
       paper_count: full,
       fractional_count: papers,
-      by_year: SAMPLE_YEARS.map((year, yi) => ({ year, paper_count: fullParts[yi], fractional_count: fracParts[yi] })),
+      by_year: years.map((year, yi) => ({ year, paper_count: fullParts[yi], fractional_count: fracParts[yi] })),
     };
   });
 }

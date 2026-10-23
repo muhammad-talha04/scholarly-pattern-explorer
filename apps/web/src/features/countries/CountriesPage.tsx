@@ -59,7 +59,7 @@ export function CountriesPage({ scale = "sample" }: { scale?: ChartScale }) {
       )}
       <section className="glass mb-4 p-4 sm:p-5">
         <h2 className="font-display text-2xl text-white">Top countries</h2>
-        <p className="mb-3 mt-1 text-sm text-mist">The {COUNTRY_CHART_TOP_N} largest, from precomputed country totals. Everyone else is one Other bar.</p>
+        <p className="mb-3 mt-1 text-sm text-mist">Percent of this period. The {COUNTRY_CHART_TOP_N} largest stay named. Everyone else is one Other bar.</p>
         {chart.loading && !chart.data ? <LoadingBlock label="Loading country totals" /> : chart.error ? <ErrorNote msg={chart.error} onRetry={chart.reload} /> : chart.data ? <CountryChart data={chart.data} /> : (
           <EmptyState title="No country totals yet" body="The chart needs GET /countries or GET /aggregates/countries. It does not count papers in the browser." />
         )}

@@ -145,7 +145,8 @@ describe("chart aggregates", () => {
 
     const chart = await api.countryChart({ counting: "fractional", top: 2 });
     expect(chart.data?.items.map((c) => c.code)).toEqual(["US", "CN"]);
-    expect(chart.data?.other).toEqual({ papers: 10, countries: 1 });
+    expect(chart.data?.items.map((c) => c.share)).toEqual([70, 20]);
+    expect(chart.data?.other).toEqual({ share: 10, countries: 1 });
     expect(urls.some((u) => u.includes("/aggregates/countries?"))).toBe(true);
     expect(urls.some((u) => u.includes("/topic-country-years"))).toBe(false);
     expect(urls.filter((u) => u.includes("scale="))).toHaveLength(0);
@@ -156,13 +157,14 @@ describe("chart aggregates", () => {
     vi.stubEnv("NEXT_PUBLIC_API_MOCK", "");
     const { api } = await import("@/lib/api/client");
     const body = {
-      counting: "fractional", year: null, top: 1, total: 80,
-      items: [{ code: "US", name: "United States", papers: 50 }],
-      other: { papers: 30, countries: 40 },
+      counting: "fractional", year: null, top: 1,
+      items: [{ code: "US", name: "United States", share: 40 }],
+      other: { share: 30, countries: 40 },
     };
     vi.stubGlobal("fetch", (async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof fetch);
     const chart = await api.countryChart({ top: 1 });
     expect(chart.source).toBe("live");
-    expect(chart.data).toMatchObject(body);
+    expect(chart.data?.items[0].share).toBe(40);
+    expect(chart.data?.other).toEqual({ share: 30, countries: 40 });
   });
 });

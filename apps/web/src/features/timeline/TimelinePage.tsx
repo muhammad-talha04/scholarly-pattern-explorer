@@ -36,10 +36,11 @@ export function TimelinePage({ scale = "sample", initialYear = null }: { scale?:
       <section className="glass mb-4 p-4 sm:p-5" data-testid="publication-section">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="font-display text-2xl text-white">{year == null ? "Papers by year" : `Papers in ${year}`}</h2>
+            <h2 className="font-display text-2xl text-white">Estimated OpenAlex output</h2>
             <p className="mt-1 text-sm text-mist">
-              {pubs.data ? `${pubs.data.total.toLocaleString("en-US")} papers in this view. ` : ""}
-              Precomputed totals, one bar per {year == null ? "year" : "month"}.
+              Papers are sampled evenly each month, so a raw count looks flat. Bars are the estimated total
+              {year == null ? " by year" : ` by month in ${year}`}.
+              {pubs.data ? ` ${pubs.data.estimated_total.toLocaleString("en-US")} estimated · ${pubs.data.sampled.toLocaleString("en-US")} sampled.` : ""}
             </p>
           </div>
           {year != null && (
@@ -49,7 +50,7 @@ export function TimelinePage({ scale = "sample", initialYear = null }: { scale?:
         {pubs.loading && !pubs.data ? <LoadingBlock label="Loading publication totals" /> : pubs.error ? <ErrorNote msg={pubs.error} onRetry={pubs.reload} /> : pubs.data ? (
           <VolumeChart data={pubs.data} onDrill={(y) => setYear(y)} />
         ) : (
-          <EmptyState title="Waiting for publication totals" body="GET /aggregates/publications is not on this API yet. The chart appears once that route returns year and month totals. It does not count papers in the browser." />
+          <EmptyState title="Waiting for publication totals" body="GET /aggregates/publications is not on this API yet. The chart appears once that route returns sampled and estimated_total for each year and month. It does not count papers in the browser." />
         )}
       </section>
       {list.length === 0 ? <EmptyState title="No runs yet" body="The timeline fills in after the first ingest. Patterns and the topic stream can still load on their own." /> : <>
@@ -84,7 +85,7 @@ export function TimelinePage({ scale = "sample", initialYear = null }: { scale?:
       <section className="glass mt-4 p-4 sm:p-5">
         <h2 className="font-display text-2xl text-white">Topic stream</h2>
         <p className="mb-3 mt-1 text-sm text-mist">
-          {year == null ? "Topic totals by year." : `Topic totals by month in ${year}.`} Already summed. Select a year on the chart above, or a column here, to open that year.
+          {year == null ? "Each year is the percent of that period." : `Each month in ${year} is the percent of that period.`} Columns sum to 100% when the period has papers. Select a year on the chart above, or a column here, to open that year.
         </p>
         {topics.loading && !topics.data ? <LoadingBlock label="Loading topic totals" /> : topics.error ? <ErrorNote msg={topics.error} onRetry={topics.reload} /> : topics.data ? (
           <Streamgraph series={series} onSelect={(key) => { if (year == null && /^\d{4}$/.test(key)) setYear(Number(key)); }} />

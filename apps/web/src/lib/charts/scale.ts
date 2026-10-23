@@ -1,54 +1,117 @@
-import type { ChartScale, Counting, CountryStats, PublicationAggregate, TimeGrain, TopicAggregate } from "@/lib/api/types";
-import { distribute, monthKey } from "./axis";
+import type { ChartScale, Counting, CountryStats, PublicationAggregate, TimeBucket, TimeGrain, TopicAggregate } from "@/lib/api/types";
+import { distribute, monthKeys } from "./axis";
+import { percentShares } from "./aggregate";
 
 export type { ChartScale };
 
+const MONTH_SHAPE = [8, 7, 9, 8, 10, 9, 8, 9, 11, 12, 10, 9];
+
 /**
  * Months forced to zero so the axis has to keep a real gap.
- * 2024 Jan–Sep: the live corpus starts mid-October 2024.
+ * 2024 Jan–Sep, only when `partialStart` is set: the live corpus starts mid-October 2024.
  * 2015 Jan–Sep: a sparse first year once the window reaches back.
  * 2020 April: a hole in the middle of a year.
  * 2026 Nov–Dec: not published yet (the clock in this repo is October 2026).
+ * The 80k window does not zero 2024.
  */
-export function monthWeights(year: number): number[] {
-  const w = [8, 7, 9, 8, 10, 9, 8, 9, 11, 12, 10, 9];
+export function monthWeights(year: number, opts?: { partialStart?: boolean }): number[] {
   const zero = new Set<number>();
-  if (year === 2015 || year === 2024) for (let m = 0; m < 9; m++) zero.add(m);
+  if (year === 2015) for (let m = 0; m < 9; m++) zero.add(m);
+  if (opts?.partialStart && year === 2024) for (let m = 0; m < 9; m++) zero.add(m);
   if (year === 2020) zero.add(3);
   if (year === 2026) { zero.add(10); zero.add(11); }
-  return w.map((n, i) => (zero.has(i) ? 0 : n));
+  return MONTH_SHAPE.map((n, i) => (zero.has(i) ? 0 : n));
 }
 
-export function bucketsForYear(year: number, total: number): { key: string; paper_count: number }[] {
-  const parts = distribute(total, monthWeights(year));
-  return parts.map((paper_count, i) => ({ key: monthKey(year, i), paper_count }));
+function windowYears(scale: ChartScale): number[] {
+  if (scale === "80k") {
+    const years: number[] = [];
+    for (let year = 2015; year <= 2026; year++) years.push(year);
+    return years;
+  }
+  return [2024, 2025, 2026];
 }
 
-/** Sample window matches the live corpus: publication dates 2024–2026. */
-export const SAMPLE_YEARS: Record<number, number> = { 2024: 4200, 2025: 8600, 2026: 7100 };
+/** Sampled papers in the fixture. Spread evenly across active months. */
+const SAMPLED_TOTAL: Record<ChartScale, number> = { sample: 19_900, "80k": 80_000 };
 
-/** Extended window the corpus may grow into. Sums to 80_000. */
-export const SCALE_80K_YEARS: Record<number, number> = {
-  2015: 800, 2016: 1100, 2017: 1400, 2018: 1800, 2019: 2400, 2020: 3200,
-  2021: 4500, 2022: 6200, 2023: 9000, 2024: 14000, 2025: 18500, 2026: 17100,
-};
+interface MonthCell {
+  year: number;
+  month: number;
+  sampled: number;
+  estimated_total: number;
+}
 
-export function yearTotals(scale: ChartScale): Record<number, number> {
-  return scale === "80k" ? SCALE_80K_YEARS : SAMPLE_YEARS;
+/**
+ * Even monthly sample, then an OpenAlex-scaled estimate.
+ * `yearRate` grows with the year. Within a year the estimate follows month seasonality,
+ * so the bars are not flat even though `sampled` differs by at most 1.
+ */
+function monthCells(scale: ChartScale): MonthCell[] {
+  const partialStart = scale !== "80k";
+  const slots: { year: number; month: number; weight: number; mean: number }[] = [];
+  for (const year of windowYears(scale)) {
+    const weights = monthWeights(year, { partialStart });
+    const active = weights.filter((w) => w > 0);
+    const mean = active.reduce((s, w) => s + w, 0) / (active.length || 1);
+    weights.forEach((weight, month) => slots.push({ year, month, weight, mean }));
+  }
+  const activeIdx = slots.map((slot, i) => (slot.weight > 0 ? i : -1)).filter((i) => i >= 0);
+  const sampledParts = distribute(SAMPLED_TOTAL[scale], activeIdx.map(() => 1));
+  const sampledAt = new Map<number, number>();
+  activeIdx.forEach((idx, k) => sampledAt.set(idx, sampledParts[k] ?? 0));
+  return slots.map((slot, i) => {
+    const sampled = sampledAt.get(i) ?? 0;
+    const yearRate = 5 + (slot.year - 2015) * 2.5;
+    const estimated_total = slot.weight > 0 ? Math.round(sampled * yearRate * (slot.weight / slot.mean)) : 0;
+    return { year: slot.year, month: slot.month, sampled, estimated_total };
+  });
+}
+
+/** Sampled papers per year. Sums to 19_900 (sample) or 80_000 (80k). */
+export function sampledByYear(scale: ChartScale): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const cell of monthCells(scale)) out[cell.year] = (out[cell.year] ?? 0) + cell.sampled;
+  return out;
+}
+
+function bucketsFromCells(cells: MonthCell[], year: number): TimeBucket[] {
+  return monthKeys(year).map((key, month) => {
+    const cell = cells.find((c) => c.year === year && c.month === month);
+    return { key, sampled: cell?.sampled ?? 0, estimated_total: cell?.estimated_total ?? 0 };
+  });
 }
 
 export function publicationAggregate(q: { grain?: TimeGrain; year?: number | null; scale?: ChartScale }): PublicationAggregate {
   const scale = q.scale ?? "sample";
-  const totals = yearTotals(scale);
-  const years = Object.keys(totals).map(Number).sort((a, b) => a - b);
+  const cells = monthCells(scale);
+  const years = windowYears(scale);
   if (q.grain === "month") {
     const year = q.year ?? years[years.length - 1];
-    const total = totals[year] ?? 0;
-    return { grain: "month", year, total, buckets: bucketsForYear(year, total) };
+    const buckets = bucketsFromCells(cells, year);
+    return {
+      grain: "month",
+      year,
+      sampled: buckets.reduce((s, b) => s + b.sampled, 0),
+      estimated_total: buckets.reduce((s, b) => s + b.estimated_total, 0),
+      buckets,
+    };
   }
-  const buckets = years.map((year) => ({ key: String(year), paper_count: totals[year] }));
-  const total = buckets.reduce((s, b) => s + b.paper_count, 0);
-  return { grain: "year", year: null, total, buckets };
+  const buckets = years.map((year) => {
+    const rows = cells.filter((c) => c.year === year);
+    return {
+      key: String(year),
+      sampled: rows.reduce((s, c) => s + c.sampled, 0),
+      estimated_total: rows.reduce((s, c) => s + c.estimated_total, 0),
+    };
+  });
+  return {
+    grain: "year",
+    year: null,
+    sampled: buckets.reduce((s, b) => s + b.sampled, 0),
+    estimated_total: buckets.reduce((s, b) => s + b.estimated_total, 0),
+    buckets,
+  };
 }
 
 const TOPIC_NAMES = [
@@ -70,29 +133,37 @@ const TOPIC_WEIGHTS = [
   [32, 11, 10, 11, 9, 8, 19],
 ];
 
+/** Month columns are percents of that month. Empty months stay all zeros. Active months are not copies of each other. */
+function monthTopicShares(year: number, yearIndex: number, partialStart: boolean): number[][] {
+  const base = TOPIC_WEIGHTS[yearIndex % TOPIC_WEIGHTS.length] ?? TOPIC_WEIGHTS[0];
+  return monthWeights(year, { partialStart }).map((weight, month) => {
+    if (weight <= 0) return base.map(() => 0);
+    const perturbed = base.map((bw, ti) => bw * (10 + ((month * 3 + ti * 5) % 9)));
+    return percentShares(perturbed);
+  });
+}
+
 export function topicAggregate(q: { grain?: TimeGrain; year?: number | null; scale?: ChartScale; top?: number }): TopicAggregate {
   const scale = q.scale ?? "sample";
-  const totals = yearTotals(scale);
-  const years = Object.keys(totals).map(Number).sort((a, b) => a - b);
+  const partialStart = scale !== "80k";
+  const years = windowYears(scale);
   const grain = q.grain ?? "year";
-  const byYear = years.map((year, yi) => {
-    const weights = TOPIC_WEIGHTS[yi % TOPIC_WEIGHTS.length];
-    const parts = distribute(totals[year], weights);
-    return { year, parts };
-  });
   if (grain === "month") {
     const year = q.year ?? years[years.length - 1];
-    const row = byYear.find((r) => r.year === year);
-    const parts = row?.parts ?? TOPIC_NAMES.map(() => 0);
+    const yi = years.indexOf(year);
+    const byMonth = monthTopicShares(year, yi < 0 ? 0 : yi, partialStart);
     const series = TOPIC_NAMES.map((name, ti) => ({
       name,
-      points: bucketsForYear(year, parts[ti] ?? 0).map((b) => ({ key: b.key, value: b.paper_count })),
+      points: monthKeys(year).map((key, mi) => ({ key, share: byMonth[mi]?.[ti] ?? 0 })),
     }));
     return { grain, year, top: q.top ?? 6, series };
   }
   const series = TOPIC_NAMES.map((name, ti) => ({
     name,
-    points: byYear.map((r) => ({ key: String(r.year), value: r.parts[ti] ?? 0 })),
+    points: years.map((year, yi) => ({
+      key: String(year),
+      share: TOPIC_WEIGHTS[yi % TOPIC_WEIGHTS.length][ti] ?? 0,
+    })),
   }));
   return { grain: "year", year: null, top: q.top ?? 6, series };
 }
@@ -133,8 +204,9 @@ function rows80k(): [string, string, number][] {
 
 /** Precomputed per-country totals at the 80k corpus. Fractional papers sum to 80_000. */
 export function countriesAtScale(counting: Counting): CountryStats[] {
-  const years = Object.keys(SCALE_80K_YEARS).map(Number).sort((a, b) => a - b);
-  const yearWeights = years.map((y) => SCALE_80K_YEARS[y]);
+  const sampled = sampledByYear("80k");
+  const years = Object.keys(sampled).map(Number).sort((a, b) => a - b);
+  const yearWeights = years.map((y) => sampled[y]);
   return rows80k().map(([code, name, papers], i) => {
     const full = Math.round(papers * 1.18);
     const fracParts = distribute(papers, yearWeights);

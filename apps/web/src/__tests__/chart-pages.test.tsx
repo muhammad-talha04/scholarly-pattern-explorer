@@ -27,10 +27,11 @@ it("timeline reads the publication aggregate and does not count topic rows", asy
   const { TimelinePage } = await import("@/features/timeline/TimelinePage");
   render(<TimelinePage scale="80k" />);
   expect(await screen.findByTestId("publication-chart")).toBeInTheDocument();
-  expect(screen.getByText(/80,000 papers in this view/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Estimated OpenAlex output" })).toBeInTheDocument();
+  expect(screen.getByText(/80,000 sampled/)).toBeInTheDocument();
   expect(calls.topicCountryYears).toBe(0);
   expect(calls.publications).toBeGreaterThan(0);
-  fireEvent.click(screen.getByRole("button", { name: /2015: 800 papers/ }));
+  fireEvent.click(screen.getByRole("button", { name: /2015: Estimated OpenAlex output/ }));
   expect(await screen.findByText(/Empty months stay on the axis/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "All years" })).toBeInTheDocument();
   expect(calls.topicCountryYears).toBe(0);

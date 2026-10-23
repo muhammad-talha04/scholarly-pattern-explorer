@@ -230,7 +230,8 @@ export const api = {
   topicCountryYears: (q: TopicYearQuery = {}) =>
     request<TopicCountryYear[]>(`/topic-country-years${qs({ topic_id: q.topic_id, country: q.country, year: q.year, limit: q.limit })}`, () => mock.topicCountryYears(q), undefined, fetch, { notFoundIsMock: true }),
   /**
-   * Precomputed papers per publication year, or per month inside one year.
+   * Precomputed publication buckets. Each one has `sampled` and `estimated_total`.
+   * The chart plots `estimated_total` because the sample is even per month.
    * `scale` is fixture-only and is not sent on the wire.
    * A 404/501 (route not shipped) returns null — the page waits, it does not count rows.
    */
@@ -244,7 +245,7 @@ export const api = {
     if (result.data == null) return { data: null, source: result.source };
     return { data: parsePublication(result.data), source: result.source };
   },
-  /** Precomputed topic totals for the streamgraph. Same 404 behavior as publications. */
+  /** Precomputed topic shares (percent of that period) for the stream. Same 404 behavior as publications. */
   topicVolume: async (q: { grain?: TimeGrain; year?: number | null; top?: number; scale?: ChartScale } = {}) => {
     const grain = q.grain ?? "year";
     const result = await request<unknown>(
@@ -256,8 +257,8 @@ export const api = {
     return { data: parseTopicAggregate(result.data), source: result.source };
   },
   /**
-   * Top-N countries plus an Other bucket, already summed.
-   * When the route is missing, the chart folds GET /countries totals (also precomputed).
+   * Top-N countries plus an Other bucket, as a percent of the selected period.
+   * When the route is missing, the chart folds GET /countries totals (also precomputed) into those shares.
    * It does not fetch topic-country-year rows.
    */
   countryChart: async (q: { counting?: Counting; top?: number; year?: number | null; scale?: ChartScale } = {}) => {
