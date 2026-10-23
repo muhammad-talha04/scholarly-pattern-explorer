@@ -98,7 +98,8 @@ def paper(paper_id: str) -> PaperDetail:
 
 @router.post("/papers/{paper_id}/ask", response_model=AskResponse)
 def ask(paper_id: str, body: AskRequest) -> AskResponse:
-    out = ml.get_service().ask(paper_id, body.question)
+    history = [{"role": turn.role, "content": turn.content} for turn in body.history]
+    out = ml.get_service().ask(paper_id, body.question, history)
     if out is None:
         raise HTTPException(404, "paper not found")
     return AskResponse(answer=out["answer"], sources=out["evidence"])
