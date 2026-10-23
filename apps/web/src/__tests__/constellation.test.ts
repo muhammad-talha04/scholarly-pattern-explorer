@@ -1,4 +1,4 @@
-import { breathAmount, BREATH_CYCLE, DRIFT_HZ, heroNetwork, LINK_REACH, nodeAmber, ORBIT_SPEED, PLEXUS_COUNT, plexusCore, plexusDrift, plexusTint, TWINKLE_HZ, zoomScale } from "@/features/galaxy/stars";
+import { breathAmount, BREATH_CYCLE, DRIFT_HZ, heroNetwork, heroVolume, LINK_REACH, nodeAmber, ORBIT_SPEED, PLEXUS_COUNT, plexusCore, plexusDrift, plexusTint, TWINKLE_HZ, VOLUME_LINK_REACH, VOLUME_RADIUS, zoomScale } from "@/features/galaxy/stars";
 import { accent, clusterColors, plexusCopper, plexusGold } from "@/lib/palette";
 
 function papers(count: number) {
@@ -83,6 +83,42 @@ it("builds a seeded diagonal plexus band", () => {
   const shades = new Set(papers(12).map((n) => nodeAmber(0, n.clusterId, n.id)));
   expect(shades.size).toBeGreaterThan(1);
   expect([...shades].every((hex) => (clusterColors as readonly string[]).includes(hex))).toBe(true);
+});
+
+it("keeps the flat band for 2D and spreads the same papers through a ball for 3D", () => {
+  const papersIn = papers(66);
+  const flat = heroNetwork(papersIn);
+  const vol = heroVolume(papersIn);
+  expect(vol.nodes.map((n) => n.id).sort()).toEqual(flat.nodes.map((n) => n.id).sort());
+  expect(vol.nodes.filter((n) => n.paper).map((n) => n.id).sort()).toEqual(flat.nodes.filter((n) => n.paper).map((n) => n.id).sort());
+
+  const span = (nodes: { pos: [number, number, number] }[], axis: 0 | 1 | 2) => {
+    const values = nodes.map((n) => n.pos[axis]);
+    return Math.max(...values) - Math.min(...values);
+  };
+  expect(span(flat.nodes, 1)).toBeLessThan(1);
+  expect(span(vol.nodes, 0)).toBeGreaterThan(VOLUME_RADIUS);
+  expect(span(vol.nodes, 1)).toBeGreaterThan(VOLUME_RADIUS);
+  expect(span(vol.nodes, 2)).toBeGreaterThan(VOLUME_RADIUS);
+  const std = (values: number[]) => {
+    const mean = values.reduce((a, v) => a + v, 0) / values.length;
+    return Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / values.length);
+  };
+  const volX = std(vol.nodes.map((n) => n.pos[0]));
+  expect(std(vol.nodes.map((n) => n.pos[1]))).toBeGreaterThan(volX * 0.7);
+  expect(std(vol.nodes.map((n) => n.pos[2]))).toBeGreaterThan(volX * 0.7);
+
+  const deg = new Map(vol.nodes.map((n) => [n.id, 0]));
+  for (const edge of vol.edges) {
+    expect(edge.span).toBeLessThanOrEqual(VOLUME_LINK_REACH + 1e-6);
+    expect(edge.span).toBeGreaterThan(0);
+    deg.set(edge.source, (deg.get(edge.source) ?? 0) + 1);
+    deg.set(edge.target, (deg.get(edge.target) ?? 0) + 1);
+  }
+  const degrees = [...deg.values()];
+  expect(Math.max(...degrees)).toBeLessThanOrEqual(6);
+  expect(degrees.filter((d) => d === 0).length).toBeLessThan(vol.nodes.length * 0.1);
+  expect(heroVolume(papersIn).nodes.map((n) => n.pos)).toEqual(vol.nodes.map((n) => n.pos));
 });
 
 it("breathes on a 14s loop and moves 1.5× faster", () => {
