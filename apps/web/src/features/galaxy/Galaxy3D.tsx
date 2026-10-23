@@ -7,7 +7,7 @@ import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
 import { accent, gap as gapColor, ink, plexusGold } from "@/lib/theme";
-import { createHoverLock, HOVER_DWELL_MS, pickClosestPaper, reduceHover } from "./hoverLock";
+import { cardBoxBeside, cardOffsetFromCenter, createHoverLock, pickClosestPaperAt, reduceHover } from "./hoverLock";
 import { breathAmount, DRIFT_HZ, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, TWINKLE_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
 
 /** Nearly overhead so the XZ diagonal reads lower-left to upper-right, with a little parallax. */
@@ -15,6 +15,8 @@ const CAMERA_POS = new Vector3(0.2, 22.5, 2.8);
 const CAMERA_FOV = 46;
 /** Screen radius for a paper hit. Non-paper dots are not targets. */
 const HIT_PX = 15;
+const CARD_W = 192;
+const CARD_H = 96;
 
 const DRIFT = `
 vec3 bandDrift(float phase) {
@@ -137,9 +139,9 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
   const lockRef = useRef(createHoverLock());
   const pointerInsideRef = useRef(false);
   const overCardRef = useRef(false);
-  const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPtr = useRef({ x: 0, y: 0 });
+  const shownIdRef = useRef<string | null>(null);
+  const [cardShift, setCardShift] = useState({ x: 14, y: -34 });
   const net = useMemo(() => heroNetwork(catalogue), [catalogue]);
   const nodes = net.nodes;
   const uniforms = useMemo(() => ({ uTime: { value: 0 }, uMotion: { value: reduce || pose ? 0 : 1 }, uZoom: { value: pose === "in" ? zoomScale(1) : 1 } }), [reduce, pose]);
@@ -251,7 +253,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
 
   useEffect(() => {
     const el = gl.domElement;
-    const hitPaper = (clientX: number, clientY: number) => {
+    const projectPapers = () => {
       const rect = el.getBoundingClientRect();
       spin.current?.updateWorldMatrix(true, false);
       const v = new Vector3();
@@ -268,49 +270,69 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
           y: (-v.y * 0.5 + 0.5) * rect.height,
         };
       });
-      return pickClosestPaper(points, clientX - rect.left, clientY - rect.top, HIT_PX);
+      return { rect, points };
     };
-    const publish = (id: string | null) => {
+    const hitPaper = (clientX: number, clientY: number) => {
+      const { rect, points } = projectPapers();
+      return { rect, hit: pickClosestPaperAt(points, clientX - rect.left, clientY - rect.top, HIT_PX) };
+    };
+    const publish = (id: string | null, at?: { x: number; y: number } | null, rect?: DOMRect) => {
       if (!id) {
-        setHover(null);
+        if (shownIdRef.current !== null) {
+          shownIdRef.current = null;
+          setHover(null);
+        }
         return;
+      }
+      if (shownIdRef.current === id) return;
+      shownIdRef.current = id;
+      if (at && rect) {
+        const box = lockRef.current.card ?? cardBoxBeside(at, { width: rect.width, height: rect.height }, CARD_W, CARD_H);
+        setCardShift(cardOffsetFromCenter(at, box));
       }
       const idx = nodes.findIndex((node) => node.paper && node.id === id);
       setHover(idx >= 0 ? idx : null);
     };
-    const armDwell = () => {
-      if (dwellRef.current) clearTimeout(dwellRef.current);
-      dwellRef.current = setTimeout(() => {
-        const next = reduceHover(lockRef.current, {
-          now: performance.now(),
-          moving: false,
-          hitId: hitPaper(lastPtr.current.x, lastPtr.current.y),
-          overCard: overCardRef.current,
-        });
-        lockRef.current = next;
-        publish(next.id);
-      }, HOVER_DWELL_MS);
-    };
     const move = (ev: PointerEvent) => {
+      if (ev.pointerType === "touch") return;
       pointerInsideRef.current = true;
       if (leaveRef.current) clearTimeout(leaveRef.current);
-      lastPtr.current = { x: ev.clientX, y: ev.clientY };
       if (ev.movementX === 0 && ev.movementY === 0) return;
+      const { rect, hit } = hitPaper(ev.clientX, ev.clientY);
+      const nextCard = hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H) : null;
       const next = reduceHover(lockRef.current, {
-        now: performance.now(),
         moving: true,
-        hitId: hitPaper(ev.clientX, ev.clientY),
+        hitId: hit?.id ?? null,
+        hitAt: hit ? { x: hit.x, y: hit.y } : null,
+        pointer: { x: ev.clientX - rect.left, y: ev.clientY - rect.top },
+        movement: { x: ev.movementX, y: ev.movementY },
         overCard: overCardRef.current,
+        nextCard,
       });
       lockRef.current = next;
-      publish(next.id);
-      armDwell();
+      const shown = next.id ? (next.id === hit?.id ? hit : null) : null;
+      publish(next.id, shown ?? next.anchor, rect);
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerType !== "touch") return;
+      const { rect, hit } = hitPaper(ev.clientX, ev.clientY);
+      const id = hit?.id ?? null;
+      lockRef.current = {
+        id,
+        anchor: hit ? { x: hit.x, y: hit.y } : null,
+        card: hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H) : null,
+      };
+      publish(id, hit, rect);
     };
     const enter = () => {
       pointerInsideRef.current = true;
       if (leaveRef.current) clearTimeout(leaveRef.current);
     };
     const leave = (ev: PointerEvent) => {
+      if (ev.pointerType === "touch") {
+        pointerInsideRef.current = false;
+        return;
+      }
       const next = ev.relatedTarget;
       if (next instanceof Element && next.closest("[data-galaxy-card]")) {
         overCardRef.current = true;
@@ -321,13 +343,13 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       if (leaveRef.current) clearTimeout(leaveRef.current);
       leaveRef.current = setTimeout(() => {
         if (overCardRef.current || pointerInsideRef.current) return;
-        if (dwellRef.current) clearTimeout(dwellRef.current);
         lockRef.current = createHoverLock();
+        shownIdRef.current = null;
         setHover(null);
       }, 48);
     };
     const click = (ev: MouseEvent) => {
-      const id = hitPaper(ev.clientX, ev.clientY);
+      const id = hitPaper(ev.clientX, ev.clientY).hit?.id ?? null;
       const node = id ? nodes.find((item) => item.id === id && item.paper) : null;
       if (!node) return;
       onFocus?.(node.id);
@@ -335,14 +357,15 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
     };
     el.addEventListener("pointerenter", enter);
     el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
     el.addEventListener("pointerleave", leave);
     el.addEventListener("click", click);
     return () => {
       el.removeEventListener("pointerenter", enter);
       el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
       el.removeEventListener("pointerleave", leave);
       el.removeEventListener("click", click);
-      if (dwellRef.current) clearTimeout(dwellRef.current);
       if (leaveRef.current) clearTimeout(leaveRef.current);
     };
   }, [camera, gl, nodes, onFocus, onHighlight, pose, reduce]);
@@ -408,9 +431,10 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
           <shaderMaterial args={[{ uniforms, vertexShader: POINT_VERT, fragmentShader: POINT_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </points>
         {tip && (
-          <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
+          <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "none" }}>
             <div
-              className="glass w-48 p-2.5 text-left text-xs"
+              className="glass pointer-events-auto w-48 p-2.5 text-left text-xs"
+              style={{ transform: `translate(${cardShift.x}px, ${cardShift.y}px)` }}
               data-testid="galaxy-paper-card"
               data-galaxy-card=""
               onPointerEnter={() => {
@@ -424,8 +448,8 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
                   pointerInsideRef.current = true;
                   return;
                 }
-                if (dwellRef.current) clearTimeout(dwellRef.current);
                 lockRef.current = createHoverLock();
+                shownIdRef.current = null;
                 setHover(null);
               }}
               onPointerDown={(e) => e.stopPropagation()}

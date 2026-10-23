@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 import { Galaxy2D } from "@/features/galaxy/Galaxy2D";
-import { HOVER_DWELL_MS } from "@/features/galaxy/hoverLock";
 import { breathAmount, heroNetwork, ORBIT_SPEED, plexusDrift, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, WIDE_CANVAS, zoomScale } from "@/features/galaxy/stars";
 
 const WIDTH = 1100;
@@ -232,9 +231,8 @@ it("picks a paper inside the hit radius even when a non-paper dot is closer", ()
   expect(held.textContent).not.toMatch(/dot-/);
 });
 
-it("keeps the same paper while the pointer travels onto the card, then switches after a rest", () => {
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  const clock = installCanvas();
+it("keeps the same paper while the pointer travels onto the card, then switches on the next paper", () => {
+  installCanvas();
   const net = heroNetwork(papers(48));
   const papersOnScreen = net.nodes.filter((n) => n.paper).map((n) => {
     const [x, y] = project(n, 0);
@@ -269,13 +267,10 @@ it("keeps the same paper while the pointer travels onto the card, then switches 
   expect(onPick).toHaveBeenCalledWith(origin!.n.id);
   expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(origin!.n.id);
 
+  fireEvent.pointerLeave(screen.getByTestId("galaxy-paper-card"), { relatedTarget: canvas });
   fireEvent.pointerMove(canvas!, { clientX: other.x, clientY: other.y, movementX: 12, movementY: -4 });
-  expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(origin!.n.id);
-  clock.advance(HOVER_DWELL_MS);
-  act(() => { vi.advanceTimersByTime(HOVER_DWELL_MS); });
   expect(screen.getByTestId("galaxy-paper-card")).toHaveTextContent(other.n.id);
   expect(translation(screen.getByTestId("galaxy-paper-card"))).toEqual(cardAnchor(other.x, other.y));
-  vi.useRealTimers();
 });
 
 it("pins the card on a touch tap and clears it on a tap in empty space", () => {
