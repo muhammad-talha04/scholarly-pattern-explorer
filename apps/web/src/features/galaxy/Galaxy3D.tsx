@@ -7,11 +7,14 @@ import type { Group } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { TopicLink } from "@/lib/graph";
 import { accent, gap as gapColor, ink, plexusGold } from "@/lib/theme";
+import { createHoverLock, HOVER_DWELL_MS, pickClosestPaper, reduceHover } from "./hoverLock";
 import { breathAmount, DRIFT_HZ, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, TWINKLE_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
 
 /** Nearly overhead so the XZ diagonal reads lower-left to upper-right, with a little parallax. */
 const CAMERA_POS = new Vector3(0.2, 22.5, 2.8);
 const CAMERA_FOV = 46;
+/** Screen radius for a paper hit. Non-paper dots are not targets. */
+const HIT_PX = 15;
 
 const DRIFT = `
 vec3 bandDrift(float phase) {
@@ -131,6 +134,12 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
   const spin = useRef<Group>(null);
   const [hover, setHover] = useState<number | null>(null);
   const time = useRef(0);
+  const lockRef = useRef(createHoverLock());
+  const pointerInsideRef = useRef(false);
+  const overCardRef = useRef(false);
+  const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPtr = useRef({ x: 0, y: 0 });
   const net = useMemo(() => heroNetwork(catalogue), [catalogue]);
   const nodes = net.nodes;
   const uniforms = useMemo(() => ({ uTime: { value: 0 }, uMotion: { value: reduce || pose ? 0 : 1 }, uZoom: { value: pose === "in" ? zoomScale(1) : 1 } }), [reduce, pose]);
@@ -242,59 +251,99 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
 
   useEffect(() => {
     const el = gl.domElement;
-    const pick = (ev: { clientX: number; clientY: number }) => {
+    const hitPaper = (clientX: number, clientY: number) => {
       const rect = el.getBoundingClientRect();
-      const px = ev.clientX - rect.left;
-      const py = ev.clientY - rect.top;
       spin.current?.updateWorldMatrix(true, false);
       const v = new Vector3();
-      const motion = reduce || pose || document.hidden ? 0 : 1;
-      let best = -1;
-      let bestD = 15 * 15;
-      nodes.forEach((node, i) => {
-        const d = plexusDrift(node.phase, time.current, motion);
+      const paused = reduce || pose || document.hidden || pointerInsideRef.current || overCardRef.current;
+      const points = nodes.map((node) => {
+        const d = plexusDrift(node.phase, time.current, paused ? 0 : 1);
         v.set(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2]);
         spin.current?.localToWorld(v);
         v.project(camera);
-        const x = (v.x * 0.5 + 0.5) * rect.width;
-        const y = (-v.y * 0.5 + 0.5) * rect.height;
-        const dd = (x - px) ** 2 + (y - py) ** 2;
-        if (dd < bestD) { bestD = dd; best = i; }
+        return {
+          id: node.id,
+          paper: node.paper,
+          x: (v.x * 0.5 + 0.5) * rect.width,
+          y: (-v.y * 0.5 + 0.5) * rect.height,
+        };
       });
-      setHover(best >= 0 ? best : null);
+      return pickClosestPaper(points, clientX - rect.left, clientY - rect.top, HIT_PX);
     };
-    const leave = () => setHover(null);
-    const click = (ev: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const px = ev.clientX - rect.left;
-      const py = ev.clientY - rect.top;
-      spin.current?.updateWorldMatrix(true, false);
-      const v = new Vector3();
-      let best = -1;
-      let bestD = 15 * 15;
-      const motion = reduce || pose || document.hidden ? 0 : 1;
-      nodes.forEach((node, i) => {
-        const d = plexusDrift(node.phase, time.current, motion);
-        v.set(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2]);
-        spin.current?.localToWorld(v);
-        v.project(camera);
-        const x = (v.x * 0.5 + 0.5) * rect.width;
-        const y = (-v.y * 0.5 + 0.5) * rect.height;
-        const dd = (x - px) ** 2 + (y - py) ** 2;
-        if (dd < bestD) { bestD = dd; best = i; }
+    const publish = (id: string | null) => {
+      if (!id) {
+        setHover(null);
+        return;
+      }
+      const idx = nodes.findIndex((node) => node.paper && node.id === id);
+      setHover(idx >= 0 ? idx : null);
+    };
+    const armDwell = () => {
+      if (dwellRef.current) clearTimeout(dwellRef.current);
+      dwellRef.current = setTimeout(() => {
+        const next = reduceHover(lockRef.current, {
+          now: performance.now(),
+          moving: false,
+          hitId: hitPaper(lastPtr.current.x, lastPtr.current.y),
+          overCard: overCardRef.current,
+        });
+        lockRef.current = next;
+        publish(next.id);
+      }, HOVER_DWELL_MS);
+    };
+    const move = (ev: PointerEvent) => {
+      pointerInsideRef.current = true;
+      if (leaveRef.current) clearTimeout(leaveRef.current);
+      lastPtr.current = { x: ev.clientX, y: ev.clientY };
+      if (ev.movementX === 0 && ev.movementY === 0) return;
+      const next = reduceHover(lockRef.current, {
+        now: performance.now(),
+        moving: true,
+        hitId: hitPaper(ev.clientX, ev.clientY),
+        overCard: overCardRef.current,
       });
-      const node = best >= 0 ? nodes[best] : null;
-      if (!node?.paper) return;
+      lockRef.current = next;
+      publish(next.id);
+      armDwell();
+    };
+    const enter = () => {
+      pointerInsideRef.current = true;
+      if (leaveRef.current) clearTimeout(leaveRef.current);
+    };
+    const leave = (ev: PointerEvent) => {
+      const next = ev.relatedTarget;
+      if (next instanceof Element && next.closest("[data-galaxy-card]")) {
+        overCardRef.current = true;
+        return;
+      }
+      pointerInsideRef.current = false;
+      // The card mounts under the cursor and can steal the hit in the same turn.
+      if (leaveRef.current) clearTimeout(leaveRef.current);
+      leaveRef.current = setTimeout(() => {
+        if (overCardRef.current || pointerInsideRef.current) return;
+        if (dwellRef.current) clearTimeout(dwellRef.current);
+        lockRef.current = createHoverLock();
+        setHover(null);
+      }, 48);
+    };
+    const click = (ev: MouseEvent) => {
+      const id = hitPaper(ev.clientX, ev.clientY);
+      const node = id ? nodes.find((item) => item.id === id && item.paper) : null;
+      if (!node) return;
       onFocus?.(node.id);
       if (node.gap) onHighlight?.(node.cluster);
     };
-    el.addEventListener("pointermove", pick);
+    el.addEventListener("pointerenter", enter);
+    el.addEventListener("pointermove", move);
     el.addEventListener("pointerleave", leave);
     el.addEventListener("click", click);
     return () => {
-      el.removeEventListener("pointermove", pick);
+      el.removeEventListener("pointerenter", enter);
+      el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerleave", leave);
       el.removeEventListener("click", click);
+      if (dwellRef.current) clearTimeout(dwellRef.current);
+      if (leaveRef.current) clearTimeout(leaveRef.current);
     };
   }, [camera, gl, nodes, onFocus, onHighlight, pose, reduce]);
 
@@ -308,34 +357,37 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
   useFrame((_, dt) => {
     if (document.hidden) return;
     const pinned = pose === "in" ? 1 : pose === "out" ? 0 : null;
-    const still = reduce || pinned != null;
+    const hoverFreeze = pointerInsideRef.current || overCardRef.current;
+    const paused = reduce || pinned != null;
     const step = Math.min(dt, 0.05);
-    if (!still) time.current += step;
+    if (!paused && !hoverFreeze) time.current += step;
     const t = time.current;
     uniforms.uTime.value = t;
-    uniforms.uMotion.value = still ? 0 : 1;
+    // Keep the drift amplitude while hovering so dots don't snap back to the origin of the drift.
+    // Time is held, so the field and the card stay where the pointer found them.
+    uniforms.uMotion.value = paused ? 0 : 1;
     const breath = reduce ? 0 : (pinned ?? breathAmount(t));
     uniforms.uZoom.value = zoomScale(breath);
     if (spin.current) {
       const wide = size.width >= WIDE_CANVAS;
       spin.current.position.x = wide ? REST_SHIFT * (1 - breath) : 0;
-      if (still) spin.current.rotation.set(0, 0, 0);
-      else {
+      if (paused) spin.current.rotation.set(0, 0, 0);
+      else if (!hoverFreeze) {
         spin.current.rotation.y = t * ORBIT_SPEED;
         spin.current.rotation.x = Math.sin(t * ROCK_X_HZ + 0.7) * 0.045;
         spin.current.rotation.z = Math.sin(t * ROCK_Z_HZ + 1.4) * 0.03;
       }
     }
     lookV.current.set(look[0], look[1], look[2]);
-    if (!still) intro.current = Math.min(1, intro.current + step * 1.15);
+    if (!paused && !hoverFreeze) intro.current = Math.min(1, intro.current + step * 1.15);
     restV.current.set(look[0] * 0.12 + CAMERA_POS.x, look[1] + CAMERA_POS.y, look[2] + CAMERA_POS.z);
-    posedV.current.copy(fromV.current).lerp(restV.current, still ? 1 : intro.current);
+    posedV.current.copy(fromV.current).lerp(restV.current, paused ? 1 : intro.current);
     offsetV.current.copy(posedV.current).sub(lookV.current);
     const restDist = Math.max(1e-4, offsetV.current.length());
     const dist = restDist / zoomScale(breath);
     offsetV.current.multiplyScalar(dist / restDist);
     goalV.current.copy(lookV.current).add(offsetV.current);
-    if (still || intro.current >= 1) camera.position.copy(goalV.current);
+    if (paused || intro.current >= 1) camera.position.copy(goalV.current);
     else camera.position.lerp(goalV.current, 1 - Math.exp(-step * 2.4));
     if (controls.current) {
       controls.current.target.copy(lookV.current);
@@ -357,7 +409,27 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
         </points>
         {tip && (
           <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
-            <div className="glass w-48 p-2.5 text-left text-xs" onPointerDown={(e) => e.stopPropagation()}>
+            <div
+              className="glass w-48 p-2.5 text-left text-xs"
+              data-testid="galaxy-paper-card"
+              data-galaxy-card=""
+              onPointerEnter={() => {
+                overCardRef.current = true;
+                if (leaveRef.current) clearTimeout(leaveRef.current);
+              }}
+              onPointerLeave={(ev) => {
+                overCardRef.current = false;
+                const next = ev.relatedTarget;
+                if (next === gl.domElement) {
+                  pointerInsideRef.current = true;
+                  return;
+                }
+                if (dwellRef.current) clearTimeout(dwellRef.current);
+                lockRef.current = createHoverLock();
+                setHover(null);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <div className="font-medium text-white">{tip.id}</div>
               <p className="mt-0.5 text-mist">Paper{tip.cluster ? ` · topic cluster ${tip.cluster}` : ""}</p>
               {showGaps && tip.gap && <p className="text-gap">Research gap</p>}
