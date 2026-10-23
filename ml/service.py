@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .timing import stage
-from .embeddings import get_embedder, model_label
+from .embeddings import get_embedder, min_search_score, model_label
 from .llm import chat_complete
 from .papers import Paper, reader_url
 from .paths import ml_data_dir
@@ -240,7 +240,9 @@ class MLService:
         # meta comes back with the vector query, so "vector" covers the meta fetch too
         with stage("vector"):
             hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
-        return [_hit(w, s, m) for w, s, m in hits if _keep(m, country, year_from)][:k]
+        floor = min_search_score(self.embedder)
+        return [_hit(w, s, m) for w, s, m in hits
+                if s >= floor and _keep(m, country, year_from)][:k]
 
     def related(self, work_id: str, k: int = 10) -> list[dict] | None:
         if self.store.get(work_id) is None:

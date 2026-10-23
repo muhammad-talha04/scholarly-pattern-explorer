@@ -10,7 +10,11 @@ Order matters. Each step writes to live Supabase once; do not reorder.
    ids OpenAlex no longer has get `null` and are not retried. ~14k rows ≈ 284 requests,
    ~2 min. `month_counts()` (bulk quotas) prefers it over `meta.created`.
 3. **Model switch / re-embed** — set `ML_EMBEDDER` to the new model everywhere
-   (Render, Actions, local), then `python -m ml.cli index --reembed`.
+   (Render, Actions, local), then `python -m ml.cli index --reembed --max-db-mb 350`
+   (details: `docs/EMBEDDER_SWITCH.md`). **Verify dates survived:**
+   `select count(*) from paper_embeddings where meta ? 'publication_date';` before and after
+   the re-embed must match; if not, stop and rerun `backfill-dates`.
+   Search floor: bge default 0.65 (`ML_MIN_SCORE`, read at runtime; pending chris's benchmark).
    Afterwards `VACUUM (FULL, ANALYZE) paper_embeddings;` to drop dead tuples.
 4. **Apply migrations 005 + 006 and deploy the API together** — `DATABASE_URL=... python -m db.apply`. 005 converts
    `embedding` to `halfvec(384)` and rebuilds `paper_embeddings_hnsw` with

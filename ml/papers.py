@@ -57,6 +57,10 @@ class Paper:
     countries: list[str] = field(default_factory=list)
     cited_by: int = 0
     original_url: str | None = None
+    publication_date: str | None = None   # OpenAlex publication date (backfill-dates / ingest)
+    # Other meta keys we don't model (and an explicit publication_date: null), carried
+    # through export -> re-embed unchanged so `index --reembed` never drops them.
+    extra: dict = field(default_factory=dict)
 
     @property
     def text(self) -> str:
@@ -95,6 +99,7 @@ class Paper:
             cited_by=w.get("cited_by_count") or 0,
             original_url=((w.get("open_access") or {}).get("oa_url")
                           or (w.get("primary_location") or {}).get("landing_page_url")),
+            publication_date=w.get("publication_date"),
         )
 
     @classmethod
@@ -105,7 +110,8 @@ class Paper:
             pub_year=r.get("year"), doi=r.get("doi"), topics=[t for t in r.get("topics") or [] if t],
             created=r.get("date"), authors=[a for a in r.get("authors") or [] if a],
             countries=r.get("countries") or [], cited_by=r.get("cited_by") or 0,
-            original_url=r.get("original_url"))
+            original_url=r.get("original_url"), publication_date=r.get("publication_date"),
+            extra=_extra_from_v2(r))
 
     @classmethod
     def from_record(cls, r: dict) -> "Paper":
@@ -115,10 +121,26 @@ class Paper:
         return cls.from_v2(r)
 
     def to_dict(self) -> dict:
-        return {"work_id": self.work_id, "title": self.title, "abstract": self.abstract,
+        d = {"work_id": self.work_id, "title": self.title, "abstract": self.abstract,
                 "pub_year": self.pub_year, "doi": self.doi, "topics": self.topics,
                 "created": self.created, "authors": self.authors, "countries": self.countries,
                 "cited_by": self.cited_by, "original_url": self.original_url}
+        d.update({k: v for k, v in (self.extra or {}).items() if k not in d})
+        if self.publication_date is not None:
+            d["publication_date"] = self.publication_date
+        return d
+
+
+# Meta keys Paper models directly; anything else rides along in Paper.extra.
+META_KEYS = frozenset({"work_id", "title", "abstract", "pub_year", "doi", "topics", "created",
+                       "authors", "countries", "cited_by", "original_url", "publication_date"})
+
+
+def _extra_from_v2(r: dict) -> dict:
+    extra = dict(r.get("meta_extra") or {})
+    if "publication_date" in r and r["publication_date"] is None:
+        extra["publication_date"] = None   # looked up, unknown: keep so backfill won't re-ask
+    return extra
 
 
 V2_PATH = "data/works_v2.jsonl"
