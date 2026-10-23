@@ -28,3 +28,11 @@ flowchart LR
 Rules: build only against `apps/api/app/schemas.py`; one owner per folder;
 never rebuild patterns from scratch, always merge onto the last snapshot;
 every PR updates `docs/STATUS.md`.
+
+## Chart totals (`/aggregates/*`)
+`GET /api/v1/aggregates/{publications,topics,countries}` (contract: PR #57) are read-only.
+Publications and topics come from one `GROUP BY` over `paper_embeddings.meta`
+(`store.aggregate_counts()`: `publication_date`, else `pub_year` year-only, else `created`)
+plus `sampling_rates`; countries are a thin read of the country snapshot. Results sit in a
+process cache (`AGGREGATES_TTL_SECONDS`, default 300, stale-while-revalidate), so totals
+refresh on their own after a load. No migration, materialized view or refresh step.
