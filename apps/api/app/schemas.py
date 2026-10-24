@@ -53,7 +53,7 @@ class AskTurn(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=500)
     # Omitted by older clients. At most the last two turns.
     history: list[AskTurn] = Field(default_factory=list, max_length=2)
 

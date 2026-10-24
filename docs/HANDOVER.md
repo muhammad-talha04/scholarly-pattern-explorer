@@ -154,7 +154,7 @@ The role is `spe_api`. It owns the tables, so it bypasses RLS while anon/authent
 
 ## 4. Environment and configuration reference
 
-**Key names only. No values are recorded here.**
+**Key names only. No secret values are recorded here.** Rate-limit numbers below are the code defaults.
 
 - `DATABASE_URL` is in the **Render service environment** and in **a private file on the maintainer's box**. It is never in the repo, never in GitHub secrets (checked 16 Oct: repo secrets are only `OPENALEX_API_KEY` and `OPENALEX_MAILTO`), and never in chat.
 
@@ -172,7 +172,13 @@ The role is `spe_api`. It owns the tables, so it bypasses RLS while anon/authent
 | `ML_VECTOR_BACKEND` | No | `local` / `pgvector` override |
 | `ML_EMBED_MODEL`, `ML_DATA_DIR`, `ML_WORKS_PATH`, `COUNTRY_SNAPSHOT`, `TOPIC_COUNTRY_YEAR_DB` | No | Path/model overrides |
 | `ML_LLM_URL`, `ML_LLM_MODEL`, `ML_LLM_API_KEY` | No | Optional OpenAI-compatible LLM. Unset uses extractive summaries. |
+| `ASK_RATE_PER_MIN` | No (default 5) | Per-IP cap on `POST /papers/{id}/ask`, per minute. `0` disables. |
+| `ASK_RATE_GLOBAL_PER_HOUR` | No (default 200) | All-clients cap on that route, per hour. `0` disables. |
+| `PAPER_RATE_PER_MIN` | No (default 60) | Per-IP cap on `GET /papers/{id}`, per minute. Separate from `/ask` and looser. `0` disables. |
+| `PAPER_RATE_GLOBAL_PER_HOUR` | No (default 2000) | All-clients cap on that route, per hour. `0` disables. |
 | `OPENALEX_API_KEY`, `OPENALEX_MAILTO` | Not needed by the API at runtime | Ingestion only |
+
+The limiter reads `CF-Connecting-IP`, then the first `X-Forwarded-For` hop, then the socket host. These four defaults are not secrets.
 
 ### 4.2 Vercel (project `scholarly-pattern-explorer`, team `muhammad-talha04`, root `apps/web`)
 

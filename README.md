@@ -276,8 +276,8 @@ A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU). Override with `ML_EMBED_MODEL` or `python -m ml.cli index --model <id>` |
 | Vector storage | Postgres + pgvector when `DATABASE_URL` is set (Supabase, HNSW cosine index). Rebuild with `python -m db.apply`. `ML_VECTOR_BACKEND=local` keeps the numpy files. Documents (galaxy, patterns, country and topic counts) use the same store. See `docs/architecture/STORAGE.md` |
 | Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
-| Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite` |
-| Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences |
+| Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite`. Rate limit: `PAPER_RATE_PER_MIN` (default 60) and `PAPER_RATE_GLOBAL_PER_HOUR` (default 2000) |
+| Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences. `question` is 1–500 characters. Rate limit: `ASK_RATE_PER_MIN` (default 5) and `ASK_RATE_GLOBAL_PER_HOUR` (default 200) |
 | Galaxy | `GET /api/v1/galaxy` reads the stored graph `{nodes, clusters, links}`. A node is one paper: `id`, `topic_id`, `topic_name`, `x`, `y`, `z`, `cluster_id`, `cluster_label`, `year`, `support`. `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout. `index` and `update` precompute it |
 | Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /api/v1/patterns`, `GET /api/v1/runs` |
 
