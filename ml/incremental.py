@@ -31,6 +31,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from fpgrowth import _build_tree, _mine, association_rules  # noqa: E402
+from ml.cs_topics import is_cs  # noqa: E402
 
 SEP = " | "
 
@@ -67,10 +68,11 @@ def assign_topics(papers, topic_centroids: dict[str, np.ndarray], embedder, k=3,
 
 class IncrementalMiner:
     def __init__(self, state_dir: str | Path, window=3, step=1, min_support=0.05,
-                 max_len=3, min_confidence=0.5, min_baskets=20):
+                 max_len=3, min_confidence=0.5, min_baskets=20, cs_only=False, min_year=None, complete_only=False):
         self.dir = Path(state_dir)
         self.cfg = dict(window=window, step=step, min_support=min_support, max_len=max_len,
-                        min_confidence=min_confidence, min_baskets=min_baskets)
+                        min_confidence=min_confidence, min_baskets=min_baskets,
+                        cs_only=cs_only, min_year=min_year, complete_only=complete_only)
         self.state = self._load()
 
     # ---------- persistence ----------
@@ -123,11 +125,14 @@ class IncrementalMiner:
         touched = set()
         for p in new:
             self.state["seen"].add(p["work_id"])
-            items = sorted(set(p.get("topics") or []))
+            items = sorted(set(t for t in (p.get("topics") or []) if not self.cfg.get("cs_only") or is_cs(t)))
             if len(items) < 2:          # same rule as mine_windows.baskets_for_window
                 continue
             key = SEP.join(items)
             for y0 in self._window_starts(int(p["pub_year"])):
+                # a window must end by the run year and start inside the corpus, or it holds partial data
+                if (self.cfg.get("complete_only") and y0 + self.cfg["window"] - 1 > int(run_date[:4])) or y0 < (self.cfg.get("min_year") or -10**9):
+                    continue
                 win = self.state["windows"].setdefault(str(y0), {
                     "window_start": y0, "window_end": y0 + self.cfg["window"] - 1,
                     "baskets": {}, "patterns": [], "rules": [], "n_tx": 0})

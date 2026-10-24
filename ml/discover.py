@@ -16,15 +16,15 @@ from .research_gaps import semantic_gaps_from_store
 
 def refresh_discoveries(run_date: str | None = None, *,
                         store=None, snapshot_path=None, db_path=None,
-                        works_path=None) -> dict:
+                        works_path=None, cs_only: bool = True) -> dict:
     """Write ``data/ml/snapshots/discoveries-<date>.json`` and return a short summary."""
     run_date = run_date or date.today().isoformat()
     rows, source = load_topic_rows(snapshot_path, db_path, works_path)
-    emerging = rank_emerging(rows)
+    emerging = rank_emerging(rows, cs_only=cs_only)
     if store is None:
         from .store import get_store
         store = get_store()
-    gaps = semantic_gaps_from_store(store)
+    gaps = semantic_gaps_from_store(store, cs_only=cs_only)
     payload = {"date": run_date, "topic_source": source,
                "n_emerging": len(emerging), "n_semantic_gaps": len(gaps),
                "emerging": emerging, "semantic_gaps": gaps}

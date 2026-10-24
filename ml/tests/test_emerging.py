@@ -168,7 +168,7 @@ def test_refresh_snapshot_uses_table_without_rebuilding_vectors(tmp_path, monkey
     from ml.store import LocalStore
     summary = refresh_discoveries(
         "2026-10-15", store=LocalStore(tmp_path / "v"), db_path=db,
-        snapshot_path=tmp_path / "no.json", works_path=tmp_path / "no.jsonl")
+        snapshot_path=tmp_path / "no.json", works_path=tmp_path / "no.jsonl", cs_only=False)
     assert summary["topic_source"] == "table"
     assert summary["n_emerging"] == 1 and summary["n_semantic_gaps"] == 0
     saved = json.loads((tmp_path / "ml" / "snapshots" / "discoveries-2026-10-15.json").read_text())

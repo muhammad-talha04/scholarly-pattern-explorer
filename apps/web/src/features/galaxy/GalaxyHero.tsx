@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { api, prefersFixtures } from "@/lib/api/client";
-import type { GalaxyGraph } from "@/lib/api/types";
+import type { GalaxyGraph, Pattern } from "@/lib/api/types";
 import { buildTopicGraph, type TopicLink, type TopicNode } from "@/lib/graph";
 import { useApi } from "@/lib/useApi";
 import { useMotionPrefs } from "@/components/MotionProvider";
@@ -95,7 +95,7 @@ function project(graph: { nodes: TopicNode[]; links: TopicLink[] }, galaxy: Gala
   return { nodes, links };
 }
 
-export function GalaxyHero() {
+export function GalaxyHero({ initial = {} }: { initial?: { pats?: Pattern[]; gaps?: Pattern[]; galaxy?: GalaxyGraph } } = {}) {
   const router = useRouter();
   const { lowPower } = useMotionPrefs();
   const [showGaps, setShowGaps] = useState(true);
@@ -110,9 +110,9 @@ export function GalaxyHero() {
     const plexus = q.get("plexus");
     setPose(plexus === "in" || plexus === "out" ? plexus : null);
   }, []);
-  const pats = useApi(() => api.patterns(), []);
-  const gaps = useApi(() => api.patterns({ trend: "gap" }), []);
-  const galaxy = useApi(() => api.galaxy(HERO_GALAXY_LIMIT), []);
+  const pats = useApi(() => api.patterns(), [], initial.pats);
+  const gaps = useApi(() => api.patterns({ trend: "gap" }), [], initial.gaps);
+  const galaxy = useApi(() => api.galaxy(HERO_GALAXY_LIMIT), [], initial.galaxy);
   const canvasReady = useAfterIdle();
   const graph = useMemo(() => buildTopicGraph(pats.data ?? [], gaps.data ?? []), [pats.data, gaps.data]);
   const useCoords = galaxy.source === "live" || (galaxy.source === "mock" && (prefersFixtures() || pats.source !== "live"));

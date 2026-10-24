@@ -1,0 +1,12 @@
+name: keepalive
+# Render's free tier sleeps after 15 idle minutes and takes about a minute to wake.
+# A ping every 10 minutes keeps the API awake so the first visitor does not wait.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS --max-time 90 https://scholarly-pattern-explorer.onrender.com/api/v1/health

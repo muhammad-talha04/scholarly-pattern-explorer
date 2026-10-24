@@ -14,6 +14,8 @@ switches over.
 """
 from __future__ import annotations
 
+from .cs_topics import is_cs
+
 import json
 import sqlite3
 from collections import defaultdict
@@ -243,7 +245,7 @@ def robust_growth(series: list[float], smoothing: float = 5.0, cap: float = 2.0)
 
 def rank_emerging(rows: list[dict], *, country: str | None = None, last_year: int | None = None,
                   years: int = 3, smoothing: float = 5.0, cap: float = 2.0,
-                  min_total: float = 20, min_last: float = 5, limit: int = 20) -> list[dict]:
+                  min_total: float = 20, min_last: float = 5, limit: int = 20, cs_only: bool = False) -> list[dict]:
     """Rank topics by robust growth over the last complete years.
 
     With no country, the series is the sum of ``fractional_count`` (a paper counts once).
@@ -259,6 +261,8 @@ def rank_emerging(rows: list[dict], *, country: str | None = None, last_year: in
         if norm is None:
             continue
         if code and norm["country_code"] != code:
+            continue
+        if cs_only and not is_cs(norm["topic_name"]):
             continue
         tid = norm["topic_id"]
         names[tid][norm["topic_name"]] += norm["paper_count"] or 1
