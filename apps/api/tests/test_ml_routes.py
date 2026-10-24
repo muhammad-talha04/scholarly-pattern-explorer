@@ -149,8 +149,9 @@ def test_galaxy_layout(client):
     assert {n["cluster_id"] for n in nodes} <= set(cluster_ids)
     assert all(cluster_ids[n["cluster_id"]] == n["color_index"] for n in nodes)
     for cluster in body["clusters"]:
-        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index"}
+        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index", "emerging_score"}
         assert isinstance(cluster["color_index"], int)
+        assert cluster["emerging_score"] == 0.0
         assert cluster["name"] == cluster["label"] and cluster["size"] >= 1
         assert set(cluster["centroid"]) == {"x", "y", "z"}
     assert len(body["links"]) <= 200
@@ -191,6 +192,28 @@ def test_placeholder_doi_is_not_returned(tmp_path, monkeypatch):
     assert "10.1234" not in str(d)
     assert d["original_url"] == "https://openalex.org/W9"
     assert d["openalex_url"] == "https://openalex.org/W9"
+
+
+def test_galaxy_emerging_score_follows_color_index(client, tmp_path, monkeypatch):
+    """The score is joined from the discoveries snapshot by colour, not cluster id."""
+    import json
+    first = client.get("/api/v1/galaxy").json()
+    colors = sorted({c["color_index"] for c in first["clusters"]})
+    assert colors
+    hot = colors[0]
+    scores = {str(color): 0.0 for color in colors}
+    scores[str(hot)] = 1.0
+    scores["999"] = 0.25
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    dest = tmp_path / "ml" / "discoveries.json"
+    dest.parent.mkdir(parents=True)
+    dest.write_text(json.dumps({"emerging_scores": scores}), encoding="utf-8")
+    body = client.get("/api/v1/galaxy").json()
+    assert client.row_calls["rows"] == 0
+    for cluster in body["clusters"]:
+        expected = 1.0 if cluster["color_index"] == hot else 0.0
+        assert cluster["emerging_score"] == expected
+        assert cluster["id"] != "999"
 
 
 def test_galaxy_empty_before_rebuild(tmp_path, monkeypatch):

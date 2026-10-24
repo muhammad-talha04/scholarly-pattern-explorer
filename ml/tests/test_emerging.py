@@ -173,6 +173,7 @@ def test_refresh_snapshot_uses_table_without_rebuilding_vectors(tmp_path, monkey
     assert summary["n_emerging"] == 1 and summary["n_semantic_gaps"] == 0
     saved = json.loads((tmp_path / "ml" / "snapshots" / "discoveries-2026-10-15.json").read_text())
     assert saved["emerging"][0]["topic_name"] == "Growing Lasers"
+    assert saved["emerging_scores"] == {}
 
 
 def test_default_loader_reads_postgres_when_selected(monkeypatch):

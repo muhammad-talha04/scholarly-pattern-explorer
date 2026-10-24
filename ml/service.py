@@ -183,11 +183,16 @@ class MLService:
         Small limits are served from the precomputed ``galaxy_sample`` document
         when it exists, so the full graph is not loaded for the hero view.
         """
-        from .galaxy import empty_graph, sample_graph
+        from .discover import load_emerging_scores
+        from .galaxy import empty_graph, sample_graph, with_emerging_scores
+        try:
+            scores = load_emerging_scores()
+        except Exception:
+            scores = {}  # a missing snapshot must not break the galaxy
         if limit is not None:
             key = int(limit)
             if key in self._sample_cache:
-                return self._sample_cache[key]
+                return with_emerging_scores(self._sample_cache[key], scores)
             small = self._cached_doc("galaxy_sample")
             if small and small.get("nodes") and key <= len(small["nodes"]):
                 out = sample_graph(small, key)
@@ -197,9 +202,9 @@ class MLService:
             if len(self._sample_cache) >= 16:
                 self._sample_cache.clear()
             self._sample_cache[key] = out
-            return out
+            return with_emerging_scores(out, scores)
         stored = self._cached_doc("galaxy")
-        return stored if stored else empty_graph()
+        return with_emerging_scores(stored if stored else empty_graph(), scores)
 
     def rebuild_galaxy(self, refit: bool = False) -> dict:
         """Recompute the layout from the embedding index and store the graph.

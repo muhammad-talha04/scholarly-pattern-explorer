@@ -505,6 +505,39 @@ def empty_graph() -> dict:
     return {"nodes": [], "clusters": [], "links": []}
 
 
+def with_emerging_scores(graph: dict | None, scores: dict | None) -> dict:
+    """Copy ``graph`` and set each cluster's ``emerging_score`` from ``color_index``.
+
+    ``scores`` is keyed by colour, not ``cluster_id``. A missing colour is 0.
+    The value stays in ``[0, 1]``.
+    """
+    if not graph:
+        return empty_graph()
+    lookup: dict[str, float] = {}
+    for key, value in (scores or {}).items():
+        try:
+            lookup[str(int(key))] = float(value)
+        except (TypeError, ValueError):
+            continue
+    clusters = []
+    for cluster in graph.get("clusters") or []:
+        if not isinstance(cluster, dict):
+            continue
+        row = dict(cluster)
+        try:
+            color = str(int(row.get("color_index")))
+        except (TypeError, ValueError):
+            color = ""
+        raw = lookup.get(color, 0.0)
+        if not math.isfinite(raw):
+            raw = 0.0
+        row["emerging_score"] = round(min(1.0, max(0.0, raw)), 4)
+        clusters.append(row)
+    out = dict(graph)
+    out["clusters"] = clusters
+    return out
+
+
 def _slug(value: str) -> str:
     text = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
     return text or "topic"
@@ -609,6 +642,7 @@ def graph_from_layout(points: list[dict], vectors: np.ndarray, metas: list[dict]
             },
             "size": len(members),
             "color_index": int(members[0]["color_index"]),
+            "emerging_score": 0.0,
         })
     return {"nodes": nodes, "clusters": clusters,
             "links": knn_links(ids, vectors, neighbours, max_edges)}
