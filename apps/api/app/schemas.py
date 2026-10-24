@@ -182,3 +182,67 @@ class GalaxyGraph(BaseModel):
     nodes: list[GalaxyNode] = []
     clusters: list[GalaxyCluster] = []
     links: list[GalaxyLink] = []
+
+
+# ---- /aggregates (chart totals; contract in PR #57) ----
+AggregateGrain = Literal["year", "month"]
+
+
+class PublicationBucket(BaseModel):
+    key: str                              # "YYYY" or "YYYY-MM"
+    paper_count: int                      # papers we hold (= sampled)
+    sampled: int                          # same number, named for the estimate below
+    estimated_total: int | None = None    # OpenAlex works in that period (sampling_rates); null = unknown
+
+
+class PublicationAggregates(BaseModel):
+    grain: AggregateGrain
+    year: int | None = None
+    total: int                            # sum of buckets[].paper_count
+    buckets: list[PublicationBucket]
+
+
+class AggregatePeriod(BaseModel):
+    """Corpus size of one bucket, so a chart can turn values into shares."""
+    key: str
+    sampled: int
+    estimated_total: int | None = None
+
+
+class TopicPoint(BaseModel):
+    key: str
+    value: float                          # fractional papers (1 / topics on the paper)
+
+
+class TopicSeries(BaseModel):
+    name: str
+    points: list[TopicPoint]
+
+
+class TopicAggregates(BaseModel):
+    grain: AggregateGrain
+    year: int | None = None
+    top: int
+    series: list[TopicSeries]
+    period: list[AggregatePeriod] = []
+
+
+class CountryAggregateItem(BaseModel):
+    code: str
+    name: str
+    papers: float
+
+
+class CountryAggregateOther(BaseModel):
+    papers: float
+    countries: int
+
+
+class CountryAggregates(BaseModel):
+    counting: CountingMethod
+    year: int | None = None
+    top: int
+    total: int                            # papers in the corpus (or that year), not the sum of country rows
+    items: list[CountryAggregateItem]
+    other: CountryAggregateOther | None = None
+    period: list[AggregatePeriod] = []

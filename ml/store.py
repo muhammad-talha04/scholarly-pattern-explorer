@@ -146,6 +146,10 @@ class LocalStore:
                 out[m] = out.get(m, 0) + 1
         return out
 
+    def aggregate_counts(self) -> dict:
+        """Papers per (year, month) and fractional topic counts per (year, month, topic)."""
+        return aggregate_meta(self.meta.get(i) for i in self.ids)
+
     def ids_missing_publication_date(self) -> list[str]:
         """work_ids whose meta has no ``publication_date`` key (null = looked up, unknown)."""
         return [w for w in self.ids if "publication_date" not in (self.meta.get(w) or {})]
@@ -277,6 +281,39 @@ def _month_of(meta: dict) -> str | None:
     meta = meta or {}
     d = meta.get("publication_date") or meta.get("created")
     return d[:7] if isinstance(d, str) and re.match(r"^\d{4}-\d{2}", d) else None
+
+
+def _year_month(meta: dict) -> tuple[int | None, str | None]:
+    """(year, 'YYYY-MM') for the aggregates. publication_date, else pub_year (year only), else created."""
+    meta = meta or {}
+    d = meta.get("publication_date")
+    if isinstance(d, str) and re.match(r"^\d{4}-\d{2}", d):
+        return int(d[:4]), d[:7]
+    y = meta.get("pub_year")
+    if isinstance(y, int) or (isinstance(y, str) and re.fullmatch(r"\d{4}", y)):
+        return int(y), None
+    c = meta.get("created")
+    if isinstance(c, str) and re.match(r"^\d{4}-\d{2}", c):
+        return int(c[:4]), c[:7]
+    return None, None
+
+
+def aggregate_meta(metas) -> dict:
+    """Python twin of PgVectorStore.aggregate_counts() (LocalStore and tests)."""
+    papers: dict[tuple, int] = {}
+    topics: dict[tuple, float] = {}
+    for m in metas:
+        y, mo = _year_month(m)
+        if y is None:
+            continue
+        papers[(y, mo)] = papers.get((y, mo), 0) + 1
+        ts = (m or {}).get("topics")
+        ts = ts if isinstance(ts, list) else []
+        for t in ts:
+            if isinstance(t, str) and t:
+                k = (y, mo, t)
+                topics[k] = topics.get(k, 0.0) + 1.0 / len(ts)
+    return {"papers": papers, "topics": topics}
 
 
 def _vec_literal(v) -> str:
@@ -448,6 +485,43 @@ class PgVectorStore:
                         "WHERE d ~ '^[0-9]{4}-[0-9]{2}' GROUP BY 1")
             return {m: int(n) for m, n in cur.fetchall()}
         return self._run(q)
+
+    # One scan of paper_embeddings, two grouping sets: papers per (year, month) and
+    # fractional topic counts (1 / topics on the paper) per (year, month, topic).
+    # Year/month: publication_date, else pub_year (month NULL), else created.
+    _AGG_SQL = """
+WITH r AS MATERIALIZED (   -- one detoast of meta per row (jsonb_to_record), not one per field
+  SELECT r.publication_date AS pd, r.pub_year AS py, r.created AS cr,
+         CASE WHEN jsonb_typeof(r.topics) = 'array' THEN r.topics ELSE '[]'::jsonb END AS ts
+  FROM paper_embeddings, jsonb_to_record(meta) AS r(publication_date text, pub_year text, created text, topics jsonb)),
+p AS (
+  SELECT CASE WHEN pd ~ '^[0-9]{4}-[0-9]{2}' THEN substr(pd, 1, 4)
+              WHEN py ~ '^[0-9]{4}$' THEN py
+              WHEN cr ~ '^[0-9]{4}-[0-9]{2}' THEN substr(cr, 1, 4) END::int AS y,
+         CASE WHEN pd ~ '^[0-9]{4}-[0-9]{2}' THEN substr(pd, 1, 7)
+              WHEN py ~ '^[0-9]{4}$' THEN NULL
+              WHEN cr ~ '^[0-9]{4}-[0-9]{2}' THEN substr(cr, 1, 7) END AS m,
+         ts
+  FROM r)
+SELECT y, m, t, GROUPING(t) AS g,
+       sum(CASE WHEN ord IS NULL OR ord = 1 THEN 1 ELSE 0 END) AS papers,
+       sum(CASE WHEN t IS NOT NULL AND t <> '' THEN 1.0 / jsonb_array_length(ts) ELSE 0 END) AS frac
+FROM p LEFT JOIN LATERAL jsonb_array_elements_text(ts) WITH ORDINALITY AS e(t, ord) ON true
+WHERE y IS NOT NULL
+GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
+
+    def aggregate_counts(self) -> dict:
+        """Papers per (year, month) and fractional topic counts per (year, month, topic)."""
+        def q(cur):
+            cur.execute(self._AGG_SQL)
+            return cur.fetchall()
+        papers, topics = {}, {}
+        for y, m, t, g, n, frac in self._run(q):
+            if g == 1:
+                papers[(int(y), m)] = int(n)
+            elif t:
+                topics[(int(y), m, t)] = float(frac)
+        return {"papers": papers, "topics": topics}
 
     def ids_missing_publication_date(self) -> list[str]:
         def q(cur):
