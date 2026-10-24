@@ -336,7 +336,7 @@ class _Page:
                 "meta": {"next_cursor": "more"}}
 
 
-class _Session:
+class _PageSession:
     def __init__(self, n):
         self.calls = []
         self._n = n
@@ -349,7 +349,7 @@ class _Session:
 def test_fetch_stops_at_max_records_inside_a_page(monkeypatch):
     import pipeline.ingest as ing
     monkeypatch.setattr(ing.time, "sleep", lambda *_: None)
-    session = _Session(50)
+    session = _PageSession(50)
     rows = list(ing.fetch("2025-01-01", [], 3, session=session))
     assert len(rows) == 3
     assert session.calls[0]["per-page"] == "3"

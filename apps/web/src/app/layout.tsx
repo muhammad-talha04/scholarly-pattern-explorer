@@ -12,7 +12,7 @@ const display = Fraunces({ subsets: ["latin"], variable: "--font-display", displ
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: SITE_NAME, template: `%s | ${SITE_NAME}` },
-  description: "Search AI research papers by keyword and topic, and explore countries, emerging patterns and research gaps in a two-year OpenAlex sample.",
+  description: "Search computer science papers by meaning, and explore countries, emerging patterns and research gaps in a 2015 to 2026 OpenAlex sample.",
   applicationName: SITE_NAME,
   openGraph: { type: "website", siteName: SITE_NAME, locale: "en_US" },
   twitter: { card: "summary_large_image" },

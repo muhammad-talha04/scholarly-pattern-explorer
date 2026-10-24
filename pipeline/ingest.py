@@ -99,7 +99,7 @@ def fetch(since: str, filters: list[str], max_records: int, session=requests):
         params["api_key"] = os.environ["OPENALEX_API_KEY"]
     while cursor and got < max_records:
         for attempt in range(6):
-            r = session.get(API, params={**params, "cursor": cursor}, timeout=60)
+            r = session.get(API, params={**params, "cursor": cursor, "per-page": str(min(200, max_records - got))}, timeout=60)
             if r.status_code == 200:
                 break
             if r.status_code in (401, 403):

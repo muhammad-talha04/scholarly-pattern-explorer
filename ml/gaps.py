@@ -33,7 +33,7 @@ from statistics import mean, median
 
 GAP_DEFINITION = (
     "A research gap here is a topic that grew fast but still has few papers in this corpus "
-    "(AI-subfield papers from Oct 2024 onward). It is relative to this sample, not to all research. "
+    "(computer science papers from 2015 onward, sampled evenly by month). It is relative to this sample, not to all research. "
     "Gaps marked low coverage rest on few papers or thinly sampled years and may be sampling holes."
 )
 

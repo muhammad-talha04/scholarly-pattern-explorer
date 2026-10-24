@@ -3,4 +3,4 @@ import { Suspense } from "react";
 import { SearchPage } from "@/features/search/SearchPage";
 export default function Page() { return <Suspense><SearchPage /></Suspense>; }
 
-export const metadata = pageMeta("/search", "Search AI papers", "Search AI research papers by keyword and topic, filtered by country and year. Meaning-based search is being upgraded.");
+export const metadata = pageMeta("/search", "Search computer science papers", "Search about 100,000 computer science papers by meaning, filtered by country and year.");

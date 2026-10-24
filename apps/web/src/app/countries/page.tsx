@@ -10,4 +10,4 @@ export default async function Page({ searchParams }: { searchParams?: { corpus?:
   return <CountriesPage scale={scale} initialCountries={Array.isArray(initial) ? initial : undefined} />;
 }
 
-export const metadata = pageMeta("/countries", "AI research by country and region", "Paper counts and co-authorship arcs for countries and regions in a two-year sample of AI papers from OpenAlex.");
+export const metadata = pageMeta("/countries", "Computer science research by country and region", "Paper counts and co-authorship arcs for countries and regions in a sample of about 100,000 computer science papers from OpenAlex, 2015 to 2026.");
