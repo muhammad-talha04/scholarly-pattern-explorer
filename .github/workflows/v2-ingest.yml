@@ -1,4 +1,4 @@
-name: v2 ingest (twice a month)
+name: v2 ingest (monthly)
 on:
   schedule:
     - cron: "0 3 1 * *"   # 03:00 UTC on the 1st of each month
@@ -47,6 +47,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ML_DATA_DIR: data/ml
+          ML_EMBEDDER: fastembed   # never fall back to the hash embedder on real data
         run: |
           pip install -r ml/requirements.txt
           python -m ml.cli index
