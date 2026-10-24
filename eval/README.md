@@ -133,3 +133,6 @@ python eval/pattern_stability.py --works data/works_v2.jsonl
 ```
 
 Test: `ml/tests/test_pattern_stability.py` (offline).
+
+## Post-deploy acceptance
+`python eval/acceptance.py [--api URL]` runs the council acceptance checks against the live API. See `docs/STATUS.md` (2026-10-16, william).
