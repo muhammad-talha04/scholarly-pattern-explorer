@@ -38,6 +38,7 @@ def test_migration_statements_cover_embeddings_and_documents():
         "004_runs_summaries_snapshots.sql",
         "005_halfvec_embeddings.sql",
         "006_sampling_rates.sql",
+        "007_sampling_rates_owner.sql",
     ]
     sql = "\n".join(migration_sql())
     assert "CREATE EXTENSION IF NOT EXISTS vector" in sql
