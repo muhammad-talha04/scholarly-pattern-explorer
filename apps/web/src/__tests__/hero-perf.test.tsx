@@ -25,6 +25,6 @@ it("placeholder fills the canvas box", async () => {
 it("hero shows the decorative-lines caption and a fixed legend slot", async () => {
   const { GalaxyHero } = await import("@/features/galaxy/GalaxyHero");
   render(<GalaxyHero />);
-  expect(screen.getByTestId("hero-caption")).toHaveTextContent("Dot positions show topic clusters; connecting lines are decorative.");
+  expect(screen.getByTestId("hero-caption")).toHaveTextContent("Colours mark topic clusters. Hover a dot to see the paper; the cloud keeps drifting.");
   expect(screen.getByTestId("legend-slot").className).toMatch(/h-14/);
 });

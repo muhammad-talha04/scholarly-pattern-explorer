@@ -27,7 +27,7 @@ export function PatternsPage({ initial = {} }: { initial?: { all?: Pattern[]; ga
   return (
     <div>
       <PageHeader title="Patterns" subtitle="Frequent topic itemsets, derived rules, lifecycles and research gaps.">
-        <select aria-label="Window" value={win ?? ""} onChange={(e) => setWin(Number(e.target.value))} className="input">{windows.map((w) => <option key={w} value={w}>Window {w}</option>)}</select>
+        {tab !== "gaps" && <select aria-label="Window" value={win ?? ""} onChange={(e) => setWin(Number(e.target.value))} className="input">{windows.map((w) => <option key={w} value={w}>{w}–{w + 2}</option>)}</select>}
       </PageHeader>
       <div className="mb-4 flex gap-1 overflow-x-auto">{(["itemsets", "rules", "lifecycles", "gaps"] as Tab[]).map((t) => (
         <button key={t} onClick={() => setTab(t)} className="relative rounded-lg px-4 py-1.5 text-sm capitalize">
@@ -40,7 +40,7 @@ export function PatternsPage({ initial = {} }: { initial?: { all?: Pattern[]; ga
               <tr key={p.items.join()} className="border-t border-white/5"><td className="p-2">{p.items.map((i) => <span key={i} className="chip mr-1">{i}</span>)}</td><td className="p-2">{p.items.length}</td>
                 <td className="p-2"><div className="flex items-center gap-2"><div className="h-1.5 flex-1 rounded bg-white/10"><div className="h-full rounded bg-accent" style={{ width: `${Math.min(100, p.support * 250)}%` }} /></div><span className="tabular-nums text-xs">{p.support.toFixed(3)}</span></div></td></tr>))}</tbody></table>
         )}
-        {tab === "rules" && (rules.length === 0 ? <p className="text-slate-400">No rules derivable in this window.</p> :
+        {tab === "rules" && (rules.length === 0 ? <p className="text-slate-400">No topic pair is frequent enough in {win}–{win != null ? win + 2 : ""} to form a rule. Try another window.</p> :
           <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-400"><tr><th className="p-2">Rule</th><th className="p-2">Support</th><th className="p-2">Confidence</th><th className="p-2">Lift</th></tr></thead>
             <tbody>{rules.map((r, i) => <tr key={i} className="border-t border-white/5"><td className="p-2">{r.antecedent.join(" + ")} <span className="text-accent">→</span> {r.consequent.join(", ")}</td><td className="p-2">{r.support.toFixed(3)}</td><td className="p-2">{(r.confidence * 100).toFixed(0)}%</td><td className="p-2">{r.lift?.toFixed(2) ?? "–"}</td></tr>)}</tbody></table>)}
         {tab === "lifecycles" && (
@@ -51,10 +51,12 @@ export function PatternsPage({ initial = {} }: { initial?: { all?: Pattern[]; ga
         )}
         {tab === "gaps" && (gaps.loading && !gaps.data ? <Spinner /> :
           <div className="space-y-6">
+            <p className="text-sm text-mist">Gaps compare topics across the whole 2015–2026 sample, so they do not change with the window. Each pair covers closely related subjects that few papers connect.</p>
             <div className="grid gap-3 md:grid-cols-2">{(gaps.data ?? []).map((g) => (
               <div key={g.items[0]} className="rounded-xl border border-gap/30 bg-gap/10 p-4">
                 <div className="flex justify-between gap-2"><Link href={`/?cluster=${encodeURIComponent(g.items[0])}`} className="font-medium text-gap underline-offset-2 hover:underline">{g.items[0]}</Link><span className="chip">score {(g.gap_score ?? g.support).toFixed(2)}</span></div>
-                <p className="mt-1 text-sm text-slate-400">Growth {g.growth_rate != null ? `${(g.growth_rate * 100).toFixed(0)}%/yr` : "n/a"} · {g.paper_count ?? "?"} papers · {g.window_start}–{g.window_end}</p>
+                <p className="mt-1 text-sm text-slate-400">{g.items.slice(1).length ? <>Related to {g.items.slice(1).join(", ")}</> : null}{g.growth_rate != null ? <> · Growth {(g.growth_rate * 100).toFixed(0)}%/yr</> : null}{g.paper_count != null ? <> · {g.paper_count} papers on both</> : null}</p>
+                {g.explanation && <p className="mt-1 text-xs text-slate-500">{g.explanation}</p>}
                 {g.top_countries && <p className="mt-1 text-xs text-slate-500">Top countries (fractional): {g.top_countries.join(", ")}</p>}
               </div>))}</div>
             <div>

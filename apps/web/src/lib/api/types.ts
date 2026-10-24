@@ -45,6 +45,7 @@ export interface Pattern {
   growth_rate?: number | null;
   paper_count?: number | null;
   top_countries?: string[] | null;
+  explanation?: string | null;
 }
 export interface CountryYearCount {
   year: number;

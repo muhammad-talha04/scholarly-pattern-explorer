@@ -11,7 +11,9 @@ import { cardBoxBeside, createHoverLock, pickClosestPaperAt, reduceHover } from 
 import { DRIFT_HZ, heroVolume, neighborIds, networkLinks, plexusCore, plexusDrift, plexusTint, TWINKLE_HZ, WIDE_CANVAS, type PlexusPose, type Star } from "./stars";
 
 /** Oblique view of the cloud. Distance is fixed so drag orbits without a zoom dolly. */
-const CLOUD_SHIFT = 3.6;
+const CLOUD_SHIFT = 0;
+/** Fraction of canvas width the rendered cloud is pushed right on wide screens, filling the empty right side. */
+const VIEW_PUSH = 0.17;
 const CAM_DELTA = new Vector3(7.4, 5.2, 12.2);
 const CAM_DIST = CAM_DELTA.length();
 const CAMERA_FOV = 42;
@@ -286,7 +288,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       const rect = el.getBoundingClientRect();
       spin.current?.updateWorldMatrix(true, false);
       const v = new Vector3();
-      const paused = reduce || pose || document.hidden || pointerInsideRef.current || overCardRef.current;
+      const paused = reduce || pose || document.hidden || overCardRef.current;
       const points = nodes.map((node) => {
         const d = plexusDrift(node.phase, time.current, paused ? 0 : 1);
         v.set(node.pos[0] + d[0], node.pos[1] + d[1], node.pos[2] + d[2]);
@@ -420,7 +422,8 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
   useFrame((_, dt) => {
     if (document.hidden) return;
     const pinned = pose === "in" || pose === "out";
-    const hoverFreeze = pointerInsideRef.current || overCardRef.current;
+    // Only the card itself freezes motion (so its button can be clicked); hovering a dot keeps everything moving.
+    const hoverFreeze = overCardRef.current;
     const paused = reduce || pinned;
     const step = Math.min(dt, 0.05);
     if (!paused && !hoverFreeze) time.current += step;
@@ -428,7 +431,13 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
     // Keep the drift amplitude while hovering so dots don't snap back.
     // Time is held, so the field and the card stay where the pointer found them.
     uniforms.uMotion.value = paused ? 0 : 1;
-    const shift = size.width >= WIDE_CANVAS ? CLOUD_SHIFT : 0;
+    const shift = CLOUD_SHIFT;
+    const push = size.width >= WIDE_CANVAS ? VIEW_PUSH : 0;
+    const want = Math.round(-size.width * push);
+    if (camera.view?.offsetX !== want || camera.view?.fullWidth !== size.width) {
+      if (push) camera.setViewOffset(size.width, size.height, want, 0, size.width, size.height);
+      else camera.clearViewOffset();
+    }
     if (!hoverFreeze && !paused && !draggingRef.current) {
       tilt.current.x += (tiltGoal.current.x - tilt.current.x) * 0.06;
       tilt.current.z += (tiltGoal.current.z - tilt.current.z) * 0.06;
