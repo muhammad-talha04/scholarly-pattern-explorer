@@ -2,14 +2,16 @@
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import ValidationError
 
+from .. import aggregates as agg
 from .. import ml_bridge as ml
 from ..ratelimit import check_ask, check_paper
 from pipeline import country_api  # repo root is on sys.path via ml_bridge
 from ml.timing import stage  # noqa: E402
-from ..schemas import (AskRequest, AskResponse, Collaboration, CorpusStats, CountingMethod, CountryStats,
+from ..schemas import (AggregateGrain, AskRequest, AskResponse, Collaboration, CorpusStats, CountingMethod,
+                       CountryAggregates, CountryStats, PublicationAggregates, TopicAggregates,
                        ExamplePaper, GalaxyGraph, PaperDetail, PaperSummary, Pattern, Run, SearchResponse,
                        TopicCountryYear)
 
@@ -252,3 +254,29 @@ def runs() -> list[Run]:
                        papers_added=r.get("new_papers", 0),
                        patterns_changed=r.get("patterns_changed", 0)))
     return out
+
+
+# ---- chart totals (PR #57). Cached for AGGREGATES_TTL_SECONDS (default 300). ----
+def _grain_year(grain: str, year: int | None) -> int | None:
+    if grain == "month" and year is None:
+        raise HTTPException(422, "grain=month needs year")
+    return year if grain == "month" else None
+
+
+@router.get("/aggregates/publications", response_model=PublicationAggregates)
+def aggregates_publications(grain: AggregateGrain = "year",
+                            year: int | None = Query(None, ge=1900, le=2100)) -> PublicationAggregates:
+    return PublicationAggregates(**agg.publications(grain, _grain_year(grain, year)))
+
+
+@router.get("/aggregates/topics", response_model=TopicAggregates)
+def aggregates_topics(grain: AggregateGrain = "year", year: int | None = Query(None, ge=1900, le=2100),
+                      top: int = Query(6, ge=1, le=50)) -> TopicAggregates:
+    return TopicAggregates(**agg.topics(grain, _grain_year(grain, year), top))
+
+
+@router.get("/aggregates/countries", response_model=CountryAggregates)
+def aggregates_countries(counting: CountingMethod = "fractional",
+                         year: int | None = Query(None, ge=1900, le=2100),
+                         top: int = Query(12, ge=1, le=100)) -> CountryAggregates:
+    return CountryAggregates(**agg.countries(country_api.countries(counting), counting, year, top))
