@@ -50,6 +50,19 @@ services:
         sync: false
       - key: ML_LLM_API_KEY
         sync: false
+      # Client key: CF-Connecting-IP, else the first X-Forwarded-For hop, else the socket host.
+      # POST /api/v1/papers/{id}/ask per client IP per minute. Code default 5 when unset. 0 disables.
+      - key: ASK_RATE_PER_MIN
+        sync: false
+      # Same route, all clients, per hour. Code default 200 when unset. 0 disables.
+      - key: ASK_RATE_GLOBAL_PER_HOUR
+        sync: false
+      # GET /api/v1/papers/{id} per client IP per minute. Separate bucket, looser. Code default 60. 0 disables.
+      - key: PAPER_RATE_PER_MIN
+        sync: false
+      # Same route, all clients, per hour. Code default 2000 when unset. 0 disables.
+      - key: PAPER_RATE_GLOBAL_PER_HOUR
+        sync: false
       - key: SEARCH_MAX_LIMIT
         sync: false
       - key: GALAXY_NODE_LIMIT

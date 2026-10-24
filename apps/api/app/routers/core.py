@@ -2,11 +2,12 @@
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import ValidationError
 
 from .. import aggregates as agg
 from .. import ml_bridge as ml
+from ..ratelimit import check_ask, check_paper
 from pipeline import country_api  # repo root is on sys.path via ml_bridge
 from ml.timing import stage  # noqa: E402
 from ..schemas import (AggregateGrain, AskRequest, AskResponse, Collaboration, CorpusStats, CountingMethod,
@@ -83,7 +84,8 @@ def search(q: str, limit: int = 20, offset: int = 0, country: str | None = None,
 
 
 @router.get("/papers/{paper_id}", response_model=PaperDetail)
-def paper(paper_id: str) -> PaperDetail:
+def paper(paper_id: str, request: Request) -> PaperDetail:
+    check_paper(request)
     svc = ml.get_service()
     meta = svc.get_paper(paper_id)
     if meta is None:
@@ -99,8 +101,10 @@ def paper(paper_id: str) -> PaperDetail:
 
 
 @router.post("/papers/{paper_id}/ask", response_model=AskResponse)
-def ask(paper_id: str, body: AskRequest) -> AskResponse:
-    out = ml.get_service().ask(paper_id, body.question)
+def ask(paper_id: str, body: AskRequest, request: Request) -> AskResponse:
+    check_ask(request)
+    history = [{"role": turn.role, "content": turn.content} for turn in body.history]
+    out = ml.get_service().ask(paper_id, body.question, history)
     if out is None:
         raise HTTPException(404, "paper not found")
     return AskResponse(answer=out["answer"], sources=out["evidence"])

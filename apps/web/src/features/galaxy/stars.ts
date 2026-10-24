@@ -175,6 +175,37 @@ export function heroNetwork<T extends Placed>(papers: T[]): { nodes: PlexusNode[
   return { nodes, edges, hub: centroid(nodes) };
 }
 
+/** Radius of the 3D cloud. The flat band stays in `heroNetwork` for the 2D view. */
+export const VOLUME_RADIUS = 5;
+/** Neighbours farther than this are not linked in the volume. */
+export const VOLUME_LINK_REACH = 2.05;
+
+/**
+ * Same papers and filler dots as the flat plexus, redistributed through a ball.
+ * The 3D view uses this so depth is real, not a tilted sheet.
+ */
+export function heroVolume<T extends Placed>(papers: T[]): { nodes: PlexusNode[]; edges: NetEdge[]; hub: Vec } {
+  const flat = heroNetwork(papers);
+  if (!flat.nodes.length) return { nodes: [], edges: [], hub: [0, 0, 0] };
+  const rand = mulberry(0x6d3d11);
+  const nodes = flat.nodes.map((node, i) => {
+    const pos = volumePoint(i, flat.nodes.length, rand);
+    return { ...node, pos, center: pos };
+  });
+  return { nodes, edges: linkVolume(nodes, rand), hub: centroid(nodes) };
+}
+
+/** Filled ball: even directions, radius cubed so points sit inside the sphere, not on a shell. */
+function volumePoint(i: number, count: number, rand: () => number): Vec {
+  const n = Math.max(1, count);
+  const y = 1 - ((i + 0.5) / n) * 2;
+  const ring = Math.sqrt(Math.max(0, 1 - y * y));
+  const theta = i * Math.PI * (3 - Math.sqrt(5));
+  const radial = Math.cbrt(0.12 + 0.88 * rand());
+  const R = VOLUME_RADIUS;
+  return [Math.cos(theta) * ring * radial * R, y * radial * R, Math.sin(theta) * ring * radial * R];
+}
+
 interface Dot { t: number; s: number; pos: Vec; fade: number }
 
 function buildBand(rand: () => number): Dot[] {
@@ -357,6 +388,57 @@ function linkBand(nodes: PlexusNode[], rand: () => number): NetEdge[] {
       b: nodes[pair.j].pos,
       span: pair.d,
       alpha: 0.14 + 0.4 * fade * fade,
+    });
+  }
+  return edges;
+}
+
+function linkVolume(nodes: PlexusNode[], rand: () => number): NetEdge[] {
+  const cell = VOLUME_LINK_REACH;
+  const grid = new Map<string, number[]>();
+  const key = (x: number, y: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(y / cell)}:${Math.floor(z / cell)}`;
+  nodes.forEach((node, i) => {
+    const k = key(node.pos[0], node.pos[1], node.pos[2]);
+    const list = grid.get(k);
+    if (list) list.push(i);
+    else grid.set(k, [i]);
+  });
+  const pairs: { i: number; j: number; d: number }[] = [];
+  nodes.forEach((node, i) => {
+    const cx = Math.floor(node.pos[0] / cell);
+    const cy = Math.floor(node.pos[1] / cell);
+    const cz = Math.floor(node.pos[2] / cell);
+    for (let gx = cx - 1; gx <= cx + 1; gx++) {
+      for (let gy = cy - 1; gy <= cy + 1; gy++) {
+        for (let gz = cz - 1; gz <= cz + 1; gz++) {
+          const bucket = grid.get(`${gx}:${gy}:${gz}`);
+          if (!bucket) continue;
+          for (const j of bucket) {
+            if (j <= i) continue;
+            const o = nodes[j].pos;
+            const d = Math.hypot(node.pos[0] - o[0], node.pos[1] - o[1], node.pos[2] - o[2]);
+            if (d > 0 && d <= VOLUME_LINK_REACH) pairs.push({ i, j, d });
+          }
+        }
+      }
+    }
+  });
+  pairs.sort((a, b) => a.d - b.d);
+  const cap = nodes.map(() => 3 + Math.floor(rand() * 4));
+  const deg = nodes.map(() => 0);
+  const edges: NetEdge[] = [];
+  for (const pair of pairs) {
+    if (deg[pair.i] >= cap[pair.i] || deg[pair.j] >= cap[pair.j]) continue;
+    deg[pair.i]++;
+    deg[pair.j]++;
+    const fade = 1 - pair.d / VOLUME_LINK_REACH;
+    edges.push({
+      source: nodes[pair.i].id,
+      target: nodes[pair.j].id,
+      a: nodes[pair.i].pos,
+      b: nodes[pair.j].pos,
+      span: pair.d,
+      alpha: 0.16 + 0.46 * fade * fade,
     });
   }
   return edges;

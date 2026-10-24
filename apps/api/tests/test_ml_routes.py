@@ -73,6 +73,56 @@ def test_paper_detail_summary_and_ask(client):
     a = client.post("/api/v1/papers/W1/ask", json={"question": "What do attention maps reveal?"}).json()
     assert "contacts" in a["answer"] and a["sources"]
     assert client.post("/api/v1/papers/NOPE/ask", json={"question": "x"}).status_code == 404
+    follow = client.post("/api/v1/papers/W1/ask", json={
+        "question": "explain that more simply",
+        "history": [
+            {"role": "user", "content": "What do attention maps reveal?"},
+            {"role": "assistant", "content": "Attention maps reveal contacts."},
+        ],
+    }).json()
+    assert "contacts" in follow["answer"].lower()
+    alone = client.post("/api/v1/papers/W1/ask", json={"question": "explain that more simply"}).json()
+    assert "does not seem" in alone["answer"]
+
+
+def test_ask_history_omitted_and_oversize(client):
+    from pydantic import ValidationError
+
+    from app.schemas import AskRequest
+
+    omitted = AskRequest.model_validate({"question": "What do attention maps reveal?"})
+    assert omitted.history == []
+    sent = client.post("/api/v1/papers/W1/ask", json={"question": "What do attention maps reveal?"})
+    assert sent.status_code == 200 and "contacts" in sent.json()["answer"]
+
+    too_many = {
+        "question": "explain that more simply",
+        "history": [
+            {"role": "user", "content": "one"},
+            {"role": "assistant", "content": "two"},
+            {"role": "user", "content": "three"},
+        ],
+    }
+    with pytest.raises(ValidationError):
+        AskRequest.model_validate(too_many)
+    assert client.post("/api/v1/papers/W1/ask", json=too_many).status_code == 422
+
+    padded = "  " + ("z" * 1000) + " Attention maps reveal contacts."
+    limited = AskRequest.model_validate({
+        "question": "explain that more simply",
+        "history": [{"role": "assistant", "content": padded}],
+    })
+    assert limited.history[0].content == "z" * 1000
+    buried = client.post("/api/v1/papers/W1/ask", json={
+        "question": "explain that more simply",
+        "history": [{"role": "assistant", "content": padded}],
+    })
+    assert buried.status_code == 200 and "does not seem" in buried.json()["answer"]
+    kept = client.post("/api/v1/papers/W1/ask", json={
+        "question": "explain that more simply",
+        "history": [{"role": "user", "content": "  Attention maps reveal contacts.  "}],
+    })
+    assert kept.status_code == 200 and "contacts" in kept.json()["answer"].lower()
 
 
 def test_galaxy_layout(client):

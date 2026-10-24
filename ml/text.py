@@ -11,22 +11,68 @@ not no but into over under such can may might will would should could has have h
 using use used based via between among more most less both each other there here i you he she
 """.split())
 
-_SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+# ASCII sentence boundary, plus accented capitals (É…) and CJK full stops.
+# Common abbreviations keep their period so "Fig. 1" and "Dr. Smith" stay one
+# sentence. "etc." ends the sentence when the next word is capitalized
+# ("etc. The"). A lowercase word ("etc. and") or a number ("etc. 12") does not.
+_ABBREV = re.compile(
+    r"\b(?:Fig|Figs|Dr|Mr|Mrs|Ms|Prof|Eq|vs|al)\.|\b(?:e\.g|i\.e)\.|\betc\.(?=\s+\d)",
+    re.IGNORECASE,
+)
+_SENT = re.compile(
+    r"(?<=[.!?])\s+(?=[0-9A-Z\u00C0-\u00D6\u00D8-\u00DE])|(?<=[。！？])"
+)
+# Scripts that are often written without spaces. Overlap is measured on bigrams.
+_UNSEGMENTED = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]+")
+# A paper can tell a model to ignore its instructions. That sentence is not a summary.
+_OVERRIDE = re.compile(
+    r"\b(?:ignore|disregard|forget)\b.{0,80}\b(?:instruction|instructions|prompt|prompts)\b"
+    r"|\byou are now\b|\bnew instructions\b",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def sentences(text: str) -> list[str]:
-    return [s.strip() for s in _SENT.split(text or "") if len(s.strip()) > 3]
+    raw = _ABBREV.sub(lambda m: m.group(0)[:-1] + "\u0001", text or "")
+    out = []
+    for part in _SENT.split(raw):
+        s = part.replace("\u0001", ".").strip()
+        if len(s) > 3:
+            out.append(s)
+    return out
 
 
 def tokens(text: str) -> list[str]:
-    return [t for t in re.findall(r"[a-z0-9]+", (text or "").lower()) if t not in STOP and len(t) > 1]
+    """Word tokens, keeping accented letters, plus bigrams for unsegmented scripts."""
+    raw = text or ""
+    out = []
+    for t in re.findall(r"[^\W_]+", raw.lower()):
+        if _UNSEGMENTED.fullmatch(t):
+            continue
+        if t not in STOP and len(t) > 1:
+            out.append(t)
+    for run in _UNSEGMENTED.findall(raw):
+        if len(run) < 2:
+            continue
+        out.extend(run[i:i + 2] for i in range(len(run) - 1))
+    return out
+
+
+def _summary_sentences(abstract: str) -> list[str]:
+    sents = sentences(abstract)
+    kept = [s for s in sents if not _OVERRIDE.search(s)]
+    return kept or sents
 
 
 def extractive_summary(title: str, abstract: str, n: int = 3) -> str:
-    """Score sentences by term frequency (title words boosted), keep top-n in order."""
-    sents = sentences(abstract)
+    """Score sentences by term frequency (title words boosted), keep top-n in order.
+
+    Returns "" when the abstract has no usable sentence. Callers decide what to
+    show instead of echoing the title.
+    """
+    sents = _summary_sentences(abstract)
     if not sents:
-        return title or ""
+        return ""
     if len(sents) <= n:
         return " ".join(sents)
     tf = Counter(tokens(abstract))
@@ -41,6 +87,38 @@ def extractive_summary(title: str, abstract: str, n: int = 3) -> str:
         return base * (1.15 if i == 0 else 1.0)
     best = sorted(sorted(enumerate(sents), key=score, reverse=True)[:n])
     return " ".join(s for _, s in best)
+
+
+_NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _content_words(text: str) -> set[str]:
+    """Content tokens, not pure numbers. Digits are checked on their own."""
+    return {t for t in tokens(text) if not t.isdigit()}
+
+
+def _numbers(text: str) -> set[str]:
+    return set(_NUMBER.findall(text or ""))
+
+
+def grounded_in_abstract(text: str, abstract: str) -> bool:
+    """True when an answer is mostly the abstract's words, with no new numbers.
+
+    Instruction-override sentences are not evidence. A model answer is kept
+    only when at least 60% of its content words occur in the remaining abstract
+    and every number it states is written in that abstract. Otherwise callers
+    fall back to an extractive quote or a refusal.
+    """
+    if not text or _OVERRIDE.search(text):
+        return False
+    body = [s for s in sentences(abstract) if not _OVERRIDE.search(s)]
+    source = " ".join(body) if body else (abstract or "")
+    have = _content_words(source)
+    got = _content_words(text)
+    if not have or not got or len(have & got) / len(got) < 0.6:
+        return False
+    known = _numbers(source)
+    return all(n in known for n in _numbers(text))
 
 
 def best_sentences(question: str, text: str, n: int = 2) -> list[tuple[str, float]]:

@@ -45,7 +45,7 @@ and `select pg_size_pretty(pg_database_size(current_database()));`
 
 `sampling_rates(month date pk, openalex_total int, sampled int, filter text, fetched_at)`
 is written by `ml.cli bulk` per month (LocalStore: `<ML_DATA_DIR>/vectors/sampling_rates.json`).
-`openalex_total` is OpenAlex `meta.count` for that month with `has_abstract:true`;
+`openalex_total` is OpenAlex `meta.count` for that month with `has_abstract:true` and the CS scope (`primary_topic.field.id:fields/17,type:article`);
 RLS is on with one policy: `spe_api` may SELECT (created only if that role exists; re-run `db.apply` after creating it). No write policies; the loader writes as the owner.
 `sampled` is papers we hold for that month (stored before + fetched). To compare with
 OpenAlex totals, scale a month's count by `openalex_total / sampled`. The min-abstract
