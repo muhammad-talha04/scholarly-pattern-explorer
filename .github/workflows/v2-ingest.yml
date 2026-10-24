@@ -43,6 +43,27 @@ jobs:
       - name: Save back
         env: {GH_TOKEN: "${{ github.token }}"}
         run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json data/country_snapshot.json --clobber
+      - name: Check database connection
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          pip install "psycopg[binary]>=3.1"
+          python - <<'PY'
+          import os, sys
+          from urllib.parse import urlsplit
+          u = os.environ.get("DATABASE_URL", "")
+          if not u:
+              sys.exit("DATABASE_URL secret is empty or missing")
+          p = urlsplit(u)
+          print("scheme", p.scheme, "| user", p.username, "| host", p.hostname, "| port", p.port, "| db", p.path)
+          import psycopg
+          try:
+              with psycopg.connect(u, connect_timeout=15) as c:
+                  print("connected:", c.execute("select 1").fetchone())
+          except Exception as e:
+              print("CONNECT FAILED:", type(e).__name__, str(e).replace(p.password or "\0", "***")[:300])
+              sys.exit(1)
+          PY
       - name: Precompute embeddings and the galaxy graph
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
