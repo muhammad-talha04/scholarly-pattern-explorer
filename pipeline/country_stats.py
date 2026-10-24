@@ -103,20 +103,40 @@ def work_topic_refs(work: dict) -> list[tuple[str, str]]:
     return out
 
 
+def work_year(work: dict) -> str | None:
+    """Calendar year as a digit string, or None when the work has no year.
+
+    Normalized works store ``year``. A raw OpenAlex work has ``publication_year``
+    instead, and a publication date covers both when the year field is empty.
+    The string ``"None"`` is not a year: it used to land in ``by_year`` and then
+    get dropped from ``topic_country_year``.
+    """
+    year = work.get("year")
+    if year is None:
+        year = work.get("publication_year")
+    if year is None:
+        iso = _iso_date(work.get("date") or work.get("publication_date"))
+        year = iso[:4] if iso else None
+    text = str(year).strip() if year is not None else ""
+    return text if text.isdigit() else None
+
+
 def tally(works) -> dict:
     t = {k: defaultdict(Counter) for k in KEYS}
     pairs = Counter()
     for w in works:
         cs = countries_of(w)
         weights = fractional_weights(cs)
-        yr = str(w.get("year"))
+        yr = work_year(w)
         tops = [x for x in (w.get("topics") or []) if x]  # all topics, same as the gap finder fallback
         for c in cs:
-            t["by_year"][c][yr] += 1
-            t["frac"][c][yr] += weights[c]
             t["topics"][c].update(tops)
+            if yr:
+                t["by_year"][c][yr] += 1
+                t["frac"][c][yr] += weights[c]
         for tp in tops:
-            t["topic_years"][tp][yr] += 1
+            if yr:
+                t["topic_years"][tp][yr] += 1
             for c in cs:
                 t["topic_countries"][tp][c] += weights[c]
         n = len(cs)
@@ -133,7 +153,7 @@ def tally(works) -> dict:
             for c in cs:
                 t["by_date"][c][date] += 1
                 t["frac_date"][c][date] += weights[c]
-        if cs:
+        if cs and yr:
             for tid, name in work_topic_refs(w):
                 t["topic_names"][tid][name] += 1
                 for c in cs:
@@ -229,9 +249,37 @@ def share_for(dates: dict | None, totals: dict | None, win: dict | None) -> dict
         out["share_reason"] = "too_few_papers"
     else:
         sc, sp = cur / tot_cur, prev / tot_prev
-        out.update(share_pct=round(sc * 100, 2), share_prev_pct=round(sp * 100, 2),
-                   share_change_pp=round((sc - sp) * 100, 2))
+        share_pct = round(sc * 100, 2)
+        share_prev_pct = round(sp * 100, 2)
+        # Difference of the displayed percents, so 4.77 - 4.03 is 0.74.
+        out.update(share_pct=share_pct, share_prev_pct=share_prev_pct,
+                   share_change_pp=round(share_pct - share_prev_pct, 2))
     return out
+
+
+MIN_SPEC_PAPERS = 10       # a country needs this many papers on a topic before it can rank as a specialty
+
+
+def specialized_topics(t: dict, code: str, top_n: int = 5, min_papers: int = MIN_SPEC_PAPERS) -> list[dict]:
+    """Rank a country's topics by location quotient (council C5).
+
+    LQ = (country's papers on topic / country's papers) / (all papers on topic / all papers).
+    LQ > 1 means the country publishes relatively more on the topic than the corpus does.
+    Only topics with >= min_papers country papers qualify, so tiny counts can't top the list.
+    Denominators use papers with at least one country (fractional sums: one per paper).
+    """
+    n_c = sum((t.get("by_year") or {}).get(code, {}).values())
+    total = sum(v for yrs in (t.get("frac") or {}).values() for v in yrs.values())
+    if not n_c or not total:
+        return []
+    out = []
+    for tp, n in (t.get("topics") or {}).get(code, {}).items():
+        g = sum((t.get("topic_countries") or {}).get(tp, {}).values())
+        if n < min_papers or not g:
+            continue
+        out.append({"name": tp, "lq": round((n / n_c) / (g / total), 2), "papers": n})
+    out.sort(key=lambda x: (-x["lq"], -x["papers"], x["name"]))
+    return out[:top_n]
 
 
 def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict]:
@@ -246,6 +294,7 @@ def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict
                      **growth_for(dsrc.get(code), win),
                      **share_for(dsrc.get(code), totals, win),
                      "top_topics": [n for n, _ in t["topics"][code].most_common(top_n)],
+                     "specialized_topics": specialized_topics(t, code, top_n),
                      "counting": counting})
     return sorted(rows, key=lambda r: -r["papers"])
 

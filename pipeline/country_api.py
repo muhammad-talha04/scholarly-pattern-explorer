@@ -61,6 +61,7 @@ def countries(counting: str = "fractional") -> list[dict]:
             "share_change_pp": r.get("share_change_pp"),
             "share_reason": r.get("share_reason"),
             "top_topics": r["top_topics"],
+            "specialized_topics": r.get("specialized_topics", []),
             "counting": r["counting"],
             "paper_count": sum(int(v) for v in whole.values()),
             "fractional_count": round(sum(float(v) for v in frac.values()), 6),

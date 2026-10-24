@@ -1,10 +1,13 @@
 import { pageMeta } from "@/lib/seo";
 import { CountriesPage } from "@/features/countries/CountriesPage";
-import type { ChartScale } from "@/lib/api/types";
+import type { ChartScale, CountryStats } from "@/lib/api/types";
+import { prefetch } from "@/lib/api/server";
 
-export default function Page({ searchParams }: { searchParams?: { corpus?: string } }) {
+// The prefetch caches for an hour inside fetch(); the page itself reads searchParams, so it renders per request.
+export default async function Page({ searchParams }: { searchParams?: { corpus?: string } }) {
   const scale: ChartScale = searchParams?.corpus === "80k" ? "80k" : "sample";
-  return <CountriesPage scale={scale} />;
+  const initial = await prefetch<CountryStats[]>("/countries?counting=fractional");
+  return <CountriesPage scale={scale} initialCountries={Array.isArray(initial) ? initial : undefined} />;
 }
 
-export const metadata = pageMeta("/countries", "AI research by country and region", "Paper counts and co-authorship arcs for countries and regions in a two-year sample of AI papers from OpenAlex.");
+export const metadata = pageMeta("/countries", "Computer science research by country and region", "Paper counts and co-authorship arcs for countries and regions in a sample of about 100,000 computer science papers from OpenAlex, 2015 to 2026.");

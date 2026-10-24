@@ -157,7 +157,8 @@ def _gap_pattern(g: dict) -> Pattern:
         items=items, support=g["gap_score"], window_start=g["window_start"],
         window_end=g["window_end"], gap_score=g["gap_score"], growth_rate=g.get("growth_rate"),
         paper_count=g.get("paper_count"), top_countries=g.get("top_countries"),
-        explanation=explanation, example_papers=_example_models(examples))
+        explanation=explanation, example_papers=_example_models(examples),
+        low_coverage=g.get("low_coverage"))
 
 
 def _in_window(g: dict, window: int | None) -> bool:

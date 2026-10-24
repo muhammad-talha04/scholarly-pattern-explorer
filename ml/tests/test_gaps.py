@@ -78,6 +78,14 @@ def test_counts_from_works_fractional():
     assert abs(sum(v for _, v in top["QML"]) - 90) < 1e-6   # each paper weighs 1
 
 
+def test_counts_from_works_folds_country_case():
+    tyc, top = counts_from_works([
+        {"id": "W1", "year": 2024, "topics": ["QML"], "countries": ["ca", "CA"]},
+    ])
+    assert tyc["QML"] == {2024: 1}
+    assert top["QML"] == [["CA", 1.0]]
+
+
 def test_load_prefers_snapshot(tmp_path):
     snap = tmp_path / "snap.json"
     snap.write_text(json.dumps({"topic_year_counts": synthetic(),
@@ -97,3 +105,28 @@ def test_load_falls_back_to_works(tmp_path):
     assert src == "works"
     gaps = find_gaps(tyc, top, last_year=LAST)
     assert [g["topic"] for g in gaps] == ["QML"] and gaps[0]["top_countries"][0] == "CA"
+
+
+def test_low_coverage_flags_thin_years_and_small_topics():
+    from ml.gaps import find_gaps
+    # 2022-2024 under half of 2025 sampling: every gap in this window is low coverage.
+    tyc = {"Big": {2022: 1, 2023: 2, 2024: 400, 2025: 800},
+           "Small": {2022: 0, 2023: 1, 2024: 10, 2025: 40}}
+    gaps = find_gaps(tyc, last_year=2025, min_total=20, min_last=5)
+    assert gaps and all(g["low_coverage"] for g in gaps)
+    assert all(g["thin_years"] == [2022, 2023, 2024] for g in gaps)
+
+
+def test_well_sampled_large_topic_is_not_low_coverage():
+    from ml.gaps import find_gaps
+    tyc = {"Rising": {2022: 40, 2023: 60, 2024: 120, 2025: 240},
+           "Flat": {2022: 900, 2023: 900, 2024: 900, 2025: 900}}
+    g = {x["topic"]: x for x in find_gaps(tyc, last_year=2025)}
+    assert g["Rising"]["low_coverage"] is False
+
+
+def test_explanation_mentions_low_coverage():
+    from ml.gaps import explain_growth_gap
+    t = explain_growth_gap({"topic": "Seismology", "growth_rate": 0.5, "window_start": 2022,
+                            "window_end": 2025, "paper_count": 30, "low_coverage": True})
+    assert "this corpus" in t and "sampled" in t

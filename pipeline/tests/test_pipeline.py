@@ -3,7 +3,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from pipeline.ingest import abstract_from_index, normalize, merge
 from pipeline.country_stats import (TOPIC_COUNTRY_YEAR_COLUMNS, combine, fractional_weights,
-                                    snapshot, tally)
+                                    snapshot, tally, work_year)
 
 W = {"id": "https://openalex.org/W1", "display_name": "T", "publication_year": 2025,
      "doi": "https://doi.org/10.1/x", "abstract_inverted_index": {"hello": [0], "world": [1]},
@@ -63,6 +63,62 @@ def test_incremental_matches_full_and_counting():
     assert full["collaborations"] == [{"source": "CA", "target": "PK", "papers": 1}]
     assert full["collaborations_1n"] == [{"source": "CA", "target": "PK", "papers": 0.5}]
     assert full["collaborations_full"] == [{"source": "CA", "target": "PK", "papers": 1}]
+
+
+class _Resp:
+    def __init__(self, body, status=200):
+        self.status_code = status
+        self._body = body
+
+    def json(self):
+        return self._body
+
+
+class _Session:
+    def __init__(self, pages):
+        self.pages = pages
+        self.cursors = []
+
+    def get(self, url, params=None, timeout=None):
+        self.cursors.append(params["cursor"])
+        return _Resp(self.pages[len(self.cursors) - 1])
+
+
+def test_fetch_stops_when_cursor_repeats(monkeypatch):
+    import pipeline.ingest as ing
+    monkeypatch.setattr(ing.time, "sleep", lambda *a, **k: None)
+    session = _Session([
+        {"results": [W], "meta": {"next_cursor": "stuck"}},
+        {"results": [{**W, "id": "https://openalex.org/W2"}], "meta": {"next_cursor": "stuck"}},
+        {"results": [{**W, "id": "https://openalex.org/W3"}], "meta": {"next_cursor": "more"}},
+    ])
+    got = list(ing.fetch("2024-01-01", [], 50, session=session))
+    assert session.cursors == ["*", "stuck"]
+    assert [r["id"] for r in got] == ["W1", "W2"]
+
+
+def test_fetch_stops_on_empty_page(monkeypatch):
+    import pipeline.ingest as ing
+    monkeypatch.setattr(ing.time, "sleep", lambda *a, **k: None)
+    session = _Session([
+        {"results": [W], "meta": {"next_cursor": "page2"}},
+        {"results": [], "meta": {"next_cursor": "page3"}},
+    ])
+    got = list(ing.fetch("2024-01-01", [], 50, session=session))
+    assert session.cursors == ["*", "page2"]
+    assert [r["id"] for r in got] == ["W1"]
+
+
+def test_fetch_stops_at_max_records(monkeypatch):
+    import pipeline.ingest as ing
+    monkeypatch.setattr(ing.time, "sleep", lambda *a, **k: None)
+    session = _Session([{
+        "results": [W, {**W, "id": "https://openalex.org/W2"}, {**W, "id": "https://openalex.org/W3"}],
+        "meta": {"next_cursor": "page2"},
+    }])
+    got = list(ing.fetch("2024-01-01", [], 2, session=session))
+    assert session.cursors == ["*"]
+    assert [r["id"] for r in got] == ["W1", "W2"]
 
 
 def test_partial_run_keeps_pages(tmp_path, monkeypatch):
@@ -265,3 +321,60 @@ def test_aggregate_seeds_once_from_corpus(tmp_path):
             for r in json.loads(out.read_text())["topic_country_year"]}
     assert rows[("T7", "CA", 2023)] == 1 and rows[("AI", "PK", 2024)] == 1
     assert rows[("AI", "US", 2025)] == 1
+
+
+class _Page:
+    def __init__(self, n, per_page):
+        self.status_code = 200
+        self._n = n
+        self.per_page = per_page
+
+    def json(self):
+        return {"results": [{"id": f"https://openalex.org/W{i}", "display_name": "t",
+                             "publication_year": 2025, "publication_date": "2025-06-01"}
+                            for i in range(self._n)],
+                "meta": {"next_cursor": "more"}}
+
+
+class _PageSession:
+    def __init__(self, n):
+        self.calls = []
+        self._n = n
+
+    def get(self, url, params, timeout):
+        self.calls.append(params)
+        return _Page(self._n, params.get("per-page"))
+
+
+def test_fetch_stops_at_max_records_inside_a_page(monkeypatch):
+    import pipeline.ingest as ing
+    monkeypatch.setattr(ing.time, "sleep", lambda *_: None)
+    session = _PageSession(50)
+    rows = list(ing.fetch("2025-01-01", [], 3, session=session))
+    assert len(rows) == 3
+    assert session.calls[0]["per-page"] == "3"
+    assert len(session.calls) == 1
+
+
+def test_raw_openalex_year_is_counted_in_the_aggregate():
+    # Normalized JSONL stores `year`. A raw OpenAlex work, or a row whose year
+    # field is null, only has publication_year / publication_date.
+    raw = {"id": "https://openalex.org/Wraw", "publication_year": 2025,
+           "publication_date": "2025-04-02",
+           "authorships": [{"countries": ["PK", "CA"]}],
+           "topics": ["AI"],
+           "topic_refs": [{"id": "T1", "name": "AI"}]}
+    assert work_year(raw) == "2025"
+    dated = {"publication_date": "2024-03-01", "countries": ["US"], "topics": ["AI"]}
+    assert work_year(dated) == "2024"
+    rows = snapshot(tally([raw]))["topic_country_year"]
+    assert {(r["topic_id"], r["country_code"], r["year"]): r["fractional_count"] for r in rows} == {
+        ("T1", "CA", 2025): 0.5, ("T1", "PK", 2025): 0.5}
+    assert "None" not in snapshot(tally([raw]))["tally"]["by_year"]["PK"]
+    # no year and no date: the paper is not filed under the string "None"
+    undated = {"id": "Wundated", "countries": ["PK"], "topics": ["AI"],
+               "topic_refs": [{"id": "AI", "name": "AI"}]}
+    assert work_year(undated) is None
+    snap = snapshot(tally([undated]))
+    assert snap["topic_country_year"] == []
+    assert "None" not in snap["tally"]["by_year"].get("PK", {})

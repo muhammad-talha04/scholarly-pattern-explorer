@@ -19,6 +19,11 @@ def test_inverted_index_and_links():
                              "publication_year": 2020, "topics": [{"display_name": "A"}],
                              "abstract_inverted_index": {"hi": [0]}})
     assert p.work_id == "W9" and p.abstract == "hi" and p.topics == ["A"]
+    inst_only = Paper.from_openalex({
+        "id": "https://openalex.org/W10",
+        "authorships": [{"institutions": [{"country_code": "ca"}]}],
+    })
+    assert inst_only.countries == ["CA"]
     assert p.openalex_url == "https://openalex.org/W9" and p.doi_url == "https://doi.org/10.1/x"
     from ml.papers import is_placeholder_doi, reader_url
     assert is_placeholder_doi("https://doi.org/10.1234/spe.0")

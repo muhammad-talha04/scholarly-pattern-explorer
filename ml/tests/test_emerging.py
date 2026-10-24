@@ -87,6 +87,18 @@ def test_rows_from_works_match_table_schema_and_fractional_counts():
     assert raw["topic_name"] == "From Raw"
 
 
+def test_rows_from_works_reads_institution_country_when_countries_missing():
+    works = [{
+        "id": "W9", "year": 2024, "topics": ["Alpha"],
+        "authorships": [
+            {"author": {"display_name": "A"}, "institutions": [{"country_code": "ca"}]},
+            {"author": {"display_name": "B"}, "countries": ["pk"]},
+        ],
+    }]
+    codes = {r["country_code"] for r in rows_from_works(works)}
+    assert codes == {"CA", "PK"}
+
+
 def test_combine_rows_matches_full_count():
     batch1 = [
         {"id": "W1", "year": 2024, "topics": ["Alpha"], "countries": ["CA", "PK"]},

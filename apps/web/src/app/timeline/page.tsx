@@ -9,4 +9,4 @@ export default function Page({ searchParams }: { searchParams?: { corpus?: strin
   return <TimelinePage scale={scale} initialYear={initialYear} />;
 }
 
-export const metadata = pageMeta("/timeline", "Topic progress over time", "How AI research topics rise and fall over time in a two-year OpenAlex sample.");
+export const metadata = pageMeta("/timeline", "Topic progress over time", "How computer science topics rise and fall over time in a 2015 to 2026 OpenAlex sample.");
