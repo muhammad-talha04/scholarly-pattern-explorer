@@ -70,6 +70,7 @@ def test_thin_topic_beside_busy_neighbors():
     assert thin["kind"] == "density"
     assert thin["paper_count"] == 2
     assert "Thin" in thin["explanation"] and "Alpha" in thin["explanation"]
+    assert {e["id"] for e in thin["example_papers"]} <= {"T0", "T1"}
     assert {e["id"] for e in thin["example_papers"]} & {"T0", "T1"}
 
 

@@ -65,6 +65,62 @@ def test_incremental_matches_full_and_counting():
     assert full["collaborations_full"] == [{"source": "CA", "target": "PK", "papers": 1}]
 
 
+class _Resp:
+    def __init__(self, body, status=200):
+        self.status_code = status
+        self._body = body
+
+    def json(self):
+        return self._body
+
+
+class _Session:
+    def __init__(self, pages):
+        self.pages = pages
+        self.cursors = []
+
+    def get(self, url, params=None, timeout=None):
+        self.cursors.append(params["cursor"])
+        return _Resp(self.pages[len(self.cursors) - 1])
+
+
+def test_fetch_stops_when_cursor_repeats(monkeypatch):
+    import pipeline.ingest as ing
+    monkeypatch.setattr(ing.time, "sleep", lambda *a, **k: None)
+    session = _Session([
+        {"results": [W], "meta": {"next_cursor": "stuck"}},
+        {"results": [{**W, "id": "https://openalex.org/W2"}], "meta": {"next_cursor": "stuck"}},
+        {"results": [{**W, "id": "https://openalex.org/W3"}], "meta": {"next_cursor": "more"}},
+    ])
+    got = list(ing.fetch("2024-01-01", [], 50, session=session))
+    assert session.cursors == ["*", "stuck"]
+    assert [r["id"] for r in got] == ["W1", "W2"]
+
+
+def test_fetch_stops_on_empty_page(monkeypatch):
+    import pipeline.ingest as ing
+    monkeypatch.setattr(ing.time, "sleep", lambda *a, **k: None)
+    session = _Session([
+        {"results": [W], "meta": {"next_cursor": "page2"}},
+        {"results": [], "meta": {"next_cursor": "page3"}},
+    ])
+    got = list(ing.fetch("2024-01-01", [], 50, session=session))
+    assert session.cursors == ["*", "page2"]
+    assert [r["id"] for r in got] == ["W1"]
+
+
+def test_fetch_stops_at_max_records(monkeypatch):
+    import pipeline.ingest as ing
+    monkeypatch.setattr(ing.time, "sleep", lambda *a, **k: None)
+    session = _Session([{
+        "results": [W, {**W, "id": "https://openalex.org/W2"}, {**W, "id": "https://openalex.org/W3"}],
+        "meta": {"next_cursor": "page2"},
+    }])
+    got = list(ing.fetch("2024-01-01", [], 2, session=session))
+    assert session.cursors == ["*"]
+    assert [r["id"] for r in got] == ["W1", "W2"]
+
+
 def test_partial_run_keeps_pages(tmp_path, monkeypatch):
     import pipeline.ingest as ing
     def fake(*a, **k):

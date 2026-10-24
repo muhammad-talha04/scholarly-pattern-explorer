@@ -77,6 +77,10 @@ Last updated: 2026-10-24 ~12:30 PKT by the ML Cowork crew: the CS load is finish
 - New `eval/acceptance.py` (stdlib only, hits the live API and OpenAlex, not run in CI). Run `python eval/acceptance.py` after every deploy or data reload; exit 0 means all checks pass.
 - Checks: every route returns 200 within 10 s when warm; growth shown only with ≥30 papers in both periods; fewer than half of the shown countries below −50% (kill criterion §11.6); corpus YTD growth within ±5 pp of OpenAlex's own count for the same filter and window; the tumour paraphrase query has ≥3/5 on-topic results; "dark matter detection" and "coral reef bleaching" return no results.
 - First run, 16 Oct ~16:45 PKT: 11/16 pass. The expected failures: 9/9 shown countries below −50%, corpus growth −85.6% vs OpenAlex +37.3%, tumour query 0/5, and both out-of-corpus queries return 20 results. These should pass after the even monthly re-sample (luni/ami) and the bge-small switch with a per-query cutoff (bob). Treat 16/16 as the release gate for turning `NEXT_PUBLIC_SHOW_GROWTH` back on.
+Last updated: 2026-10-22: read-only audit after PR #20, plus a small research-quality fix (see Audit Oct 22). Earlier, 2026-10-16 ~15:00 PKT by olli: disabled the `v2 ingest (twice a month)` workflow and fixed country growth (see below). Earlier, 2026-10-16 ~12:00 PKT: added §11 "External review (council)" to `docs/HANDOVER.md`. Earlier on 2026-10-16: added `docs/HANDOVER.md` (handover report for the next team). Earlier, 2026-10-15 by harry (demo-data links, paper-count badge, Render blueprint); earlier the same day by harry (Embedding Lens plexus breath zoom, Champagne & Platinum, galaxy copy), lura (merged #13, #14, #15 and #11; #16 waiting on token `workflow` permission), tom (ML row) and ami (integration tests row).
+
+## 2026-10-22 (audit)
+- **Audit only, plus five safe fixes.** Share-of-corpus change is the difference of the rounded percents. OpenAlex `fetch` stops on an empty page, a repeated cursor, and `max_records`. Density-gap examples are papers from the thin topic. "1 paper studies" is grammatical. Country codes from author countries and institution `country_code` are uppercased in `Paper.from_openalex`, ingest, the emerging raw fallback, and gap counts. Nothing else in search, the emerging ranker, snapshots, or embedder defaults changed. Findings, metric reruns, and reviews of #20, #40, and #43 are in **Audit Oct 22** below. #16, #20, #40, and #43 stay open.
 
 ## 2026-10-16 (olli)
 - **Ingest paused.** The `v2 ingest (twice a month)` GitHub Actions workflow is disabled (state `disabled_manually`), so the 1 Nov 08:00 PKT run will not mix a new embedding model into the hash-embedded corpus. Re-enable only after the embedding model is chosen and set in the workflow config. Workflow files were not edited.
@@ -251,6 +255,123 @@ Set these in the Render dashboard. `render.yaml` lists them as `sync: false`.
 | Collaborations | Default `limit` 200. |
 | Gaps, emerging, semantic gaps | 20, 20, and 10 inside `ml_bridge`. These are topic rows, not the corpus. |
 | OpenAlex ingest | 200 works per page. `--max-records` default 50000. The first anonymous page of the search-eval fetch is 50 ids. |
+
+## Audit Oct 22
+
+Read-only pass of `main` at `8eb49ba` (after PR #20 was opened, through the 2026-10-18 weekly snapshots). Nothing in this section was merged from another PR. Live API checked the same day: https://scholarly-pattern-explorer.onrender.com .
+
+### What landed after #20 was opened
+
+#16 and #20 are still open. Almost every merge below is by muhammad-talha04; the commit author is named when it differs.
+
+| PR | State | What changed |
+|---|---|---|
+| #16 `cursor/precomputed-discoveries-4506` | Open, conflicting | Read growth gaps and emerging topics from the discoveries snapshot. Touches `v2-ingest.yml` (workflow permission). Semantic gaps on main already come from the snapshot via #26. Growth gaps and emerging still compute live. |
+| #18 | Merged 2026-10-15 | Embedding Lens landing galaxy (harry). Web files. The #18 checkboxes above are still open even though this merged. |
+| #20 `cursor/stable-cluster-identity-a2c6` | Open, head `886111a` | Galaxy `color_index` plus an eval-only topic walk. Reviewed below. |
+| #22 | Merged | Placeholder DOI stripped, demo-data links, `render.yaml` (cursoragent). |
+| #23 | Merged | `psycopg` in `apps/api/requirements.txt`. |
+| #24 | Merged | STATUS note for the 14k load. |
+| #25 | Merged | `deploy/data` snapshots and `ml/paths.py` fallback when `RENDER` or `SPE_DEPLOY_SNAPSHOTS`. |
+| #26 | Merged | `ml_bridge` serves semantic gaps from the discoveries snapshot. |
+| #27, #28 | Merged | `docs/HANDOVER.md`, then the council review in §11. |
+| #29 | Merged (evan) | Web labels, regions, SEO, `/about`, growth null, `NEXT_PUBLIC_SHOW_GROWTH` default off. |
+| #31 | Merged (olli) | Equal-period country growth, 30-paper minimum, partial-year hide, snapshot regen. |
+| #32 | Merged (olli) | Batched resumable indexer, model guard, pg pool, search timings, migrations off by default. |
+| #33 | Merged (olli) | Stratified galaxy sample and in-process cache. |
+| #34 | Merged (evan) | Hero galaxy `?limit=600`, deferred 3D. |
+| #35 | Merged (evan) | Share column behind `NEXT_PUBLIC_SHOW_SHARE` (default off). |
+| #36 | Merged (evan) | "No close matches" UI, 120s timeout, share to 2 decimals. No server-side score floor. |
+| #37 | Merged (olli) | `share_pct` / `share_prev_pct` / `share_change_pp`. |
+
+Also on main, not a PR: 2026-10-18 weekly snapshot commits refresh `docs/LATEST.md`, `docs/canada/LATEST.md`, and the chart CSVs. They do not change v2 search or gap logic.
+
+Still open, not merged here: #21 (color-keyed `emerging_score`, depends on #20), #30 (fastembed, superseded by #43), #38 (hero copy), #39 (seeded per-month ingest sample), #40 (acceptance checks), #41 (SSR first rows), #42 (location quotient), #43 (fastembed bge and score floor), #44 (`/ask` rate limit), #45 (gap `low_coverage` flags), #46 (OG share card).
+
+### Shortlist
+
+None of the features in `docs/research/FEATURE_SHORTLIST.md` landed (OpenAlex filter, retraction, facets, BibTeX, most-cited sort, citation timeline, literature connector, authors/institutions, funders, abstract evidence table). Compare, collections, the related-paper map, the tour, and the citation map are already in release 1/2 and were left off that shortlist on purpose.
+
+### Where this file disagrees with the repo
+
+- The header says v2 ingest is `disabled_manually`. The "External review" paragraph still says the workflow is `active` and that nothing landed after #27. Both later sentences are stale. `gh` shows the workflow disabled. Commits and PRs after #27 are listed above.
+- The #18 checkboxes are still open. #18 merged.
+- The gap-finder paragraph says `eval/search_queries.jsonl` has 35 queries. The file has 40 (`q01`–`q40`), matching the qrels.
+- The open-items line for #16 says gap and emerging routes still compute live. Semantic gaps are served from `deploy/data/ml/snapshots/discoveries-2026-10-15.json` (#26). Growth gaps and emerging topics still compute live.
+- `ml/emerging.py` still says the ranker is "PR #6, not on main yet". It is on main.
+
+### Search metrics (2026-10-22)
+
+Same qrels as PR #10 (`eval/search_qrels.jsonl`, 40 queries, 255 judged works). Offline fixture (`ml/tests/test_score_search.py`, hash, 2 papers): nDCG@10 1.0, Recall@20 1.0, MRR 1.0.
+
+| Embedder | nDCG@10 | Recall@20 | MRR | vs PR #10 |
+|---|---|---|---|---|
+| Hash on the 255 judged works | 0.7413 | 0.8704 | 0.9177 | PR #10 hash was 0.7406 / 0.8704 / 0.9177. Recall and MRR match. nDCG is 0.0007 higher. |
+| MiniLM `sentence-transformers/all-MiniLM-L6-v2` on the same 255 | 0.9308 | 1.0 | 0.9708 | Exact match to the PR #10 MiniLM baseline. |
+| Live Render API | hash | | | `GET /search?q=quantum%20error%20correction&limit=3` scores 0.6547 / 0.6405 / 0.4965, the same numbers as the hash column in #43's report. |
+
+**Live search uses hash embeddings, not MiniLM.** `render.yaml` does not pin `ML_EMBEDDER` (`sync: false`). The code default when the variable is unset is MiniLM. The running service has `ML_EMBEDDER=hash`. MiniLM qrel numbers do not describe what users get. Hash scores 0/9 paraphrases in the #43 report (the tumour query's top hit is a solar-irradiance paper).
+
+### Pattern stability
+
+`eval/pattern_stability.py` builtin sample. Fixed-topic pattern Jaccard is 1.0 (103 patterns, support MAE 0) on every run below.
+
+| Tree | topic drift | color_index |
+|---|---|---|
+| `main` `8eb49ba` | 0.6667 (Beta splits: Alpha 2, Beta 1). Same as the PR #10 baseline. | Field does not exist. |
+| #40 `william/acceptance-checks` `2b8a9bd` | 0.6667, same split. The branch does not touch the script or the galaxy. | Field does not exist. |
+| #20 `886111a` | `before` 0.6667 (the old walk). Reported `topic_drift` 0.0, split count 0. | Hungarian match (cosine minimum 0.5). Tests: a refit keeps the centroid's color; a new cluster under the threshold gets a fresh color; a stored graph with no `color_index` is filled from the cluster id (`2`, `-1`, and a stored `7` stays `7`). |
+
+### Review: #20 (`886111a`) — changes needed
+
+The color half can land. `ensure_color_index` fills a missing `color_index` from the cluster id so older galaxy documents still validate, stored colors win, and unclustered or non-numeric ids become `-1`. The merge of main is in the branch. Two limits: the fallback is the cluster id until a rebuild writes `color_of`, so the live 14k galaxy does not keep colors across a refit until `galaxy --refit`; the fill is in memory only and is not written back with `put_document`.
+
+The topic half overclaims. `topic_drift` 0.0 comes from `eval/pattern_stability.py`, which now labels every seed in the batch at once and does not walk papers in year order. `ml/incremental.py` is unchanged against main. The twice-monthly miner still assigns topic-less papers from the centroids it is given on arrival. The old 0.6667 result is still there as `assign_online` / `report["before"]`. `ml.cli --refit` only passes through to `rebuild_galaxy`; it does not refit topic labels. Do not treat 0.0 as evidence that production incremental topics are stable. Narrow the PR text, or put the same rule in `IncrementalMiner`, before calling the topic half done.
+
+### Review: #40 — do not merge as a fix
+
+`eval/acceptance.py` is a useful post-deploy gate and is not in CI. Run on 2026-10-22: 11/16 checks passed, matching the PR's own claim. It correctly fails today: 9/9 shown countries are below −50% growth; this corpus is about −85.6% over the window while OpenAlex subfield 1702 articles are about +38.1% (the PR text said +37.3%; the OpenAlex side moves). The tumour paraphrase returned 0/5 title matches; dark matter and coral reef each returned 20 hits.
+
+Limits if this is used as a gate: the empty-result checks need a non-zero score floor, and #43's hash floor is 0, so they still fail while production stays on hash. The OpenAlex comparison is the full subfield against this sample's fractional country-paper sum (papers with no country are excluded). `openalex_count` is not caught, so a 403 aborts the rest of the script. The tumour check is a title regex. Growth is summed over every country, including ones the UI hides.
+
+### Review: #43 — do not merge as the production switch
+
+The report is on the right corpus (the live 14,159 works) and shows hash cannot do paraphrase search. bge-small scores 18/18 of their in-corpus queries; MiniLM scores 16/18. That judgment set is the author's, pooled across embedders, and it overlaps the PR #10 qrels in only 4 relevant papers / 3 queries. An nDCG on those 3 queries is not comparable to 0.9308. The bge cutoff margin is thin (off-topic max about 0.649, relevant min about 0.673). Re-embedding the corpus is a separate job. While `ML_EMBEDDER=hash`, search behavior does not change. The floor lookup uses the last path segment of the model id, so a Qdrant ONNX id gets floor 0. This supersedes #30.
+
+### Bugs by severity
+
+**High (listed, not fixed here)**
+
+- Live search is hash. Paraphrase queries fail. MiniLM qrel numbers are not the production system.
+- Emerging topics and growth gaps say a topic "grew about 133% a year from 2022 to 2025" when the corpus has zero papers in 2022 and 2023 (it starts 2024-10-15). The rate is the cap: smoothed steps `[0, 2, 2]` become `min(4/3, 2) = 1.3333`. The top 20 emerging rows in the committed discoveries snapshot are all 1.3333. Dropping the empty years would still pin many topics on the +200% cap (partial 2024 vs full 2025). The ranker was not changed. Hardcoding 2024 as a partial year inside the ranker would empty the list and break tests that treat 2024 as a full year. #45 would flag `low_coverage` and does not stop the number.
+- Semantic gaps in the committed snapshot were built from hash vectors. Similarity near 0.96 between unrelated topics is not a meaning match. Density-gap examples round-robin neighbor topics, so the stored ECG examples are not ECG papers. The example picker is fixed below for the next `discover` run; the snapshot was not regenerated, so Render still serves the old examples until then.
+- Shown country growth is about −79% to −90% (median about −82.9) against OpenAlex subfield growth of about +38%. The arithmetic matches the spec. The corpus is front-loaded. The median test stays xfail. #40's kill criterion fails for this reason.
+
+**Medium**
+
+- `render.yaml` does not pin `ML_EMBEDDER`. A deploy with the variable unset loads MiniLM. The indexer refuses a mixed table; a search query can still be embedded with the wrong model.
+- `v2-ingest.yml` runs `ml.cli index` without `ML_EMBEDDER=hash`. The workflow is `disabled_manually`. Re-enable it only after the model is chosen.
+- A country or year filter over-fetches 5× the search cap and then slices, so a filter can under-return.
+- `GET /countries?counting=per_country` returns fractional totals and `counting="fractional"`. Collaboration weights do change. The label was left as documented.
+- #16 is open and conflicting. Growth gaps and emerging topics are still computed on request.
+- `share_change_pp` in the committed country snapshot is off by 0.01 points for GB and DE (4.77 − 4.03 was stored as 0.75). The code now subtracts the rounded percents. The 5.3 MB snapshot was not rewritten; the next `country_stats` run picks this up.
+- `score_search.py --fetch` refuses more than 50 ids in one call without `OPENALEX_API_KEY`, even though each anonymous page of 50 succeeds. The bulk-needs-a-key rule from #14 was left as is.
+- #40 and #43 limits are in the reviews above.
+
+**Low**
+
+- STATUS contradictions listed above. Five queries have no relevance-1 qrel (tests only require grades 0 and 2). `country_stats --dates` replaces date counters instead of merging them. Collaboration pair keys split on a hyphen (ISO-2 codes are fine). Weekly snapshot commits refresh v1 charts only.
+
+No test file was deleted after 2026-10-15. `ml/tests/test_embedder_real.py` still skips unless `ML_RUN_REAL_EMBED=1`. The growth-median xfail is intentional.
+
+### Fixed in this change
+
+1. `share_change_pp` is `round(share_pct - share_prev_pct, 2)`.
+2. `pipeline.ingest.fetch` stops when a page is empty, when `next_cursor` is missing or equal to the cursor just used, and once `max_records` works have been yielded.
+3. A density gap's example papers come only from that topic. One co-occurring paper "studies" the two topics.
+4. `countries_from_authorships` uppercases author countries and institution `country_code`. `Paper.from_openalex`, `pipeline.ingest.normalize`, and the emerging fallback (when a row has no `countries` key) use it. `counts_from_works` folds case so `ca` and `CA` are one country.
+
+Not fixed here, on purpose: the emerging window, the hash production embedder, regenerating `discoveries-2026-10-15.json` or `country_snapshot.json`, and merging #16, #20, #40, or #43.
 
 ## Open items
 - [ ] #16 read gaps and emerging topics from the precomputed discoveries snapshot: reviewed, tests pass with main merged in (ml+pipeline 91, api 27, integration 42). The merge resolution changes `.github/workflows/v2-ingest.yml` (discover step + upload of the refreshed `discoveries.json` after `ml.cli update`), and the push was refused because the bot token lacks the `workflow` permission. Needs a token with Workflows read/write, or the owner pushes the merge. Until #16 lands, gap/emerging routes still compute live.

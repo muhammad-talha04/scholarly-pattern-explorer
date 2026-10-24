@@ -52,9 +52,8 @@ def topic_refs(w: dict) -> list[dict]:
 
 
 def normalize(w: dict) -> dict:
-    countries = sorted({c for a in w.get("authorships") or []
-                        for c in (a.get("countries") or [])
-                        + [i.get("country_code") for i in a.get("institutions") or []] if c})
+    from ml.papers import countries_from_authorships
+    countries = countries_from_authorships(w.get("authorships"))
     loc = w.get("primary_location") or {}
     oa = w.get("open_access") or {}
     return {
@@ -109,10 +108,18 @@ def fetch(since: str, filters: list[str], max_records: int, session=requests):
         else:
             raise SystemExit(f"OpenAlex kept failing: HTTP {r.status_code}")
         data = r.json()
-        for w in data.get("results", []):
+        results = data.get("results") or []
+        if not results:
+            break
+        for w in results:
+            if got >= max_records:
+                break
             got += 1
             yield normalize(w)
-        cursor = (data.get("meta") or {}).get("next_cursor")
+        next_cursor = (data.get("meta") or {}).get("next_cursor")
+        if got >= max_records or not next_cursor or next_cursor == cursor:
+            break
+        cursor = next_cursor
         time.sleep(0.15)
 
 

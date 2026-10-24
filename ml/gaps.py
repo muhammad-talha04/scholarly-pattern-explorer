@@ -48,7 +48,7 @@ def counts_from_works(works) -> tuple[dict, dict]:
         topics = [t for t in (d.get("topics") or []) if t]
         if not year or not topics:
             continue
-        cs = sorted(set(d.get("countries") or []))
+        cs = sorted({str(c).strip().upper() for c in (d.get("countries") or []) if c and str(c).strip()})
         for t in dict.fromkeys(topics):
             tyc[t][int(year)] += 1
             for c in cs:
