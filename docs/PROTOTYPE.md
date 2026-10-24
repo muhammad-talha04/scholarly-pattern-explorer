@@ -1,0 +1,355 @@
+> **Archive.** This is the README of the first version (a Streamlit dashboard over a Canadian and an AI corpus). The current project is described in the [main README](../README.md).
+
+# Scholarly Pattern Explorer
+
+Sliding-window frequent-pattern mining over the OpenAlex scholarly graph, with a
+six-view visual analytics front end.
+
+The question this answers: **which combinations of research topics are emerging,
+and which is the field abandoning?** Counting single topics cannot answer that —
+"machine learning" has been popular for twenty years. What actually changes is
+which topics start appearing *together*, and the window in which a pair first
+becomes frequent is a research direction being born.
+
+![Pattern lifecycles](../screenshots/tab3_pattern_lifecycles.png)
+
+Each line is one mined topic pair. Support is 0 in windows where the pair was not
+frequent, so a line climbing off the floor is a combination being born and a line
+falling to the floor is one the field left behind.
+
+## What it does
+
+1. Pulls papers from the OpenAlex API into JSONL, resuming from a saved cursor if
+   the connection drops.
+2. Loads them into a normalised database (DuckDB or SQLite) — eight tables, bulk
+   inserted, indexed *after* the load.
+3. Treats each paper as a *transaction* whose *items* are its topics, then runs
+   FP-Growth over overlapping three-year windows and writes every frequent
+   itemset and association rule back into the same database.
+4. Serves six linked views over those stored results — a world map of where
+   the research comes from, the raw topic data, the mined patterns themselves,
+   their lifecycles, the co-authorship graph, and link-prediction model
+   performance — either for the whole corpus or filtered to a single country
+   from a searchable sidebar dropdown.
+5. Refreshes itself: a scheduled GitHub Actions workflow re-fetches new papers
+   daily and re-mines weekly, so the corpus and patterns stay current without
+   anyone running a script by hand.
+
+Storing the mined patterns alongside the raw data is what makes the front end
+interactive, and what makes pattern *lifecycles* possible at all: the support of
+one itemset can be drawn across 25 windows because all 25 answers are already on
+disk.
+
+## The six views
+
+| View | What it shows |
+|---|---|
+| 1. World | a choropleth of where the research comes from, plus international-collaboration strength and output over time |
+| 2. Raw data | topic frequency, plus a topic-by-topic co-occurrence heatmap built with a self-join |
+| 3. Mined patterns | frequent itemsets for the selected window, and association rules plotted confidence against lift |
+| 4. Pattern lifecycles | support of any chosen itemsets across every window |
+| 5. Co-authorship network | the collaboration graph behind the papers that contain one mined pattern |
+| 6. Link prediction | AUC/AP of seven models (common neighbours, Jaccard, Adamic-Adar, preferential attachment, node2vec, topic similarity, a graph-aware MLP) at predicting who will co-author next; on the Canadian corpus the graph-aware MLP reaches AUC 0.91 against 0.67 for common neighbours |
+
+<p align="center">
+  <img src="../screenshots/world_map.png" width="45%">
+  <img src="../screenshots/tab1_topic_distribution.png" width="45%">
+  <img src="../screenshots/tab2_frequent_itemsets.png" width="45%">
+  <img src="../screenshots/tab4_coauthor_network.png" width="45%">
+  <img src="../screenshots/link_metrics.png" width="45%">
+  <img src="../screenshots/tab1_cooccurrence_heatmap.png" width="45%">
+  <img src="../screenshots/tab2_association_rules.png" width="45%">
+</p>
+
+Every screenshot here is the AI · global corpus described below, in the
+2024–2026 window.
+
+View 5 is the part I did not expect to work. In the Canadian corpus, scope the
+co-authorship network to papers carrying both *Quantum Computing Algorithms and
+Architecture* and *Quantum Information and Cryptography* in 2020–2022, and
+Louvain community detection on the full graph (604 authors, 5,393 links)
+separates a 37-author community around Alexandre Blais at Sherbrooke from a
+59-author community around D-Wave's hardware team (R. Harris, M. H. S. Amin,
+Isil Ozfidan). The two communities share no direct co-authorship link; the
+shortest path from Blais to Harris runs through four collaborations.
+
+No affiliation or institution data is used anywhere in the pipeline.
+`python verify_quantum_communities.py` reproduces these numbers. The dashboard
+caps the graph at the top 800 co-author pairs, so it shows a smaller slice.
+
+## Findings
+
+Two corpora were mined. The headline run is **44,047 Canadian computer-science
+papers, 2000–2026** (`country_code:ca`, cited 10+), 2,064 topics, 82,266 authors,
+mined at `--min-support 0.005` into 5,734 pattern rows across 25 windows. A
+larger run covers **188,462 papers in the Artificial Intelligence subfield**.
+Both are also mined per country — pick any country with enough papers from the
+sidebar to re-run every view against just its authors — and both are kept
+current automatically (see [Automation](#automation) below).
+
+Change in support between the first and last window in which each pair appears:
+
+| Emerging | Δ support | | Declining | Δ support |
+|---|---|---|---|---|
+| Quantum computing + quantum information | +0.029 | | Software-engineering methodologies | −0.014 |
+| Anomaly detection + intrusion detection | +0.024 | | Wireless communication techniques | −0.012 |
+| Malware + intrusion detection | +0.019 | | Database systems + data management | −0.012 |
+| Cryptography + privacy-preserving computation | +0.015 | | Software engineering research | −0.010 |
+| Blockchain + IoT | +0.013 | | Graph theory + complexity | −0.010 |
+| AI in cancer detection + radiomics | +0.011 | | Fuzzy logic + neural networks | −0.009 |
+| NLP + topic modelling | +0.010 | | Graph theory + graph labelling | −0.007 |
+
+Network-security anomaly detection first clears the support threshold in the
+2017–2019 window and rises from there; the fuzzy-logic/neural-network pairing
+that dominated the early 2000s falls away by the mid-2010s. Neither result is
+surprising to anyone who works in the field, which is the point — a miner that
+did *not* recover them would be wrong.
+
+## Limitations
+
+**The citation filter biases the newest windows.** Keeping only papers cited ten
+or more times means recent work is under-represented: 7,206 papers in 2020–2022
+against 2,013 in 2024–2026, because a 2025 paper has not had time to accumulate
+citations. Supports in the last two windows therefore favour fast-cited work and
+should not be read as a clean measure of current activity. The emerging patterns
+above all cross the threshold years before the thin windows begin, so the trends
+survive, but the absolute values in 2023–2026 do not.
+
+**Topics are OpenAlex's, not mine.** Each paper carries machine-assigned topic
+labels. Errors in that assignment propagate straight into the itemsets.
+
+**A window is three years and steps by one.** Consecutive windows share two
+thirds of their papers, so the support curves are smoothed by construction; a
+one-window spike is not evidence of anything.
+
+**Support says nothing about causation.** Two topics co-occurring frequently may
+share a venue, a funding programme, or a single prolific group, which is exactly
+why view 5 exists — it shows you *whose* papers produced the pattern.
+
+## Quick start
+
+Python 3.10 or newer, and Streamlit 1.49 or newer for the front end. No API key
+and no network are needed for the demo: the sample generator writes JSONL in the
+real OpenAlex response shape, with three signals planted in it.
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows;  source .venv/bin/activate elsewhere
+pip install -r requirements.txt
+
+python make_sample_data.py      # synthetic corpus, real JSON shape
+python build_db.py              # schema, bulk load, then indexes
+python mine_windows.py          # FP-Growth per window, results back into the DB
+streamlit run app.py            # http://localhost:8501
+```
+
+Three commands verify the work without opening a browser:
+
+```bash
+python test_fpgrowth.py                          # miner vs brute force
+python analytics.py --db data/openalex.duckdb     # every query, with row counts
+python verify_quantum_communities.py             # the View 5 and link-prediction numbers above
+```
+
+`pip install -r requirements-dev.txt` adds mlxtend, which makes
+`test_fpgrowth.py` additionally compare the miner against a second, independent
+FP-Growth implementation. It is deliberately not in `requirements.txt`, since
+nothing the app runs imports it — torch, gensim and scikit-learn *are* in
+`requirements.txt`, but only because `linkpred.py` needs them for the
+link-prediction view.
+
+`python check_setup.py` checks the environment first if anything looks wrong.
+
+To mine real data, set `OPENALEX_API_KEY` in your environment (never in a file),
+count before you download, then fetch:
+
+```bash
+python fetch_openalex.py --subfield-id 1702 --min-cited 20 --count-only
+python fetch_openalex.py --subfield-id 1702 --min-cited 20 --max-records 200000
+python build_db.py  --input data/works_real.jsonl --db data/openalex.duckdb
+python mine_windows.py --db data/openalex.duckdb --min-support 0.005
+```
+
+`--count-only` spends one API call to tell you how many papers match. Use it.
+A slice that is too small is worse than no slice: at roughly 175 papers per
+window, a "frequent" pattern needs only three papers to qualify, and you are
+mining noise.
+
+## Automation
+
+The corpus does not go stale, and it does not need anyone's laptop turned on.
+Two GitHub Actions workflows run on GitHub's own servers:
+
+| Workflow | Schedule | Does |
+|---|---|---|
+| `daily-fetch.yml` | 03:00 UTC, every day | Pulls papers published in the last 45 days for both corpora. Only rebuilds and re-mines if something new actually arrived. |
+| `weekly-mine.yml` | 04:00 UTC, every Sunday | A 3-year catch-up fetch, a full rebuild and re-mine of both databases (including per-country patterns and co-authorship link prediction), and republishes the small public snapshot under `docs/`. |
+
+Both databases and their raw JSONL live on this repo's `data-store` release
+rather than in git — GitHub blocks any committed file over 100 MB — and each
+workflow downloads them at the start of a run and uploads the updated copies at
+the end. Either one can also be triggered by hand from the repo's **Actions**
+tab with "Run workflow", no local setup required.
+
+## Files
+
+| File | Role |
+|---|---|
+| `dbconn.py` | one adapter over DuckDB and SQLite, with a bulk-load fast path |
+| `schema.sql` / `indexes.sql` | eight tables; indexes deliberately kept separate |
+| `fpgrowth.py` | FP-Growth and association-rule generation, written from scratch |
+| `test_fpgrowth.py` | checks it against brute force, and against mlxtend if installed |
+| `make_sample_data.py` | synthetic corpus with planted signals |
+| `build_db.py` | JSONL to database, with an orphan-row check |
+| `mine_windows.py` | sliding windows, constraint push-down, results persisted |
+| `analytics.py` | every SQL query in the project, with a command-line self-test |
+| `app.py` | the Streamlit front end — contains no SQL at all |
+| `ui_style.py` | CSS, colour palette, Plotly styling and HTML cards for `app.py` — kept apart so `app.py` reads as "what is shown" and this reads as "how it looks" |
+| `.streamlit/config.toml` | base theme colours, kept in sync by hand with the palette in `ui_style.py` |
+| `fetch_openalex.py` | resumable OpenAlex downloader — one-shot bulk download to start a new corpus |
+| `refresh.py` | incremental fetch used by the automation — appends only new papers since the last run |
+| `mine_countries.py` | per-country patterns and rules, for the sidebar's country filter |
+| `countries.py` | country name/code lookups shared by the app and the miner |
+| `linkgraph.py` / `linkpred.py` | co-authorship graph, temporal train/test split, and the link-prediction models |
+| `test_linkpred.py` | self-check for the link-prediction heuristics on a tiny synthetic graph |
+| `verify_quantum_communities.py` | reproduces the View 5 community finding (Louvain on the full 2020–2022 quantum co-authorship graph) and prints the stored link-prediction metrics |
+| `export_snapshot.py` | writes the small public snapshot (`docs/`) that `weekly-mine.yml` commits |
+| `check_setup.py` | environment check |
+| `check_corpus.py` | read-only report on what's actually inside `works_real.jsonl` |
+| `clean_corpus.py` | writes a filtered copy of a JSONL corpus; never overwrites the original |
+| `diagnose_429.py` | sends six minimal requests to isolate why OpenAlex is rejecting a request |
+| `pipeline_common.ps1` / `refresh_daily.ps1` / `weekly_pipeline.ps1` / `publish_github.ps1` | the original Windows Task Scheduler automation; superseded by `daily-fetch.yml` / `weekly-mine.yml` but kept for running the pipeline by hand on a local machine |
+
+The split between `analytics.py` and `app.py` is intentional. UI code is hard to
+test and query code is easy to test, so all the SQL lives in one module with its
+own CLI self-test (`python analytics.py --db data/openalex.duckdb`), and the app
+is a thin rendering layer over it.
+
+## Implementation notes
+
+**FP-Growth is written by hand**, not imported. `test_fpgrowth.py` mines the same
+transactions by brute force and asserts the two agree exactly — 363, 99 and 19
+itemsets at minimum counts of 5, 15 and 40 — and additionally checks against
+mlxtend when that library is available, skipping cleanly when it is not.
+
+**Bulk loading matters more than the algorithm did.** The first version used
+`executemany`, which DuckDB performs row by row, and it hung for over half an hour
+on 188k papers with the indexes already in place. `DB.many()` now registers a
+pandas DataFrame and runs `INSERT INTO t SELECT * FROM _bulk_rows` in 100k
+chunks, and the indexes are created afterwards from `indexes.sql`. If the fast
+path ever fails mid-stream it falls back to the slow path at the exact offset
+reached, so no row is inserted twice.
+
+**Sparse series must be zero-filled.** An itemset that is not frequent in a
+window has no row, so a naive plot connects 2004 straight to 2013 and the
+emergence disappears. `pattern_timeseries` reindexes over the full
+window-by-pattern product with `fill_value=0.0`.
+
+**Streamlit's cache ignores underscore-prefixed arguments.** That is how you pass
+an unhashable database connection, but it also means switching database files in
+the sidebar does not invalidate anything — the header showed one corpus while the
+charts showed another. The fix is to pass the path in as an ordinary argument
+purely so it joins the cache key.
+
+**The co-authorship graph needs two filters to be readable.** Restricting it to
+the papers containing every topic of one itemset, and then to the largest
+connected component (union-find with path halving, no networkx dependency), turns
+roughly a hundred two-person islands into one legible community.
+
+**The downloader retries connections, not just status codes.** A dropped
+connection killed an early 188k-record download at 41,200 records because only
+HTTP error codes were being retried. It now backs off on any
+`requests.exceptions.RequestException` and on truncated JSON, and resumes from
+the cursor saved after every page.
+
+## Data
+
+Papers, topics and authorships come from [OpenAlex](https://openalex.org), which
+is CC0. Nothing in this repository redistributes their data — `data/` is
+gitignored and every database is rebuilt locally by the commands above.
+
+The code is MIT licensed; see [LICENSE](LICENSE).
+## ML service (`ml/`)
+
+A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
+
+| Feature | How |
+|---|---|
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` on title + abstract (384-d, CPU). Override with `ML_EMBED_MODEL` or `python -m ml.cli index --model <id>` |
+| Vector storage | Postgres + pgvector when `DATABASE_URL` is set (Supabase, HNSW cosine index). Rebuild with `python -m db.apply`. `ML_VECTOR_BACKEND=local` keeps the numpy files. Documents (galaxy, patterns, country and topic counts) use the same store. See `docs/architecture/STORAGE.md` |
+| Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
+| Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite`. Rate limit: `PAPER_RATE_PER_MIN` (default 60) and `PAPER_RATE_GLOBAL_PER_HOUR` (default 2000) |
+| Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences. `question` is 1–500 characters. Rate limit: `ASK_RATE_PER_MIN` (default 5) and `ASK_RATE_GLOBAL_PER_HOUR` (default 200) |
+| Galaxy | `GET /api/v1/galaxy` reads the stored graph `{nodes, clusters, links}`. A node is one paper: `id`, `topic_id`, `topic_name`, `x`, `y`, `z`, `cluster_id`, `cluster_label`, `year`, `support`, `color_index`. `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout. `index` and `update` precompute it |
+| Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /api/v1/patterns`, `GET /api/v1/runs` |
+
+**Embedding model.** The default stays `all-MiniLM-L6-v2`. `python -m ml.benchmark`
+compares it with other small free 384-d models (`BAAI/bge-small-en-v1.5`,
+`intfloat/e5-small-v2`) on a CSV labelled `query_id,query,work_id,relevance`,
+scored with recall@10 and nDCG@10. A model replaces the default only if it
+leads by at least 0.05 on both. SPECTER2 is not in the comparison: it is 768-d
+and needs the adapters library, so it does not fit the pgvector column.
+e5 and bge queries get the prefixes those models require. The checked-in
+`eval/benchmark_queries.csv` is a tiny format sample; a hand-labelled set can
+replace it without a code change. Numbers from the real models are in
+`eval/README.md`.
+
+**Galaxy layout.** Papers are clustered in embedding space (UMAP + HDBSCAN when
+both libraries are installed and there are at least 25 papers, otherwise
+k-means) and labelled with c-TF-IDF keywords. The plotted coordinates are a
+3-component PCA, not the UMAP coordinates. The basis is saved on the first
+build. Later runs project only new or re-embedded papers into that basis and
+assign them to the nearest existing centroid, so papers that were already
+placed do not move. Labels are recomputed from the current members, so the
+wording can change. `python -m ml.cli galaxy --refit` recomputes the basis and
+the clusters and can move every point. With fewer than about 25 papers, or
+without `umap-learn` and `hdbscan` installed, clustering is k-means.
+
+The API returns a graph, not a bare list. Each node carries the paper id, year,
+cluster label, and the fields the web client reads (`topic_id`, `topic_name`,
+`title`, `cluster_id`, `support`). `title` is the paper title. `topic_name` is
+the OpenAlex display name (`meta.topics[0]`), or the title when the paper has
+no topic. `support` is the paper's citation count divided by the highest count in
+the index (at least 1). Clusters have `id`, `name`, `label`, a 3D `centroid`,
+`size`, and `color_index`. `color_index` is matched to the previous centroid
+(Hungarian assignment on cosine distance) when a rebuild recomputes clusters,
+so a palette slot stays with the same region. A new cluster below the match
+threshold gets a fresh index. The mapping is stored in the `galaxy_state`
+document. Links are undirected nearest-neighbour edges (2 neighbours, at most
+200 edges) keyed on the work id, with `source`, `target`, and `weight`. `index --galaxy` and `update` store
+the graph; `index --reembed` and `update --refit` refit the layout. `GET /api/v1/galaxy` only reads that stored document, and an empty
+store returns `{nodes: [], clusters: [], links: []}`.
+
+**Local LLM, optional.** Summaries and chat work with no model at all
+(term-frequency sentence ranking and BM25-style evidence, cached per paper).
+To use a free local model, run an OpenAI-compatible server and leave the API
+key unset:
+
+```bash
+# Ollama, in one terminal: ollama serve
+ML_LLM_URL=http://127.0.0.1:11434/v1 ML_LLM_MODEL=llama3.2
+
+# llama.cpp: llama-server -m model.gguf --port 8080
+ML_LLM_URL=http://127.0.0.1:8080/v1 ML_LLM_MODEL=local
+```
+
+If `ML_LLM_URL` is unset or the server does not answer, the service falls back
+to the extractive methods. `ml/tests/test_llm_local.py` checks both summary and
+chat against a local endpoint.
+
+**Incremental mining.** Each sliding window stores a compressed basket multiset
+(`{topic set: count}`) next to its patterns. A run skips papers it has already seen.
+Papers without topics can be assigned to existing topics by embedding similarity
+to the topic centroids. Only the windows that receive new papers are re-mined, using
+the repo's own `fpgrowth.py` on the weighted multiset. The result is exactly what a
+full recompute would give (a test checks this), but the raw corpus is never
+rescanned. Every run writes `data/ml/patterns/snapshots/YYYY-MM-DD.json` for the
+progress timeline.
+
+```bash
+pip install -r ml/requirements.txt
+python -m ml.cli index      # embeds data/works_v2.jsonl (falls back to data/works.jsonl) and writes the galaxy
+python -m ml.benchmark      # recall@10 and nDCG@10 for MiniLM, bge-small, e5-small
+(cd apps/api && uvicorn app.main:app --reload)      # API routes are in apps/api/app/routers/core.py
+ML_EMBEDDER=hash python -m pytest ml -q             # offline tests, no model download
+```
