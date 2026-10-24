@@ -72,6 +72,8 @@ export interface CountryStats {
   share_change_pp?: number | null;
   share_reason?: GrowthReason | null;
   top_topics: string[];
+  /** Topics this country publishes in far more than the world average (location quotient, at least 100 papers). */
+  specialized_topics?: { name: string }[];
   /** Present once the live snapshot includes it (PR #6). */
   counting?: Counting;
   paper_count?: number;
