@@ -19,7 +19,7 @@ from typing import Protocol
 
 import numpy as np
 
-from .paths import ml_data_dir
+from .paths import ml_data_dir, use_postgres
 
 # Shared JSON slots. Any kind matching the name pattern can be stored the same way.
 DOCUMENT_KINDS = (
@@ -113,7 +113,12 @@ class LocalStore:
         return len(self.ids)
 
     def rows(self):
-        return list(self.ids), self.vecs, [self.meta.get(i, {}) for i in self.ids]
+        order = sorted(range(len(self.ids)), key=lambda i: self.ids[i])
+        ids = [self.ids[i] for i in order]
+        if not order:
+            return [], self.vecs, []
+        vecs = self.vecs[np.asarray(order, dtype=int)]
+        return ids, vecs, [self.meta.get(i, {}) for i in ids]
 
     def stored_dim(self) -> int | None:
         """Dimension of the stored vectors, or None when nothing is stored."""
@@ -604,7 +609,8 @@ GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
 
     def rows(self):
         def q(cur):
-            cur.execute("SELECT work_id, embedding::vector::text, meta FROM paper_embeddings")
+            cur.execute(
+                "SELECT work_id, embedding::vector::text, meta FROM paper_embeddings ORDER BY work_id")
             return cur.fetchall()
         fetched = self._run(q)
         if not fetched:
@@ -639,14 +645,12 @@ GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
 
 
 def get_store():
-    """Postgres + pgvector when DATABASE_URL is set, unless ML_VECTOR_BACKEND=local.
+    """Postgres + pgvector when ``use_postgres()`` is true, otherwise files.
 
-    ``ML_VECTOR_BACKEND=pgvector`` forces Postgres and needs ``DATABASE_URL``.
-    With neither set, embeddings and documents are files under ``ML_DATA_DIR``.
+    ``use_postgres`` (in ``ml.paths``) follows ``DATABASE_URL`` unless
+    ``ML_VECTOR_BACKEND`` forces ``local`` or ``pgvector``. With neither set,
+    embeddings and documents are files under ``ML_DATA_DIR``.
     """
-    backend = os.getenv("ML_VECTOR_BACKEND", "").strip().lower()
-    if backend == "local":
-        return LocalStore(ml_data_dir() / "vectors")
-    if backend == "pgvector" or os.getenv("DATABASE_URL"):
+    if use_postgres():
         return PgVectorStore()
     return LocalStore(ml_data_dir() / "vectors")

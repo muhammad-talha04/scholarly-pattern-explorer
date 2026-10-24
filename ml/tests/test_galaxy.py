@@ -1,8 +1,9 @@
 import numpy as np
+import pytest
 
 from ml.embeddings import HashEmbedder
 from ml.galaxy import (GalaxyMap, cluster_ids, ctfidf_labels, empty_graph, graph_from_layout,
-                       knn_links, resolve_method)
+                       hungarian, knn_links, match_cluster_colors, resolve_method)
 from ml.papers import Paper
 from ml.service import MLService, SummaryCache
 from ml.store import LocalStore
@@ -15,6 +16,29 @@ def test_ctfidf_labels_use_distinctive_words():
     names = ctfidf_labels(labels, texts, n_terms=2)
     assert "protein" in names[0]
     assert "quantum" in names[1] or "qubits" in names[1]
+
+
+def test_ctfidf_labels_drop_generic_words():
+    labels = [0, 0, 1, 1, 2, 2, 2]
+    texts = [
+        "ai learning study of multi model data",
+        "ai learning study of multi model data systems",
+        "quantum model learning qubits data",
+        "quantum learning model qubits study",
+        "large language models for translation",
+        "large language models answer questions",
+        "language models at large scale",
+    ]
+    names = ctfidf_labels(labels, texts, n_terms=3)
+    assert names[1] == "quantum, qubits"
+    for word in ("ai", "learning", "model", "data", "study", "multi"):
+        assert word not in names[1].split(", ")
+    assert names[2].split(", ")[0] == "language"
+    for word in ("large", "models", "model"):
+        assert word not in names[2].split(", ")
+    # Every term was generic, so the label falls back instead of going empty.
+    assert names[0]
+    assert "cluster" not in names[0]
 
 
 def test_method_falls_back_without_umap(monkeypatch):
@@ -118,6 +142,34 @@ def test_cli_index_writes_a_galaxy(tmp_path, monkeypatch, capsys):
     assert stored["nodes"] and stored["nodes"][0]["id"] == "W1"
 
 
+def test_reembed_refits_and_update_honors_refit(tmp_path, monkeypatch):
+    monkeypatch.setenv("ML_EMBEDDER", "hash")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "local")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    papers = tmp_path / "works.jsonl"
+    papers.write_text(
+        '{"id": "W1", "title": "Protein folding", "abstract": "transformers predict structure", "year": 2020}\n',
+        encoding="utf-8")
+    calls = []
+
+    def fake_rebuild(self, refit=False):
+        calls.append(bool(refit))
+        return {"nodes": [{"id": "W1"}], "clusters": [], "links": []}
+
+    monkeypatch.setattr("ml.service.MLService.rebuild_galaxy", fake_rebuild)
+    from ml.cli import main
+    main(["index", "--jsonl", str(papers)])
+    assert calls == []
+    main(["index", "--jsonl", str(papers), "--galaxy"])
+    main(["index", "--jsonl", str(papers), "--reembed", "--galaxy"])
+    main(["galaxy"])
+    main(["galaxy", "--refit"])
+    main(["update", "--jsonl", str(papers)])
+    main(["update", "--jsonl", str(papers), "--refit"])
+    assert calls == [False, True, False, True, False, True]
+
+
 def test_service_galaxy_round_trip(tmp_path):
     papers = [
         Paper("W1", "Transformers for protein structure", "Attention predicts protein folding contacts.", 2021,
@@ -145,17 +197,21 @@ def test_service_galaxy_round_trip(tmp_path):
     by_id = {n["id"]: n for n in graph["nodes"]}
     assert by_id["W1"]["year"] == 2021 and by_id["W2"]["year"] == 2020
     assert by_id["W1"]["topic_id"] == "protein-folding"
-    assert by_id["W1"]["topic_name"] == "Transformers for protein structure"
+    assert by_id["W1"]["title"] == "Transformers for protein structure"
+    assert by_id["W1"]["topic_name"] == "Protein folding"
+    assert by_id["W2"]["topic_name"] == "Quantum codes"
     assert by_id["W1"]["support"] == 1.0
     assert isinstance(by_id["W1"]["cluster_id"], str)
     assert {c["id"] for c in graph["clusters"]} >= {n["cluster_id"] for n in graph["nodes"]}
     for cluster in graph["clusters"]:
-        assert set(cluster) == {"id", "name", "label", "centroid", "size"}
+        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index", "emerging_score"}
+        assert cluster["emerging_score"] == 0.0
+        assert isinstance(cluster["color_index"], int)
         assert cluster["name"] == cluster["label"]
         assert set(cluster["centroid"]) == {"x", "y", "z"}
-    names = {n["topic_name"] for n in graph["nodes"]}
+    ids = {n["id"] for n in graph["nodes"]}
     for link in graph["links"]:
-        assert link["source"] in names and link["target"] in names
+        assert link["source"] in ids and link["target"] in ids
     assert svc.read_galaxy() == graph
     assert calls["rows"] == 1
     again = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
@@ -178,9 +234,66 @@ def test_graph_links_are_capped_nearest_neighbours():
     graph = graph_from_layout(points, np.stack(vectors), metas, neighbours=2, max_edges=3)
     assert len(graph["links"]) == 3
     assert graph["links"] == sorted(graph["links"], key=lambda link: -link["weight"])
-    names = {n["topic_name"] for n in graph["nodes"]}
-    assert names == {"Same title"} | {f"Same title (W{i})" for i in range(1, 6)}
+    assert {n["topic_name"] for n in graph["nodes"]} == {"Shared topic"}
+    assert {n["title"] for n in graph["nodes"]} == {"Same title"}
+    ids = {n["id"] for n in graph["nodes"]}
+    assert ids == {f"W{i}" for i in range(6)}
+    for link in graph["links"]:
+        assert link["source"] in ids and link["target"] in ids
+        assert link["source"] != link["target"]
     assert graph["clusters"][0]["size"] == 6
     assert graph["clusters"][0]["id"] == "0"
+    assert graph["clusters"][0]["color_index"] == 0
+    assert {n["color_index"] for n in graph["nodes"]} == {0}
     assert knn_links(["a"], np.ones((1, 2))) == []
     assert graph_from_layout([], np.zeros((0, 2)), []) == empty_graph()
+
+
+def test_hungarian_matches_brute_force():
+    import itertools
+    rng = np.random.default_rng(0)
+    cost = rng.random((4, 4))
+    rows, cols = hungarian(cost)
+    assert sorted(rows.tolist()) == [0, 1, 2, 3]
+    assert sorted(cols.tolist()) == [0, 1, 2, 3]
+    got = float(cost[rows, cols].sum())
+    best = min(sum(cost[i, perm] for i, perm in enumerate(order))
+               for order in itertools.permutations(range(4)))
+    assert got == pytest.approx(best)
+
+
+def test_new_cluster_below_cosine_threshold_gets_a_fresh_color():
+    mapping, nxt = match_cluster_colors({"0": [1.0, 0.0], "1": [0.0, 1.0]},
+                                        {"0": [1.0, 0.0]}, next_color=1)
+    assert mapping == {"0": 0, "1": 1} and nxt == 2
+    fresh, nxt = match_cluster_colors({"0": [0.0, 1.0]}, {"3": [1.0, 0.0]}, next_color=4)
+    assert fresh == {"0": 4} and nxt == 5
+
+
+def test_color_index_follows_the_centroid_across_a_refit(tmp_path):
+    ids, vectors, metas = _blobs()
+    galaxy = GalaxyMap(tmp_path / "g")
+    first = galaxy.sync(ids, vectors, metas)
+    colors = {p["id"]: p["color_index"] for p in first}
+    assert len(set(colors.values())) == 2
+    assert all(p["color_index"] >= 0 for p in first)
+    saved = galaxy.state["color_centroids"]
+    keys = sorted(saved, key=int)
+    galaxy.state["color_centroids"] = {keys[0]: saved[keys[1]], keys[1]: saved[keys[0]]}
+    again = galaxy.sync(ids, vectors, metas, refit=True)
+    swapped = {int(keys[0]): int(keys[1]), int(keys[1]): int(keys[0])}
+    for point in again:
+        assert point["color_index"] == swapped[colors[point["id"]]]
+    by_cluster = {}
+    for point in again:
+        by_cluster.setdefault(point["cluster_id"], set()).add(point["color_index"])
+    assert all(len(vals) == 1 for vals in by_cluster.values())
+    # An incremental add keeps the colours just assigned.
+    kept = {p["id"]: p["color_index"] for p in again}
+    extra_vec = np.vstack([vectors, vectors[:1]])
+    extra_meta = metas + [dict(metas[0], pub_year=2024)]
+    grown = galaxy.sync(ids + ["Pnew"], extra_vec, extra_meta)
+    grown_colors = {p["id"]: p["color_index"] for p in grown}
+    for wid, color in kept.items():
+        assert grown_colors[wid] == color
+    assert grown_colors["Pnew"] == kept[ids[0]]

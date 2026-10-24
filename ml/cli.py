@@ -3,10 +3,12 @@
   python -m ml.cli index --batch-size 1000 --resume        # embed only work_ids not stored yet
   python -m ml.cli index --reembed                         # replace all rows with the current model
   python -m ml.cli index --galaxy                          # index, then rebuild the galaxy
+  python -m ml.cli index --reembed --galaxy                # re-embed, then refit the galaxy
   python -m ml.cli index --model BAAI/bge-small-en-v1.5   # a different free model
   python -m ml.cli galaxy                                  # store the galaxy graph from the index
   python -m ml.cli galaxy --refit                          # recompute layout (points may move)
   python -m ml.cli update                                  # incremental patterns, then discoveries
+  python -m ml.cli update --refit                          # same, then refit the galaxy layout
   python -m ml.cli discover                                # emerging topics + embedding gaps only
   python -m ml.cli index  --jsonl data/works.jsonl         # old JSONL fallback
   python -m ml.cli update --db data/openalex.duckdb
@@ -33,7 +35,8 @@ def main(argv=None):
     ap.add_argument("--jsonl")
     ap.add_argument("--db")
     ap.add_argument("--model", help="sentence-transformers model id (ignored when ML_EMBEDDER=hash)")
-    ap.add_argument("--refit", action="store_true", help="recompute the galaxy layout from scratch")
+    ap.add_argument("--refit", action="store_true",
+                    help="recompute galaxy clusters from scratch; colours are matched to the previous centroids")
     ap.add_argument("--min-support", type=float, default=0.05)
     ap.add_argument("--window", type=int, default=3)
     ap.add_argument("--batch-size", type=int, default=1000)
@@ -114,7 +117,8 @@ def main(argv=None):
                   + ("; STOPPED at size limit" if res.stopped_for_size else ""))
             if not a.galaxy:
                 return
-        graph = svc.rebuild_galaxy(refit=a.refit)
+        # A new embedding space does not fit the saved PCA basis.
+        graph = svc.rebuild_galaxy(refit=a.refit or a.reembed)
         print(f"galaxy {len(graph['nodes'])} nodes")
         return
     from .incremental import IncrementalMiner, papers_since_from_db
@@ -136,7 +140,7 @@ def main(argv=None):
     # The pattern snapshot is already saved. A galaxy failure must not undo that.
     try:
         from .service import MLService
-        graph = MLService().rebuild_galaxy()
+        graph = MLService().rebuild_galaxy(refit=a.refit or a.reembed)
         print(f"galaxy {len(graph['nodes'])} nodes")
     except Exception as exc:
         print(f"galaxy skipped: {exc}")

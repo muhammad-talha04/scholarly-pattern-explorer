@@ -32,9 +32,25 @@ from .text import tokens
 
 MIN_UMAP_PAPERS = 25
 MIN_SIM = 0.2
+# A refit keeps a previous colour when the new centroid is at least this close
+# in cosine similarity. Below that, the cluster is new and gets a fresh index.
+COLOR_MATCH_MIN_SIM = 0.5
 # Nearest-neighbour edges for the front end. Kept small on purpose.
 LINK_NEIGHBOURS = 2
 LINK_CAP = 200
+# Generic words that win c-TF-IDF on broad clusters. Kept out of text.STOP so
+# summaries and grounded answers still see them.
+LABEL_STOP = frozenset("""
+ai artificial intelligence learn learning learned machine
+model models modeling modelling
+data dataset datasets
+study studies multi multiple
+based approach approaches method methods
+result results analysis research paper papers
+system systems network networks
+deep neural algorithm algorithms
+proposed novel new towards large small
+""".split())
 
 def _optional_available() -> bool:
     return (importlib.util.find_spec("umap") is not None
@@ -138,17 +154,26 @@ def topic_labels(labels, metas: list[dict], n_terms: int = 2) -> dict[int, str]:
 
 
 def ctfidf_labels(labels, texts: list[str], n_terms: int = 3) -> dict[int, str]:
-    """c-TF-IDF keywords per cluster (BERTopic-style class-based TF-IDF)."""
+    """c-TF-IDF keywords per cluster (BERTopic-style class-based TF-IDF).
+
+    Generic boilerplate (``ai``, ``learning``, ``model``, ``data``, and the
+    rest of ``LABEL_STOP``) is dropped. A cluster whose every term is generic
+    keeps the unfiltered keywords so the label is not empty.
+    """
     groups: dict[int, list[str]] = {}
     for lab, text in zip(labels, texts):
         lab = int(lab)
         if lab < 0:
             continue
         groups.setdefault(lab, []).append(text or "")
-    counts = {c: Counter(tokens(" ".join(parts))) for c, parts in groups.items()}
-    counts = {c: ct for c, ct in counts.items() if ct}
-    if not counts:
+    raw = {c: Counter(tokens(" ".join(parts))) for c, parts in groups.items()}
+    raw = {c: ct for c, ct in raw.items() if ct}
+    if not raw:
         return {}
+    counts = {}
+    for c, ct in raw.items():
+        kept = Counter({term: freq for term, freq in ct.items() if term not in LABEL_STOP})
+        counts[c] = kept or ct
     tf_all: Counter = Counter()
     lengths = {}
     for c, ct in counts.items():
@@ -227,6 +252,102 @@ def _round_coord(value: float) -> float:
     return round(float(value), 6)
 
 
+def _cosine(a, b) -> float:
+    a = np.asarray(a, dtype=np.float64).ravel()
+    b = np.asarray(b, dtype=np.float64).ravel()
+    return float(np.dot(a, b) / ((np.linalg.norm(a) + 1e-9) * (np.linalg.norm(b) + 1e-9)))
+
+
+def hungarian(cost: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Minimum-cost assignment for a square matrix. Returns row and column indexes."""
+    cost = np.asarray(cost, dtype=np.float64)
+    n = cost.shape[0]
+    u = np.zeros(n + 1)
+    v = np.zeros(n + 1)
+    p = np.zeros(n + 1, dtype=int)
+    way = np.zeros(n + 1, dtype=int)
+    for i in range(1, n + 1):
+        p[0] = i
+        j0 = 0
+        minv = np.full(n + 1, np.inf)
+        used = np.zeros(n + 1, dtype=bool)
+        while True:
+            used[j0] = True
+            i0 = p[j0]
+            delta = np.inf
+            j1 = 0
+            for j in range(1, n + 1):
+                if used[j]:
+                    continue
+                cur = cost[i0 - 1, j - 1] - u[i0] - v[j]
+                if cur < minv[j]:
+                    minv[j] = cur
+                    way[j] = j0
+                if minv[j] < delta:
+                    delta = minv[j]
+                    j1 = j
+            for j in range(n + 1):
+                if used[j]:
+                    u[p[j]] += delta
+                    v[j] -= delta
+                else:
+                    minv[j] -= delta
+            j0 = j1
+            if p[j0] == 0:
+                break
+        while True:
+            j1 = way[j0]
+            p[j0] = p[j1]
+            j0 = j1
+            if j0 == 0:
+                break
+    rows, cols = [], []
+    for j in range(1, n + 1):
+        if p[j]:
+            rows.append(p[j] - 1)
+            cols.append(j - 1)
+    return np.asarray(rows, dtype=int), np.asarray(cols, dtype=int)
+
+
+def match_cluster_colors(new_centroids: dict, prev_centroids: dict, next_color: int,
+                         min_sim: float = COLOR_MATCH_MIN_SIM) -> tuple[dict[str, int], int]:
+    """Match new cluster ids to previous colour indexes by centroid cosine.
+
+    Hungarian assignment minimises cosine distance. A pair below ``min_sim``
+    is left unmatched, and that new cluster receives a fresh index.
+    """
+    new_ids = sorted(new_centroids, key=lambda x: int(x))
+    prev_ids = sorted(prev_centroids, key=lambda x: int(x))
+    mapping: dict[str, int] = {}
+    if not new_ids:
+        return mapping, int(next_color)
+    if not prev_ids:
+        for cid in new_ids:
+            mapping[str(cid)] = int(next_color)
+            next_color += 1
+        return mapping, int(next_color)
+    n, m = len(new_ids), len(prev_ids)
+    sim = np.zeros((n, m), dtype=np.float64)
+    for i, cid in enumerate(new_ids):
+        for j, pid in enumerate(prev_ids):
+            sim[i, j] = _cosine(new_centroids[cid], prev_centroids[pid])
+    size = max(n, m)
+    # Dummy rows and columns cost more than any real pair, so they lose.
+    cost = np.full((size, size), 2.0, dtype=np.float64)
+    cost[:n, :m] = 1.0 - sim
+    rows, cols = hungarian(cost)
+    for r, c in zip(rows, cols):
+        if r >= n or c >= m:
+            continue
+        if sim[r, c] >= min_sim:
+            mapping[str(new_ids[r])] = int(prev_ids[c])
+    for cid in new_ids:
+        if str(cid) not in mapping:
+            mapping[str(cid)] = int(next_color)
+            next_color += 1
+    return mapping, int(next_color)
+
+
 class GalaxyMap:
     """Persisted layout. See the module docstring for the stability rule."""
 
@@ -265,6 +386,7 @@ class GalaxyMap:
         return self.public(ids)
 
     def _fit(self, ids, vectors, metas, method: str) -> None:
+        prev_centroids, next_color = self._previous_colors()
         labels, used = cluster_ids(vectors, method=method)
         basis = fit_basis(vectors)
         coords = project(vectors, basis)
@@ -273,13 +395,49 @@ class GalaxyMap:
         for cid in sorted({int(c) for c in labels if int(c) >= 0}):
             block = vectors[np.asarray(labels) == cid]
             centroids[str(cid)] = np.asarray(block, dtype=np.float64).mean(0).tolist()
+        color_of, next_color = match_cluster_colors(centroids, prev_centroids, next_color)
         papers = {}
         for i, wid in enumerate(ids):
             papers[wid] = self._record(coords[i], int(labels[i]), metas[i], vectors[i])
         self.state = {"basis": basis, "centroids": centroids,
                       "label_names": {str(k): v for k, v in names.items()},
-                      "papers": papers, "cluster_method": used, "layout": "pca"}
+                      "papers": papers, "cluster_method": used, "layout": "pca",
+                      "color_of": color_of, "next_color": next_color}
+        self._sync_color_centroids()
         self._save()
+
+    def _previous_colors(self) -> tuple[dict, int]:
+        prev = dict(self.state.get("color_centroids") or {})
+        if not prev and self.state.get("centroids"):
+            color_of = self.state.get("color_of") or {}
+            for cid, vec in self.state["centroids"].items():
+                prev[str(color_of.get(str(cid), cid))] = vec
+        return prev, int(self.state.get("next_color") or 0)
+
+    def _sync_color_centroids(self) -> None:
+        mapping = self.state.get("color_of") or {}
+        saved = {}
+        for cid, vec in (self.state.get("centroids") or {}).items():
+            color = mapping.get(str(cid))
+            if color is None:
+                continue
+            saved[str(color)] = vec
+        self.state["color_centroids"] = saved
+
+    def _ensure_colors(self) -> None:
+        """Fill colour indexes for a layout saved before colours existed."""
+        if self.state.get("color_of"):
+            self._sync_color_centroids()
+            return
+        cents = self.state.get("centroids") or {}
+        mapping = {}
+        next_color = 0
+        for cid in sorted(cents, key=lambda x: int(x)):
+            mapping[str(cid)] = next_color
+            next_color += 1
+        self.state["color_of"] = mapping
+        self.state["next_color"] = next_color
+        self._sync_color_centroids()
 
     def _incremental(self, ids, vectors, metas) -> None:
         papers = self.state.setdefault("papers", {})
@@ -300,6 +458,7 @@ class GalaxyMap:
                                                metas[i], vectors[i])
         self._refresh_centroids(ids, vectors)
         self._relabel(ids, metas)
+        self._ensure_colors()
         self._save()
 
     def _refresh_centroids(self, ids, vectors) -> None:
@@ -325,16 +484,20 @@ class GalaxyMap:
 
     def public(self, ids: list[str]) -> list[dict]:
         names = self.state.get("label_names") or {}
+        colors = self.state.get("color_of") or {}
         out = []
         for wid in ids:
             paper = self.state["papers"][wid]
             cid = int(paper["cluster_id"])
             if cid < 0:
                 label = "unclustered"
+                color = -1
             else:
                 label = names.get(str(cid)) or f"cluster {cid}"
+                color = int(colors.get(str(cid), cid))
             out.append({"id": wid, "x": paper["x"], "y": paper["y"], "z": paper["z"],
-                        "cluster_id": cid, "cluster_label": label, "year": paper.get("year")})
+                        "cluster_id": cid, "cluster_label": label, "year": paper.get("year"),
+                        "color_index": color})
         return out
 
 
@@ -342,21 +505,56 @@ def empty_graph() -> dict:
     return {"nodes": [], "clusters": [], "links": []}
 
 
+def with_emerging_scores(graph: dict | None, scores: dict | None) -> dict:
+    """Copy ``graph`` and set each cluster's ``emerging_score`` from ``color_index``.
+
+    ``scores`` is keyed by colour, not ``cluster_id``. A missing colour is 0.
+    The value stays in ``[0, 1]``.
+    """
+    if not graph:
+        return empty_graph()
+    lookup: dict[str, float] = {}
+    for key, value in (scores or {}).items():
+        try:
+            lookup[str(int(key))] = float(value)
+        except (TypeError, ValueError):
+            continue
+    clusters = []
+    for cluster in graph.get("clusters") or []:
+        if not isinstance(cluster, dict):
+            continue
+        row = dict(cluster)
+        try:
+            color = str(int(row.get("color_index")))
+        except (TypeError, ValueError):
+            color = ""
+        raw = lookup.get(color, 0.0)
+        if not math.isfinite(raw):
+            raw = 0.0
+        row["emerging_score"] = round(min(1.0, max(0.0, raw)), 4)
+        clusters.append(row)
+    out = dict(graph)
+    out["clusters"] = clusters
+    return out
+
+
 def _slug(value: str) -> str:
     text = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
     return text or "topic"
 
 
-def _unique_names(points: list[dict], metas: list[dict]) -> list[str]:
-    """Front-end links join on topic_name, so each node needs its own."""
-    seen: dict[str, int] = {}
-    names = []
-    for point, meta in zip(points, metas):
-        title = (meta.get("title") or "").strip() or point["id"]
-        n = seen.get(title, 0)
-        seen[title] = n + 1
-        names.append(title if n == 0 else f"{title} ({point['id']})")
-    return names
+def _paper_title(meta: dict, point_id: str) -> str:
+    title = str(meta.get("title") or "").strip()
+    return title or str(point_id)
+
+
+def _openalex_topic(meta: dict) -> str:
+    """OpenAlex display name stored on the embedding meta as ``topics[0]``."""
+    for topic in meta.get("topics") or []:
+        text = str(topic).strip()
+        if text:
+            return text
+    return ""
 
 
 def knn_links(names: list[str], vectors: np.ndarray, neighbours: int = LINK_NEIGHBOURS,
@@ -394,27 +592,38 @@ def knn_links(names: list[str], vectors: np.ndarray, neighbours: int = LINK_NEIG
 
 def graph_from_layout(points: list[dict], vectors: np.ndarray, metas: list[dict],
                       neighbours: int = LINK_NEIGHBOURS, max_edges: int = LINK_CAP) -> dict:
-    """GalaxyGraph: front-end fields plus the per-paper id, label and year."""
+    """GalaxyGraph: one node per paper, links keyed on the work id.
+
+    ``title`` is the paper title. ``topic_name`` is the OpenAlex display name
+    (``meta.topics[0]``), or the title when the paper has no topic.
+    """
     if not points:
         return empty_graph()
     metas = list(metas)
-    names = _unique_names(points, metas)
     cited = [int(meta.get("cited_by") or 0) for meta in metas]
     peak = max(cited) or 1
     nodes = []
-    for point, meta, name, cites in zip(points, metas, names, cited):
-        topics = [t for t in (meta.get("topics") or []) if t]
-        topic_src = topics[0] if topics else point["id"]
+    ids = []
+    for point, meta, cites in zip(points, metas, cited):
+        title = _paper_title(meta, point["id"])
+        topic = _openalex_topic(meta) or title
         cid = str(point["cluster_id"])
+        if point.get("color_index") is None:
+            color = -1 if cid == "-1" else int(cid)
+        else:
+            color = int(point["color_index"])
+        ids.append(point["id"])
         nodes.append({
             "id": point["id"],
-            "topic_id": _slug(str(topic_src)),
-            "topic_name": name,
+            "title": title,
+            "topic_id": _slug(topic),
+            "topic_name": topic,
             "x": point["x"], "y": point["y"], "z": point["z"],
             "cluster_id": cid,
             "cluster_label": point.get("cluster_label") or "",
             "year": point.get("year"),
             "support": round(max(cites, 1) / peak, 4),
+            "color_index": color,
         })
     groups: dict[str, list[dict]] = {}
     for node in nodes:
@@ -432,9 +641,33 @@ def graph_from_layout(points: list[dict], vectors: np.ndarray, metas: list[dict]
                 "z": round(sum(m["z"] for m in members) / len(members), 6),
             },
             "size": len(members),
+            "color_index": int(members[0]["color_index"]),
+            "emerging_score": 0.0,
         })
     return {"nodes": nodes, "clusters": clusters,
-            "links": knn_links(names, vectors, neighbours, max_edges)}
+            "links": knn_links(ids, vectors, neighbours, max_edges)}
+
+
+def _fallback_color(cluster_id) -> int:
+    cid = str(cluster_id)
+    try:
+        return -1 if cid == "-1" else int(cid)
+    except ValueError:
+        return -1
+
+
+def ensure_color_index(graph: dict) -> dict:
+    """Fill ``color_index`` on a graph stored before stable colours existed.
+
+    Nodes and clusters without one get the cluster id (``-1`` for unclustered or
+    non-numeric ids), the same fallback ``graph_from_layout`` uses. Stored values win.
+    """
+    for key in ("nodes", "clusters"):
+        for item in graph.get(key) or []:
+            if item.get("color_index") is None:
+                cid = item.get("cluster_id") if key == "nodes" else item.get("id")
+                item["color_index"] = _fallback_color(cid)
+    return graph
 
 
 # ---- representative samples for GET /galaxy?limit=N ----

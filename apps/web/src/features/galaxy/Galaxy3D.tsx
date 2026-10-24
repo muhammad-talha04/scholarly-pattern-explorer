@@ -501,10 +501,10 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <div className="line-clamp-2 font-medium text-white">{tip.id}</div>
-              <p className="mt-0.5 truncate text-mist">{tip.cluster ?? "Paper"}</p>
+              <div className="line-clamp-2 font-medium text-white">{tip.title || tip.id}</div>
+              <p className="mt-0.5 truncate text-mist">{tip.topic ?? tip.cluster ?? "Paper"}</p>
               {showGaps && tip.gap && <p className="text-gap">Research gap</p>}
-              <button className="btn mt-1.5 w-full py-0.5" onClick={() => onPick?.(tip.id)}>Search this paper</button>
+              <button className="btn mt-1.5 w-full py-0.5" onClick={() => onPick?.(tip.title || tip.id)}>Search this paper</button>
             </div>
           </Html>
         )}

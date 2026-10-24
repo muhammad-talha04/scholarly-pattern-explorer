@@ -9,11 +9,16 @@ Two checks on one sample:
 
 2. Topics. Papers with no topics are labelled from topic centroids.
    The full rebuild builds centroids from every labelled paper, then assigns
-   the rest once. The incremental run walks papers in year order and updates
-   centroids as it goes, so a topic can drift and a single full-rebuild topic
-   can split across two incremental labels. Drift is 1 minus the mean Jaccard
-   of the assigned topic sets. A split is a full-rebuild topic whose papers
-   received two or more different incremental labels.
+   the rest once. ``assign_incremental`` does the same: centroids come only
+   from papers that already had topics, a paper that already has an assignment
+   keeps it, and ``refit=True`` clears those assignments and labels again.
+   ``assign_online`` is the previous walk. It folded each guess into the
+   centroids before the next paper, so a paper labelled before a topic's seed
+   arrived kept the wrong topic. On the built-in sample that moved 2 of 3
+   unlabelled papers (drift 0.6667) and split one full-rebuild topic.
+   Drift is 1 minus the mean Jaccard of the assigned topic sets. A split is a
+   full-rebuild topic whose papers received two or more different incremental
+   labels.
 
     python eval/pattern_stability.py
     python eval/pattern_stability.py --works data/works_v2.jsonl
@@ -58,8 +63,12 @@ def _means(sums, counts) -> dict:
     return {t: (sums[t] / counts[t]).astype(np.float32) for t in sums}
 
 
-def assign_incremental(papers: list[dict], embedder, k: int = 1, min_sim: float = 0.3) -> list[dict]:
-    """Label topic-less papers in year order, folding each assignment into the centroids."""
+def assign_online(papers: list[dict], embedder, k: int = 1, min_sim: float = 0.3) -> list[dict]:
+    """Previous incremental walk: each guess updates the centroids before the next paper.
+
+    A paper that arrives before its topic's seed is labelled with whatever
+    centroid exists at that moment, and that label then pulls the centroid.
+    """
     ordered = sorted((dict(p) for p in papers), key=lambda p: (p.get("pub_year") or 0, p["work_id"]))
     sums, counts = {}, {}
     out = []
@@ -76,6 +85,33 @@ def assign_incremental(papers: list[dict], embedder, k: int = 1, min_sim: float 
                     _accumulate(sums, counts, p["topics"], vec)
         out.append(p)
     return out
+
+
+def assign_incremental(papers: list[dict], embedder, k: int = 1, min_sim: float = 0.3,
+                       refit: bool = False) -> list[dict]:
+    """Label topic-less papers from centroids of papers that already had topics.
+
+    An existing assignment is kept. ``refit=True`` drops assignments this
+    function made earlier (``topics_assigned``) and labels those papers again.
+    Guessed labels are not folded back into the centroids.
+    """
+    ordered = sorted((dict(p) for p in papers), key=lambda p: (p.get("pub_year") or 0, p["work_id"]))
+    if refit:
+        for p in ordered:
+            if p.get("topics_assigned"):
+                p["topics"] = []
+                p["topics_assigned"] = False
+    seeds = [p for p in ordered if p.get("topics") and not p.get("topics_assigned")]
+    sums, counts = {}, {}
+    if seeds:
+        vecs = embedder.encode([_text(p) for p in seeds])
+        for p, vec in zip(seeds, vecs):
+            _accumulate(sums, counts, p.get("topics") or [], vec)
+    cents = _means(sums, counts)
+    unlabeled = [p for p in ordered if not p.get("topics")]
+    if unlabeled and cents:
+        assign_topics(unlabeled, cents, embedder, k=k, min_sim=min_sim)
+    return ordered
 
 
 def assign_full(papers: list[dict], embedder, k: int = 1, min_sim: float = 0.3) -> list[dict]:
@@ -227,7 +263,7 @@ def drift_sample() -> list[dict]:
 
 
 def evaluate(papers: list[dict], embedder=None, batch: int = 20, k: int = 1,
-            min_sim: float = 0.3, miner_cfg: dict | None = None) -> dict:
+            min_sim: float = 0.3, miner_cfg: dict | None = None, refit: bool = False) -> dict:
     cfg = dict(MINER)
     if miner_cfg:
         cfg.update(miner_cfg)
@@ -242,7 +278,7 @@ def evaluate(papers: list[dict], embedder=None, batch: int = 20, k: int = 1,
              "papers_disagreed": 0, "topic_split_count": 0, "topic_splits": [],
              "pattern_jaccard": None, "support_mae": None}
     if embedder is not None and any(not p.get("topics") for p in papers):
-        inc = assign_incremental(papers, embedder, k=k, min_sim=min_sim)
+        inc = assign_incremental(papers, embedder, k=k, min_sim=min_sim, refit=refit)
         full = assign_full(papers, embedder, k=k, min_sim=min_sim)
         topic = topic_drift_and_splits(papers, inc, full)
         inc_pat = compare_patterns(mine_batches(inc, batch, **cfg), mine_once(full, **cfg))
@@ -261,12 +297,26 @@ def evaluate(papers: list[dict], embedder=None, batch: int = 20, k: int = 1,
 
 
 def run_builtin() -> dict:
-    """Fixed-topic pattern check, then the small sample that drifts and splits."""
+    """Fixed-topic pattern check, then the sample that used to drift and split."""
     fixed = evaluate(fixed_topic_sample(), embedder=None, batch=20)
-    drifted = evaluate(drift_sample(), embedder=_DriftEmbedder(), batch=5, k=1, min_sim=0.3,
-                       miner_cfg={"min_baskets": 1, "min_support": 0.2})
+    sample = drift_sample()
+    embedder = _DriftEmbedder()
+    cfg = {"min_baskets": 1, "min_support": 0.2}
+    before = topic_drift_and_splits(
+        sample,
+        assign_online(sample, embedder, k=1, min_sim=0.3),
+        assign_full(sample, embedder, k=1, min_sim=0.3),
+    )
+    drifted = evaluate(sample, embedder=embedder, batch=5, k=1, min_sim=0.3, miner_cfg=cfg)
     return {
         "fixed_topics": fixed["fixed_topics"],
+        "before": {
+            "topic_drift": before["topic_drift"],
+            "topic_split_count": before["topic_split_count"],
+            "papers_disagreed": before["papers_disagreed"],
+            "unlabeled": before["unlabeled"],
+            "topic_splits": before["topic_splits"],
+        },
         "assigned_topics": drifted["assigned_topics"],
         "topic_drift": drifted["topic_drift"],
         "topic_split_count": drifted["topic_split_count"],
@@ -287,13 +337,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Incremental patterns and topics versus a full rebuild")
     ap.add_argument("--works", help="optional works JSONL. Relative paths are from the repo root")
     ap.add_argument("--batch", type=int, default=50)
+    ap.add_argument("--refit", action="store_true",
+                    help="drop previous automatic topic labels and assign them again")
     a = ap.parse_args(argv)
     if a.works:
         from ml.embeddings import get_embedder
         papers = papers_from_works(resolve(a.works))
         if not papers:
             sys.exit("no works in that file")
-        report = evaluate(papers, embedder=get_embedder(), batch=a.batch)
+        report = evaluate(papers, embedder=get_embedder(), batch=a.batch, refit=a.refit)
     else:
         report = run_builtin()
     print(json.dumps(report, indent=2))

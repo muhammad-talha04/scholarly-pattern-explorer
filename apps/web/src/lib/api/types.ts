@@ -110,9 +110,14 @@ export interface GalaxyCluster {
   /** Optional 0–1 warmth from /galaxy. Missing means the cluster does not glow warmer. */
   emerging_score?: number;
 }
-/** One paper in the galaxy. `topic_name` is the label; `cluster_id` is its topic cluster. */
+/** One paper in the galaxy. `topic_name` is the OpenAlex topic; `cluster_id` is its topic cluster. */
 export interface GalaxyPoint {
+  /** Work id. Present on graph payloads; the #8 paper list uses it as `topic_id` instead. */
+  id?: string;
+  /** Paper title. Absent on galaxies stored before titles were split from the topic. */
+  title?: string;
   topic_id: string;
+  /** OpenAlex display name, or the paper title on older payloads. */
   topic_name: string;
   x: number;
   y: number;

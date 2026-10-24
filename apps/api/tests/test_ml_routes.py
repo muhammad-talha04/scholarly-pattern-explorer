@@ -32,6 +32,8 @@ V2 = [
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    from app.routers import core
+    core._gap_patterns.cache_clear()
     svc = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
                     cache=SummaryCache(tmp_path / "s.sqlite"))
     svc.index_papers([Paper.from_record(r) for r in V2])
@@ -131,28 +133,33 @@ def test_galaxy_layout(client):
     assert set(body) == {"nodes", "clusters", "links"}
     nodes = body["nodes"]
     assert {n["id"] for n in nodes} == {"W1", "W2", "W3"}
-    names = {n["topic_name"] for n in nodes}
+    ids = {n["id"] for n in nodes}
     for node in nodes:
-        assert set(node) == {"id", "topic_id", "topic_name", "x", "y", "z",
-                             "cluster_id", "cluster_label", "year", "support"}
+        assert set(node) == {"id", "title", "topic_id", "topic_name", "x", "y", "z",
+                             "cluster_id", "cluster_label", "year", "support", "color_index"}
         assert isinstance(node["cluster_id"], str) and node["cluster_label"]
         assert isinstance(node["x"], float) and isinstance(node["y"], float) and isinstance(node["z"], float)
         assert isinstance(node["support"], float) and 0 < node["support"] <= 1
     assert {n["id"]: n["year"] for n in nodes} == {"W1": 2021, "W2": 2023, "W3": 2020}
     by_id = {n["id"]: n for n in nodes}
     assert by_id["W1"]["support"] == 1.0
-    assert by_id["W1"]["topic_name"] == "Transformers for protein structure prediction"
+    assert by_id["W1"]["title"] == "Transformers for protein structure prediction"
+    assert by_id["W1"]["topic_name"] == "Proteins"
     assert by_id["W1"]["topic_id"] == "proteins"
-    cluster_ids = {c["id"] for c in body["clusters"]}
-    assert {n["cluster_id"] for n in nodes} <= cluster_ids
+    assert by_id["W3"]["topic_name"] == "Quantum"
+    cluster_ids = {c["id"]: c["color_index"] for c in body["clusters"]}
+    assert {n["cluster_id"] for n in nodes} <= set(cluster_ids)
+    assert all(cluster_ids[n["cluster_id"]] == n["color_index"] for n in nodes)
     for cluster in body["clusters"]:
-        assert set(cluster) == {"id", "name", "label", "centroid", "size"}
+        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index", "emerging_score"}
+        assert isinstance(cluster["color_index"], int)
+        assert cluster["emerging_score"] == 0.0
         assert cluster["name"] == cluster["label"] and cluster["size"] >= 1
         assert set(cluster["centroid"]) == {"x", "y", "z"}
     assert len(body["links"]) <= 200
     for link in body["links"]:
         assert set(link) == {"source", "target", "weight"}
-        assert link["source"] in names and link["target"] in names
+        assert link["source"] in ids and link["target"] in ids
         assert link["source"] != link["target"]
     assert client.get("/api/v1/galaxy").json() == body
     assert client.row_calls["rows"] == 0
@@ -187,6 +194,28 @@ def test_placeholder_doi_is_not_returned(tmp_path, monkeypatch):
     assert "10.1234" not in str(d)
     assert d["original_url"] == "https://openalex.org/W9"
     assert d["openalex_url"] == "https://openalex.org/W9"
+
+
+def test_galaxy_emerging_score_follows_color_index(client, tmp_path, monkeypatch):
+    """The score is joined from the discoveries snapshot by colour, not cluster id."""
+    import json
+    first = client.get("/api/v1/galaxy").json()
+    colors = sorted({c["color_index"] for c in first["clusters"]})
+    assert colors
+    hot = colors[0]
+    scores = {str(color): 0.0 for color in colors}
+    scores[str(hot)] = 1.0
+    scores["999"] = 0.25
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    dest = tmp_path / "ml" / "discoveries.json"
+    dest.parent.mkdir(parents=True)
+    dest.write_text(json.dumps({"emerging_scores": scores}), encoding="utf-8")
+    body = client.get("/api/v1/galaxy").json()
+    assert client.row_calls["rows"] == 0
+    for cluster in body["clusters"]:
+        expected = 1.0 if cluster["color_index"] == hot else 0.0
+        assert cluster["emerging_score"] == expected
+        assert cluster["id"] != "999"
 
 
 def test_galaxy_empty_before_rebuild(tmp_path, monkeypatch):

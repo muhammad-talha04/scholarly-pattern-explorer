@@ -349,6 +349,9 @@ def test_api_gap_patterns_from_snapshot(client, tmp_path, monkeypatch):
     import ml.gaps as g
     real = g.find_gaps
     monkeypatch.setattr(ml_bridge, "find_gaps", lambda t, tp, **kw: real(t, tp, last_year=2025, **kw))
+    monkeypatch.setattr(ml_bridge, "is_cs", lambda name: True)  # fake topic names
+    from app.routers import core
+    core._gap_patterns.cache_clear()
     r = client.get("/api/v1/patterns", params={"trend": "gap"})
     assert r.status_code == 200, r.text
     ps = [Pattern.model_validate(x) for x in r.json()]

@@ -9,7 +9,7 @@ name: Weekly re-mine and publish
 
 on:
   schedule:
-    - cron: "0 4 * * 0"   # 04:00 UTC every Sunday
+    - cron: "0 4 1 * *"   # 04:00 UTC on the 1st of each month
   workflow_dispatch: {}
 
 permissions:

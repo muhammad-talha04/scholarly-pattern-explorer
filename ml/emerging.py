@@ -1,12 +1,13 @@
 """Emerging topics: year-over-year growth from the topic × country × year table.
 
-The table (PR #6, not on main yet) has columns:
+The table has columns:
 
     topic_id, topic_name, country_code, year, paper_count, fractional_count
 
-``load_topic_rows`` reads that table when it is present (SQLite file beside the
-country snapshot, or the ``topic_country_year`` list on the snapshot). Until
-then it builds the same rows from ``data/works_v2.jsonl``. Counts are additive,
+``load_topic_rows`` reads that table when it is present (Postgres when
+``use_postgres()`` is true and no path was passed, otherwise the SQLite file,
+then the ``topic_country_year`` list on the snapshot). Until then it builds
+the same rows from ``data/works_v2.jsonl``. Counts are additive,
 so a twice-monthly run can sum the new works onto the previous rows
 (``combine_rows``) and match a full recompute. The scheduled pipeline already
 does that inside ``country_stats`` once the table exists; this loader just
@@ -206,11 +207,24 @@ def _read_snapshot(path: Path) -> list[dict] | None:
 def load_topic_rows(snapshot_path: str | Path | None = None,
                     db_path: str | Path | None = None,
                     works_path: str | Path | None = None) -> tuple[list[dict], str]:
-    """Prefer the SQLite table, then the snapshot list, then works JSONL.
+    """Prefer the typed table, then the snapshot list, then works JSONL.
 
-    Pass a path to force that source. ``None`` uses the repo-root defaults from ``ml.paths``.
+    Pass a path to force the SQLite / snapshot / works chain. With every path
+    left as ``None``, Postgres is consulted first when ``use_postgres()`` is
+    true; otherwise the repo-root SQLite default from ``ml.paths`` is used.
     """
-    from .paths import country_snapshot, topic_country_year_db
+    from .paths import country_snapshot, topic_country_year_db, use_postgres
+
+    if db_path is None and snapshot_path is None and works_path is None and use_postgres():
+        try:
+            from pipeline.aggregate_store import read_topic_country_year
+            fetched = read_topic_country_year()
+        except Exception:
+            fetched = None
+        if fetched:
+            rows = [n for n in (_norm_row(r) for r in fetched) if n is not None]
+            if rows:
+                return rows, "table"
 
     db = Path(db_path) if db_path is not None else topic_country_year_db()
     table = _read_db(db)

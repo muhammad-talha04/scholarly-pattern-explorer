@@ -85,3 +85,13 @@ def test_rebuild_stores_hero_sample(tmp_path, monkeypatch):
     graph = svc.rebuild_galaxy()
     assert svc.store.get_document("galaxy_sample")["nodes"] == graph["nodes"]  # 12 < 600
     assert len(svc.read_galaxy()["nodes"]) == 12                                # cache cleared
+
+
+def test_legacy_galaxy_without_color_index_is_backfilled(tmp_path, monkeypatch):
+    from ml.galaxy import ensure_color_index
+    legacy = {"nodes": [{"id": "a", "cluster_id": "2"}, {"id": "b", "cluster_id": "-1"},
+                        {"id": "c", "cluster_id": "1", "color_index": 7}],
+              "clusters": [{"id": "2"}, {"id": "-1"}], "links": []}
+    out = ensure_color_index(legacy)
+    assert [n["color_index"] for n in out["nodes"]] == [2, -1, 7]
+    assert [c["color_index"] for c in out["clusters"]] == [2, -1]

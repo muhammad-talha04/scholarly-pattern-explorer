@@ -156,19 +156,30 @@ class GalaxyCentroid(BaseModel):
 
 
 class GalaxyCluster(BaseModel):
-    """One topic cluster. ``name`` is the front-end label; ``label`` is the same string."""
+    """One topic cluster. ``name`` is the front-end label; ``label`` is the same string.
+
+    ``emerging_score`` is in ``[0, 1]`` and follows ``color_index`` across rebuilds.
+    """
     id: str
     name: str
     label: str
     centroid: GalaxyCentroid
     size: int
+    color_index: int
+    emerging_score: float = 0.0
 
 
 class GalaxyNode(BaseModel):
-    """One paper. ``topic_name`` is the display id the front end uses for links."""
+    """One paper. Links join on ``id`` (the work id).
+
+    ``title`` is the paper title. ``topic_name`` is the OpenAlex display name.
+    ``title`` defaults to empty so a galaxy document stored before that split
+    still validates; the client then keeps the older title-keyed links.
+    """
     id: str
     topic_id: str
     topic_name: str
+    title: str = ""
     x: float
     y: float
     z: float
@@ -176,6 +187,7 @@ class GalaxyNode(BaseModel):
     cluster_label: str = ""
     year: int | None = None
     support: float
+    color_index: int
 
 
 class GalaxyLink(BaseModel):

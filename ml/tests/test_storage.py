@@ -10,6 +10,15 @@ def test_document_kinds_cover_shared_snapshots():
             "topic_country_year"} <= set(DOCUMENT_KINDS)
 
 
+def test_local_rows_follow_work_id_order(tmp_path):
+    store = LocalStore(tmp_path, dim=2)
+    store.upsert(["b", "a"], np.array([[0, 1], [1, 0]], dtype=np.float32),
+                 [{"title": "second"}, {"title": "first"}])
+    ids, vecs, metas = store.rows()
+    assert ids == ["a", "b"]
+    assert metas[0]["title"] == "first" and vecs[0, 0] == 1
+
+
 def test_local_documents_round_trip(tmp_path):
     store = LocalStore(tmp_path)
     store.put_document("countries", {"PK": 3})
@@ -139,6 +148,7 @@ def test_pg_rows_still_parse_meta():
             return False
 
         def execute(self, sql, params=None):
+            self.sql = sql
             return None
 
         def fetchall(self):
@@ -147,10 +157,8 @@ def test_pg_rows_still_parse_meta():
         def fetchone(self):
             return None
 
-    class Conn:
-        def cursor(self):
-            return Cur()
-
-    ids, vecs, metas = PgVectorStore(conn=Conn()).rows()
+    cur = Cur()
+    ids, vecs, metas = PgVectorStore(conn=type("Conn", (), {"cursor": lambda self: cur})()).rows()
+    assert "ORDER BY work_id" in cur.sql
     assert ids == ["W1"] and vecs.shape == (1, 2) and metas[0]["title"] == "t"
     assert not np.isnan(vecs).any()

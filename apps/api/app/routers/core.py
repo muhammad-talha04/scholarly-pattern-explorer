@@ -1,5 +1,6 @@
 """Contract routes. Bodies are wired to the ML package (ml/) via app.ml_bridge."""
 import os
+from functools import lru_cache
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -165,22 +166,26 @@ def _in_window(g: dict, window: int | None) -> bool:
     return window is None or g.get("window_start") == window
 
 
+@lru_cache(maxsize=16)
+def _gap_patterns(window: int | None) -> list[Pattern]:
+    """Built once per window: the inputs only change on deploy, and the example
+    lookups made this endpoint take seconds per request."""
+    growth = [g for g in ml.get_gaps() if _in_window(g, window)]
+    semantic = [g for g in ml.get_semantic_gaps() if _in_window(g, window)][:10]
+    merged = sorted(growth + semantic, key=lambda g: (
+        -float(g.get("gap_score") or 0),
+        0 if g.get("kind", "growth") == "growth" else 1,
+        -float(g.get("growth_rate") or 0),
+        " ".join(g.get("items") or [g.get("topic") or ""]),
+    ))
+    return [_gap_pattern(g) for g in merged]
+
+
 @router.get("/patterns", response_model=list[Pattern])
 def patterns(window: int | None = None, trend: str | None = None,
              country: str | None = None) -> list[Pattern]:
     if trend == "gap":
-        # Growing-but-small topics, plus embedding-space gaps (thin regions and
-        # related topics that rarely co-occur). Growth rows keep their score so
-        # a perfect growth gap stays ahead of an embedding gap with the same score.
-        growth = [g for g in ml.get_gaps() if _in_window(g, window)]
-        semantic = [g for g in ml.get_semantic_gaps() if _in_window(g, window)][:10]
-        merged = sorted(growth + semantic, key=lambda g: (
-            -float(g.get("gap_score") or 0),
-            0 if g.get("kind", "growth") == "growth" else 1,
-            -float(g.get("growth_rate") or 0),
-            " ".join(g.get("items") or [g.get("topic") or ""]),
-        ))
-        return [_gap_pattern(g) for g in merged]
+        return list(_gap_patterns(window))
     if trend == "emerging":
         rows = ml.get_emerging(country=country)
         out = []
