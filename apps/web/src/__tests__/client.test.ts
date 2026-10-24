@@ -114,3 +114,57 @@ describe("normalizeGalaxy", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("chart aggregates", () => {
+  beforeEach(() => { vi.resetModules(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+  it("asks for precomputed totals and does not count rows when the route is missing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.test");
+    vi.stubEnv("NEXT_PUBLIC_API_MOCK", "");
+    const { api } = await import("@/lib/api/client");
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", (async (u: string) => {
+      urls.push(String(u));
+      const url = String(u);
+      if (url.includes("/aggregates/")) return new Response("{}", { status: 404 });
+      if (url.includes("/countries?")) {
+        return new Response(JSON.stringify([
+          { code: "US", name: "United States", papers: 70, growth_pct: 1, top_topics: [], counting: "fractional", paper_count: 70, fractional_count: 70 },
+          { code: "CN", name: "China", papers: 20, growth_pct: 1, top_topics: [], counting: "fractional", paper_count: 20, fractional_count: 20 },
+          { code: "IN", name: "India", papers: 10, growth_pct: 1, top_topics: [], counting: "fractional", paper_count: 10, fractional_count: 10 },
+        ]), { status: 200 });
+      }
+      return new Response("[]", { status: 200 });
+    }) as unknown as typeof fetch);
+
+    const pubs = await api.publications({ grain: "year" });
+    expect(pubs.data).toBeNull();
+    expect(pubs.source).toBe("live");
+    expect(urls.some((u) => u.includes("/topic-country-years"))).toBe(false);
+    expect(urls.some((u) => u.includes("/aggregates/publications?grain=year"))).toBe(true);
+
+    const chart = await api.countryChart({ counting: "fractional", top: 2 });
+    expect(chart.data?.items.map((c) => c.code)).toEqual(["US", "CN"]);
+    expect(chart.data?.items.map((c) => c.share)).toEqual([70, 20]);
+    expect(chart.data?.other).toEqual({ share: 10, countries: 1 });
+    expect(urls.some((u) => u.includes("/aggregates/countries?"))).toBe(true);
+    expect(urls.some((u) => u.includes("/topic-country-years"))).toBe(false);
+    expect(urls.filter((u) => u.includes("scale="))).toHaveLength(0);
+  });
+
+  it("uses a live aggregate payload as sent, without rebucketing it", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.test");
+    vi.stubEnv("NEXT_PUBLIC_API_MOCK", "");
+    const { api } = await import("@/lib/api/client");
+    const body = {
+      counting: "fractional", year: null, top: 1,
+      items: [{ code: "US", name: "United States", share: 40 }],
+      other: { share: 30, countries: 40 },
+    };
+    vi.stubGlobal("fetch", (async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof fetch);
+    const chart = await api.countryChart({ top: 1 });
+    expect(chart.source).toBe("live");
+    expect(chart.data?.items[0].share).toBe(40);
+    expect(chart.data?.other).toEqual({ share: 30, countries: 40 });
+  });
+});

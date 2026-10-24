@@ -126,3 +126,68 @@ export interface GalaxyGraph {
 
 export interface SearchParams { q: string; limit?: number; offset?: number; country?: string; year_from?: number }
 export interface TopicYearQuery { topic_id?: string; country?: string; year?: number; limit?: number }
+
+/**
+ * Chart aggregates, as GET /aggregates/* sends them (PR #58).
+ * Sampling is even per month, so a raw count looks flat.
+ *
+ * GET /api/v1/aggregates/publications?grain=year|month&year=
+ *   { grain, year, total, buckets: [{ key, paper_count, sampled, estimated_total }] }
+ *   `paper_count` and `sampled` are the papers we hold. `estimated_total` is
+ *   `sampling_rates.openalex_total` for that month, or null when the row is missing.
+ *   A year estimate is null when any month we hold papers for has no row.
+ *   The timeline plots `estimated_total` and leaves null as unknown, not zero.
+ *
+ * GET /api/v1/aggregates/topics?grain=year|month&year=&top=
+ *   { grain, year, top, series: [{ name, points: [{ key, value }] }], period }
+ *   `value` is a fractional paper count. `period` is `{key, sampled, estimated_total}`.
+ *   The stream draws `value / period.sampled` as the percent of that period.
+ *
+ * GET /api/v1/aggregates/countries?counting=&top=&year=
+ *   { counting, year, top, total, items: [{ code, name, papers }], other, period }
+ *   `papers` is the country total for the period. The chart draws each bar as a
+ *   percent of those papers (top N + Other). `total` is corpus papers, not the
+ *   sum of the country rows.
+ */
+export type TimeGrain = "year" | "month";
+/** Fixture-only preview. Never sent to a live API. */
+export type ChartScale = "sample" | "80k";
+
+export interface TimeBucket {
+  /** "2025" or "2025-03". */
+  key: string;
+  /** Papers we hold in this bucket (`sampled`, same number as `paper_count`). */
+  sampled: number;
+  /** `sampling_rates.openalex_total`. Null when that month has no row. Bar height when known. */
+  estimated_total: number | null;
+}
+export interface PublicationAggregate {
+  grain: TimeGrain;
+  year: number | null;
+  /** Sum of `buckets[].sampled` (the response `total`). */
+  sampled: number;
+  /**
+   * Sum of known estimates. Null when any bucket with sampled papers has no
+   * estimate, so a partial OpenAlex total is not shown as if it were complete.
+   */
+  estimated_total: number | null;
+  buckets: TimeBucket[];
+}
+/** `share` is 0–100 and is the percent of that one period. */
+export interface TopicPoint { key: string; share: number }
+export interface TopicAggregateSeries { name: string; points: TopicPoint[] }
+export interface TopicAggregate {
+  grain: TimeGrain;
+  year: number | null;
+  top: number;
+  series: TopicAggregateSeries[];
+}
+export interface CountryChartItem { code: string; name: string; share: number }
+export interface CountryChart {
+  counting: Counting;
+  year: number | null;
+  top: number;
+  items: CountryChartItem[];
+  /** Null when every country is already named in items. `share` is percent of the period. */
+  other: { share: number; countries: number } | null;
+}

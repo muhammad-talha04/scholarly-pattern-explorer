@@ -2,9 +2,9 @@
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { api, prefersFixtures } from "@/lib/api/client";
-import type { Counting, CountryStats, GrowthReason } from "@/lib/api/types";
-import { papersByCountryYear, yearRange } from "@/lib/series";
+import { api } from "@/lib/api/client";
+import type { ChartScale, Counting, CountryStats, GrowthReason } from "@/lib/api/types";
+import { COUNTRY_CHART_TOP_N, papersInYear, yearRangeFromCountries } from "@/lib/charts/aggregate";
 import { useApi } from "@/lib/useApi";
 import { useMotionPrefs } from "@/components/MotionProvider";
 import { EmptyState, ErrorNote, LoadingBlock, PageHeader } from "@/components/ui";
@@ -14,25 +14,27 @@ import { isRegion } from "@/lib/regions";
 import Link from "next/link";
 import { SHOW_GROWTH, SHOW_SHARE } from "@/lib/flags";
 import { Share } from "./Share";
+import { CountryChart } from "./CountryChart";
 
 const Globe3D = dynamic(() => import("./Globe3D"), { ssr: false, loading: () => <LoadingBlock label="Raising the globe" /> });
 
-export function CountriesPage() {
+export function CountriesPage({ scale = "sample" }: { scale?: ChartScale }) {
   const { lowPower } = useMotionPrefs();
   const [counting, setCounting] = useState<Counting>("fractional");
   const [sel, setSel] = useState<string | null>(null);
   const [year, setYear] = useState<number | "all">("all");
-  const cs = useApi(() => api.countries(counting), [counting]);
+  const cs = useApi(() => api.countries(counting, scale), [counting, scale]);
   const col = useApi(() => api.collaborations(counting), [counting]);
-  const tcy = useApi(() => api.topicCountryYears({ limit: 5000 }), []);
-  const yearlyReady = tcy.source === "live" || prefersFixtures();
-  const range = yearlyReady ? yearRange(tcy.data ?? []) : null;
+  const chartYear = year === "all" ? null : year;
+  const chart = useApi(() => api.countryChart({ counting, top: COUNTRY_CHART_TOP_N, year: chartYear, scale }), [counting, chartYear, scale]);
+  const range = yearRangeFromCountries(cs.data ?? []);
   const list = useMemo(() => {
-    const base = [...(cs.data ?? [])].sort((a, b) => b.papers - a.papers);
-    if (year === "all" || !yearlyReady || !tcy.data) return base;
-    const by = papersByCountryYear(tcy.data, year, counting);
-    return base.map((c) => ({ ...c, papers: by.get(c.code) ?? 0 })).sort((a, b) => b.papers - a.papers);
-  }, [cs.data, tcy.data, year, counting, yearlyReady]);
+    const base = [...(cs.data ?? [])];
+    const withYear = year === "all" || !range
+      ? base
+      : base.map((c) => ({ ...c, papers: papersInYear(c, year, counting) }));
+    return withYear.sort((a, b) => b.papers - a.papers || a.code.localeCompare(b.code));
+  }, [cs.data, year, counting, range]);
   const current = list.find((c) => c.code === sel);
   const partners = (col.data ?? []).filter((c) => c.source === sel || c.target === sel).sort((a, b) => b.papers - a.papers);
   const fmt = (n: number) => (counting === "full" ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 1 }));
@@ -55,9 +57,13 @@ export function CountriesPage() {
           </label>
         </div>
       )}
-      {!yearlyReady && tcy.source === "mock" && !prefersFixtures() && (
-        <p className="mb-3 text-xs text-accent">The topic × country × year table is not on this API yet, so the year slider stays off. Country bars use the live /countries route.</p>
-      )}
+      <section className="glass mb-4 p-4 sm:p-5">
+        <h2 className="font-display text-2xl text-white">Top countries</h2>
+        <p className="mb-3 mt-1 text-sm text-mist">Percent of this period. The {COUNTRY_CHART_TOP_N} largest stay named. Everyone else is one Other bar.</p>
+        {chart.loading && !chart.data ? <LoadingBlock label="Loading country totals" /> : chart.error ? <ErrorNote msg={chart.error} onRetry={chart.reload} /> : chart.data ? <CountryChart data={chart.data} /> : (
+          <EmptyState title="No country totals yet" body="The chart needs GET /countries or GET /aggregates/countries. It does not count papers in the browser." />
+        )}
+      </section>
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="glass relative h-[420px] overflow-hidden sm:h-[560px]">
           {cs.loading && !cs.data ? <LoadingBlock label="Raising the globe" /> : list.length === 0 ? (

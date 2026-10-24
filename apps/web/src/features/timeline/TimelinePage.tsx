@@ -1,34 +1,61 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { api, prefersFixtures } from "@/lib/api/client";
+import { api } from "@/lib/api/client";
+import type { ChartScale } from "@/lib/api/types";
+import { seriesFromTopicAggregate } from "@/lib/charts/aggregate";
 import { selectBornDied } from "@/lib/graph";
 import { useApi } from "@/lib/useApi";
 import { EmptyState, ErrorNote, LoadingBlock, PageHeader, Stat } from "@/components/ui";
 import { Streamgraph } from "./Streamgraph";
+import { VolumeChart } from "./VolumeChart";
 
 const fmtDate = (s: string) => new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-export function TimelinePage() {
+export function TimelinePage({ scale = "sample", initialYear = null }: { scale?: ChartScale; initialYear?: number | null }) {
+  const [year, setYear] = useState<number | null>(initialYear);
+  const grain = year == null ? "year" : "month";
   const runs = useApi(() => api.runs(), []);
   const pats = useApi(() => api.patterns(), []);
-  const tcy = useApi(() => api.topicCountryYears({ limit: 5000 }), []);
+  const pubs = useApi(() => api.publications({ grain, year, scale }), [grain, year, scale]);
+  const topics = useApi(() => api.topicVolume({ grain, year, top: 6, scale }), [grain, year, scale]);
   const list = useMemo(() => [...(runs.data ?? [])].sort((a, b) => a.started_at.localeCompare(b.started_at)), [runs.data]);
   const [idx, setIdx] = useState(0);
   useEffect(() => setIdx(Math.max(0, list.length - 1)), [list.length]);
+  const series = useMemo(() => (topics.data ? seriesFromTopicAggregate(topics.data) : []), [topics.data]);
   if (runs.loading && !runs.data) return <LoadingBlock label="Loading runs" />;
   if (runs.error) return <ErrorNote msg={runs.error} onRetry={runs.reload} />;
   const cur = list[idx];
   const max = Math.max(...list.map((r) => r.papers_added), 1);
   const cumulative = list.slice(0, idx + 1).reduce((s, r) => s + r.papers_added, 0);
-  const year = cur ? new Date(cur.started_at).getUTCFullYear() : 0;
-  const life = selectBornDied(pats.data ?? [], year);
-  const showStream = tcy.source === "live" || prefersFixtures();
+  const runYear = cur ? new Date(cur.started_at).getUTCFullYear() : 0;
+  const life = selectBornDied(pats.data ?? [], runYear);
   return (
     <div>
-      <PageHeader title="Progress timeline" subtitle="Every scheduled incremental run, on the 1st and the 15th, with the topics moving underneath." />
+      <PageHeader title="Progress timeline" subtitle="Publication dates of the corpus, then every scheduled incremental run, with the topics moving underneath." />
+      <section className="glass mb-4 p-4 sm:p-5" data-testid="publication-section">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-2xl text-white">Estimated OpenAlex output</h2>
+            <p className="mt-1 text-sm text-mist">
+              Papers are sampled evenly each month, so a raw count looks flat. Bars are the estimated total
+              {year == null ? " by year" : ` by month in ${year}`}.
+              {pubs.data ? ` ${pubs.data.estimated_total == null ? "estimate unavailable" : `${pubs.data.estimated_total.toLocaleString("en-US")} estimated`} · ${pubs.data.sampled.toLocaleString("en-US")} sampled.` : ""}
+            </p>
+          </div>
+          {year != null && (
+            <button type="button" className="btn" onClick={() => setYear(null)}>All years</button>
+          )}
+        </div>
+        {pubs.loading && !pubs.data ? <LoadingBlock label="Loading publication totals" /> : pubs.error ? <ErrorNote msg={pubs.error} onRetry={pubs.reload} /> : pubs.data ? (
+          <VolumeChart data={pubs.data} onDrill={(y) => setYear(y)} />
+        ) : (
+          <EmptyState title="Waiting for publication totals" body="GET /aggregates/publications is not on this API yet. The chart appears once that route returns sampled and estimated_total for each year and month. It does not count papers in the browser." />
+        )}
+      </section>
       {list.length === 0 ? <EmptyState title="No runs yet" body="The timeline fills in after the first ingest. Patterns and the topic stream can still load on their own." /> : <>
         <div className="glass p-4 sm:p-5">
+          <h2 className="mb-3 font-display text-2xl text-white">Ingest runs</h2>
           <div className="flex h-44 items-end gap-1" aria-label="Papers added per run">
             {list.map((r, i) => (
               <button key={r.id} onClick={() => setIdx(i)} aria-label={`${fmtDate(r.started_at)}: ${r.papers_added} papers`} title={`${fmtDate(r.started_at)}: ${r.papers_added} papers`} className="group flex h-full min-w-0 flex-1 flex-col justify-end focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
@@ -57,9 +84,13 @@ export function TimelinePage() {
       </>}
       <section className="glass mt-4 p-4 sm:p-5">
         <h2 className="font-display text-2xl text-white">Topic stream</h2>
-        <p className="mb-3 mt-1 text-sm text-mist">Fractional paper counts by topic and year, from the topic × country × year table.</p>
-        {tcy.loading && !tcy.data ? <LoadingBlock label="Loading the topic-year table" /> : tcy.error ? <ErrorNote msg={tcy.error} onRetry={tcy.reload} /> : showStream && tcy.data ? <Streamgraph rows={tcy.data} /> : (
-          <EmptyState title="Waiting for the topic-year table" body="GET /topic-country-years is not on this API yet. The stream appears on its own once that route returns rows. Until then this page keeps the live run history." />
+        <p className="mb-3 mt-1 text-sm text-mist">
+          {year == null ? "Each year is the percent of that period." : `Each month in ${year} is the percent of that period.`} Columns sum to 100% when the period has papers. Select a year on the chart above, or a column here, to open that year.
+        </p>
+        {topics.loading && !topics.data ? <LoadingBlock label="Loading topic totals" /> : topics.error ? <ErrorNote msg={topics.error} onRetry={topics.reload} /> : topics.data ? (
+          <Streamgraph series={series} onSelect={(key) => { if (year == null && /^\d{4}$/.test(key)) setYear(Number(key)); }} />
+        ) : (
+          <EmptyState title="Waiting for topic totals" body="GET /aggregates/topics is not on this API yet. The stream appears once that route returns precomputed topic totals. It does not download the topic × country × year table and count it here." />
         )}
       </section>
     </div>
