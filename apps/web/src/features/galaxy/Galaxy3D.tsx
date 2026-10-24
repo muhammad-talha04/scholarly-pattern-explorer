@@ -478,7 +478,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
           <shaderMaterial args={[{ uniforms, vertexShader: POINT_VERT, fragmentShader: POINT_FRAG, transparent: true, depthWrite: false, toneMapped: false }]} />
         </points>
         {tip && (
-          <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "none" }}>
+          <Html position={tip.pos} zIndexRange={[12, 0]} style={{ pointerEvents: "none" }}>
             <div
               className="glass pointer-events-auto w-44 p-2 text-left text-[11px] leading-snug"
               style={{ transform: `translate(${cardShift.x}px, ${cardShift.y}px)` }}
