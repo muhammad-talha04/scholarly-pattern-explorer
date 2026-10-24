@@ -150,7 +150,9 @@ def _read_ids(path: Path) -> set[str]:
     return ids
 
 
-FILTER = "from_publication_date:{lo},to_publication_date:{hi},has_abstract:true"
+# Computer Science (OpenAlex field 17) articles only. Without the field filter the loader sampled all of science.
+SCOPE = "primary_topic.field.id:fields/17,type:article"
+FILTER = "from_publication_date:{lo},to_publication_date:{hi},has_abstract:true," + SCOPE
 
 
 def fetch(target: int, out: str | Path, state: str | Path | None = None, start: str = "2015-01",

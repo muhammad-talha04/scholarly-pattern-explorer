@@ -49,6 +49,7 @@ def test_fetch_dedupes_skips_no_abstract_and_resumes(tmp_path):
     assert len(ids) == len(set(ids)) == r.fetched == 6
     assert "W2" not in ids and "W99999" not in ids and all("raw" not in x for x in rows)
     assert all("has_abstract:true" in call["filter"] for call in c.calls)
+    assert all("primary_topic.field.id:fields/17" in call["filter"] for call in c.calls)
     # resume: every month is marked done, so nothing is requested again
     c2 = FakeClient(lambda p: pytest.fail("should not fetch"))
     c2.get = lambda p: pytest.fail("should not request")
