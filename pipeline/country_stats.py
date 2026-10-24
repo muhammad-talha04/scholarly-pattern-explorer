@@ -103,20 +103,40 @@ def work_topic_refs(work: dict) -> list[tuple[str, str]]:
     return out
 
 
+def work_year(work: dict) -> str | None:
+    """Calendar year as a digit string, or None when the work has no year.
+
+    Normalized works store ``year``. A raw OpenAlex work has ``publication_year``
+    instead, and a publication date covers both when the year field is empty.
+    The string ``"None"`` is not a year: it used to land in ``by_year`` and then
+    get dropped from ``topic_country_year``.
+    """
+    year = work.get("year")
+    if year is None:
+        year = work.get("publication_year")
+    if year is None:
+        iso = _iso_date(work.get("date") or work.get("publication_date"))
+        year = iso[:4] if iso else None
+    text = str(year).strip() if year is not None else ""
+    return text if text.isdigit() else None
+
+
 def tally(works) -> dict:
     t = {k: defaultdict(Counter) for k in KEYS}
     pairs = Counter()
     for w in works:
         cs = countries_of(w)
         weights = fractional_weights(cs)
-        yr = str(w.get("year"))
+        yr = work_year(w)
         tops = [x for x in (w.get("topics") or []) if x]  # all topics, same as the gap finder fallback
         for c in cs:
-            t["by_year"][c][yr] += 1
-            t["frac"][c][yr] += weights[c]
             t["topics"][c].update(tops)
+            if yr:
+                t["by_year"][c][yr] += 1
+                t["frac"][c][yr] += weights[c]
         for tp in tops:
-            t["topic_years"][tp][yr] += 1
+            if yr:
+                t["topic_years"][tp][yr] += 1
             for c in cs:
                 t["topic_countries"][tp][c] += weights[c]
         n = len(cs)
@@ -133,7 +153,7 @@ def tally(works) -> dict:
             for c in cs:
                 t["by_date"][c][date] += 1
                 t["frac_date"][c][date] += weights[c]
-        if cs:
+        if cs and yr:
             for tid, name in work_topic_refs(w):
                 t["topic_names"][tid][name] += 1
                 for c in cs:
