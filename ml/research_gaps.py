@@ -144,8 +144,8 @@ def _pick_examples(groups: list[list[dict]], n: int = 3) -> list[dict]:
 
 
 def find_semantic_gaps(papers: list[dict], vectors: np.ndarray, *,
-                       min_sim: float = 0.45, min_each: int = 5, max_co_rate: float = 0.2,
-                       neighbor_k: int = 3, min_neighbor: float = 5, max_density_ratio: float = 0.5,
+                       min_sim: float = 0.45, min_each: int = 60, max_co_rate: float = 0.2,
+                       neighbor_k: int = 3, min_neighbor: float = 300, max_density_ratio: float = 0.5,
                        limit: int = 10) -> list[dict]:
     """Rank co-occurrence gaps and low-density neighbourhoods.
 

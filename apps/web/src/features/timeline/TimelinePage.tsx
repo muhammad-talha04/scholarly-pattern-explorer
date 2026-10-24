@@ -56,6 +56,12 @@ export function TimelinePage({ scale = "sample", initialYear = null }: { scale?:
       {list.length === 0 ? <EmptyState title="No runs yet" body="The timeline fills in after the first ingest. Patterns and the topic stream can still load on their own." /> : <>
         <div className="glass p-4 sm:p-5">
           <h2 className="mb-3 font-display text-2xl text-white">Ingest runs</h2>
+          {list.length < 2 ? (
+            <p className="max-w-2xl text-sm text-mist">
+              One ingest run so far: the initial load of {list[0].papers_added.toLocaleString()} papers on {fmtDate(list[0].started_at)}.
+              Each weekly update will add its own bar here, so you can step through how the corpus and its patterns changed.
+            </p>
+          ) : (<>
           <div className="flex h-44 items-end gap-1" aria-label="Papers added per run">
             {list.map((r, i) => (
               <button key={r.id} onClick={() => setIdx(i)} aria-label={`${fmtDate(r.started_at)}: ${r.papers_added} papers`} title={`${fmtDate(r.started_at)}: ${r.papers_added} papers`} className="group flex h-full min-w-0 flex-1 flex-col justify-end focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
@@ -66,6 +72,7 @@ export function TimelinePage({ scale = "sample", initialYear = null }: { scale?:
           </div>
           <input type="range" aria-label="Run scrubber" min={0} max={list.length - 1} value={idx} onChange={(e) => setIdx(Number(e.target.value))} className="mt-4 w-full accent-accent" />
           <div className="mt-1 flex justify-between text-xs text-mist"><span>{fmtDate(list[0].started_at)}</span><span>{fmtDate(list[list.length - 1].started_at)}</span></div>
+          </>)}
         </div>
         {cur && (
           <motion.div key={cur.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
