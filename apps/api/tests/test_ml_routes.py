@@ -134,7 +134,7 @@ def test_galaxy_layout(client):
     names = {n["topic_name"] for n in nodes}
     for node in nodes:
         assert set(node) == {"id", "topic_id", "topic_name", "x", "y", "z",
-                             "cluster_id", "cluster_label", "year", "support"}
+                             "cluster_id", "cluster_label", "year", "support", "color_index"}
         assert isinstance(node["cluster_id"], str) and node["cluster_label"]
         assert isinstance(node["x"], float) and isinstance(node["y"], float) and isinstance(node["z"], float)
         assert isinstance(node["support"], float) and 0 < node["support"] <= 1
@@ -143,10 +143,12 @@ def test_galaxy_layout(client):
     assert by_id["W1"]["support"] == 1.0
     assert by_id["W1"]["topic_name"] == "Transformers for protein structure prediction"
     assert by_id["W1"]["topic_id"] == "proteins"
-    cluster_ids = {c["id"] for c in body["clusters"]}
-    assert {n["cluster_id"] for n in nodes} <= cluster_ids
+    cluster_ids = {c["id"]: c["color_index"] for c in body["clusters"]}
+    assert {n["cluster_id"] for n in nodes} <= set(cluster_ids)
+    assert all(cluster_ids[n["cluster_id"]] == n["color_index"] for n in nodes)
     for cluster in body["clusters"]:
-        assert set(cluster) == {"id", "name", "label", "centroid", "size"}
+        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index"}
+        assert isinstance(cluster["color_index"], int)
         assert cluster["name"] == cluster["label"] and cluster["size"] >= 1
         assert set(cluster["centroid"]) == {"x", "y", "z"}
     assert len(body["links"]) <= 200

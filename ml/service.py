@@ -169,6 +169,9 @@ class MLService:
         if hit and now - hit[0] < ttl:
             return hit[1]
         doc = self.store.get_document(kind)
+        if kind in ("galaxy", "galaxy_sample") and doc:
+            from .galaxy import ensure_color_index
+            doc = ensure_color_index(doc)
         self._doc_cache[kind] = (now, doc)
         self._sample_cache.clear()
         return doc

@@ -278,7 +278,7 @@ A free, self-hostable ML layer on top of the corpus. No paid APIs are required.
 | Semantic search | `GET /api/v1/search?q=&limit=&country=&year_from=` → top-k with score; `GET /api/v1/papers/{id}/related` |
 | Summaries | `GET /api/v1/papers/{id}` (detail incl. summary, original/OpenAlex links); generated once per paper and cached in `data/ml/summaries.sqlite`. Rate limit: `PAPER_RATE_PER_MIN` (default 60) and `PAPER_RATE_GLOBAL_PER_HOUR` (default 2000) |
 | Paper chat | `POST /api/v1/papers/{id}/ask {"question"}`; grounded in the paper's abstract, returns evidence sentences. `question` is 1–500 characters. Rate limit: `ASK_RATE_PER_MIN` (default 5) and `ASK_RATE_GLOBAL_PER_HOUR` (default 200) |
-| Galaxy | `GET /api/v1/galaxy` reads the stored graph `{nodes, clusters, links}`. A node is one paper: `id`, `topic_id`, `topic_name`, `x`, `y`, `z`, `cluster_id`, `cluster_label`, `year`, `support`. `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout. `index` and `update` precompute it |
+| Galaxy | `GET /api/v1/galaxy` reads the stored graph `{nodes, clusters, links}`. A node is one paper: `id`, `topic_id`, `topic_name`, `x`, `y`, `z`, `cluster_id`, `cluster_label`, `year`, `support`, `color_index`. `(x, y)` is the 2D layout; `(x, y, z)` is the 3D layout. `index` and `update` precompute it |
 | Incremental patterns | `python -m ml.cli update --db data/openalex.duckdb`; `GET /api/v1/patterns`, `GET /api/v1/runs` |
 
 **Embedding model.** The default stays `all-MiniLM-L6-v2`. `python -m ml.benchmark`
@@ -309,7 +309,11 @@ cluster label, and the fields the web client reads (`topic_id`, `topic_name`,
 appended when two titles match, because the client draws links between those
 names. `support` is the paper's citation count divided by the highest count in
 the index (at least 1). Clusters have `id`, `name`, `label`, a 3D `centroid`,
-and `size`. Links are undirected nearest-neighbour edges (2 neighbours, at most
+`size`, and `color_index`. `color_index` is matched to the previous centroid
+(Hungarian assignment on cosine distance) when a rebuild recomputes clusters,
+so a palette slot stays with the same region. A new cluster below the match
+threshold gets a fresh index. The mapping is stored in the `galaxy_state`
+document. Links are undirected nearest-neighbour edges (2 neighbours, at most
 200 edges) with `source`, `target`, and `weight`. `index` and `update` store
 the graph. `GET /api/v1/galaxy` only reads that stored document, and an empty
 store returns `{nodes: [], clusters: [], links: []}`.

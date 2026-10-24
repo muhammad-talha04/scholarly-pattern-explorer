@@ -1,8 +1,9 @@
 import numpy as np
+import pytest
 
 from ml.embeddings import HashEmbedder
 from ml.galaxy import (GalaxyMap, cluster_ids, ctfidf_labels, empty_graph, graph_from_layout,
-                       knn_links, resolve_method)
+                       hungarian, knn_links, match_cluster_colors, resolve_method)
 from ml.papers import Paper
 from ml.service import MLService, SummaryCache
 from ml.store import LocalStore
@@ -150,7 +151,8 @@ def test_service_galaxy_round_trip(tmp_path):
     assert isinstance(by_id["W1"]["cluster_id"], str)
     assert {c["id"] for c in graph["clusters"]} >= {n["cluster_id"] for n in graph["nodes"]}
     for cluster in graph["clusters"]:
-        assert set(cluster) == {"id", "name", "label", "centroid", "size"}
+        assert set(cluster) == {"id", "name", "label", "centroid", "size", "color_index"}
+        assert isinstance(cluster["color_index"], int)
         assert cluster["name"] == cluster["label"]
         assert set(cluster["centroid"]) == {"x", "y", "z"}
     names = {n["topic_name"] for n in graph["nodes"]}
@@ -182,5 +184,57 @@ def test_graph_links_are_capped_nearest_neighbours():
     assert names == {"Same title"} | {f"Same title (W{i})" for i in range(1, 6)}
     assert graph["clusters"][0]["size"] == 6
     assert graph["clusters"][0]["id"] == "0"
+    assert graph["clusters"][0]["color_index"] == 0
+    assert {n["color_index"] for n in graph["nodes"]} == {0}
     assert knn_links(["a"], np.ones((1, 2))) == []
     assert graph_from_layout([], np.zeros((0, 2)), []) == empty_graph()
+
+
+def test_hungarian_matches_brute_force():
+    import itertools
+    rng = np.random.default_rng(0)
+    cost = rng.random((4, 4))
+    rows, cols = hungarian(cost)
+    assert sorted(rows.tolist()) == [0, 1, 2, 3]
+    assert sorted(cols.tolist()) == [0, 1, 2, 3]
+    got = float(cost[rows, cols].sum())
+    best = min(sum(cost[i, perm] for i, perm in enumerate(order))
+               for order in itertools.permutations(range(4)))
+    assert got == pytest.approx(best)
+
+
+def test_new_cluster_below_cosine_threshold_gets_a_fresh_color():
+    mapping, nxt = match_cluster_colors({"0": [1.0, 0.0], "1": [0.0, 1.0]},
+                                        {"0": [1.0, 0.0]}, next_color=1)
+    assert mapping == {"0": 0, "1": 1} and nxt == 2
+    fresh, nxt = match_cluster_colors({"0": [0.0, 1.0]}, {"3": [1.0, 0.0]}, next_color=4)
+    assert fresh == {"0": 4} and nxt == 5
+
+
+def test_color_index_follows_the_centroid_across_a_refit(tmp_path):
+    ids, vectors, metas = _blobs()
+    galaxy = GalaxyMap(tmp_path / "g")
+    first = galaxy.sync(ids, vectors, metas)
+    colors = {p["id"]: p["color_index"] for p in first}
+    assert len(set(colors.values())) == 2
+    assert all(p["color_index"] >= 0 for p in first)
+    saved = galaxy.state["color_centroids"]
+    keys = sorted(saved, key=int)
+    galaxy.state["color_centroids"] = {keys[0]: saved[keys[1]], keys[1]: saved[keys[0]]}
+    again = galaxy.sync(ids, vectors, metas, refit=True)
+    swapped = {int(keys[0]): int(keys[1]), int(keys[1]): int(keys[0])}
+    for point in again:
+        assert point["color_index"] == swapped[colors[point["id"]]]
+    by_cluster = {}
+    for point in again:
+        by_cluster.setdefault(point["cluster_id"], set()).add(point["color_index"])
+    assert all(len(vals) == 1 for vals in by_cluster.values())
+    # An incremental add keeps the colours just assigned.
+    kept = {p["id"]: p["color_index"] for p in again}
+    extra_vec = np.vstack([vectors, vectors[:1]])
+    extra_meta = metas + [dict(metas[0], pub_year=2024)]
+    grown = galaxy.sync(ids + ["Pnew"], extra_vec, extra_meta)
+    grown_colors = {p["id"]: p["color_index"] for p in grown}
+    for wid, color in kept.items():
+        assert grown_colors[wid] == color
+    assert grown_colors["Pnew"] == kept[ids[0]]

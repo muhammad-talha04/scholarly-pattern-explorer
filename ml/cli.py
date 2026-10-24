@@ -33,7 +33,8 @@ def main(argv=None):
     ap.add_argument("--jsonl")
     ap.add_argument("--db")
     ap.add_argument("--model", help="sentence-transformers model id (ignored when ML_EMBEDDER=hash)")
-    ap.add_argument("--refit", action="store_true", help="recompute the galaxy layout from scratch")
+    ap.add_argument("--refit", action="store_true",
+                    help="recompute galaxy clusters from scratch; colours are matched to the previous centroids")
     ap.add_argument("--min-support", type=float, default=0.05)
     ap.add_argument("--window", type=int, default=3)
     ap.add_argument("--batch-size", type=int, default=1000)
@@ -136,7 +137,7 @@ def main(argv=None):
     # The pattern snapshot is already saved. A galaxy failure must not undo that.
     try:
         from .service import MLService
-        graph = MLService().rebuild_galaxy()
+        graph = MLService().rebuild_galaxy(refit=a.refit)
         print(f"galaxy {len(graph['nodes'])} nodes")
     except Exception as exc:
         print(f"galaxy skipped: {exc}")
