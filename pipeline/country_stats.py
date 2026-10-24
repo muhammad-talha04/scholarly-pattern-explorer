@@ -28,7 +28,7 @@ KEYS = ("by_year", "frac", "topics", "topic_years", "topic_countries",
 # the equal-period growth metric. Papers without a publication date are skipped there.
 
 MIN_PAPERS = 30            # both periods need at least this many (active counting mode)
-PARTIAL_YEARS = {2024}     # corpus starts mid-Oct 2024: any window touching it is hidden
+PARTIAL_YEARS: set[int] = set()   # corpus now spans 2015 onward evenly; no partial first year
 SHARE_FIELDS = ("share_pct", "share_prev_pct", "share_change_pp", "share_reason")
 GROWTH_FIELDS = ("growth_pct", "growth_reason", "growth_cur_count", "growth_prev_count",
                  "growth_window_start", "growth_window_end")
@@ -369,6 +369,8 @@ def main(argv=None):
     ap.add_argument("--prev", help="previous snapshot JSON")
     ap.add_argument("--out", default="data/country_snapshot.json")
     ap.add_argument("--table", help="SQLite file for topic_country_year (default: beside --out)")
+    ap.add_argument("--min-tcy", type=int, default=0, help="snapshot keeps topic×country×year cells with at least this many papers "
+                    "(singletons are ~65%% of rows, 18 MB at 80k papers; the SQLite table keeps all)")
     ap.add_argument("--dates", help="JSONL of {date, countries} for every work; rebuilds the "
                     "date counters (by_date/frac_date) when --prev predates them")
     ap.add_argument("--corpus", help="full works JSONL; read once if --prev has no topic-country-year counters")
@@ -400,12 +402,14 @@ def main(argv=None):
         for key in ("by_date", "frac_date", "papers_date"):
             combined[key] = seeded[key]
     snap = snapshot(combined)
+    full_rows = snap["topic_country_year"]
+    snap["topic_country_year"] = [r for r in full_rows if r["paper_count"] >= a.min_tcy]
     out, table = output_paths(a.out, a.table)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(snap))
-    write_topic_country_year(snap["topic_country_year"], table)
+    write_topic_country_year(full_rows, table)
     print(f"{len(snap['countries'])} countries, {len(snap['topic_year_counts'])} topics, "
-          f"{len(snap['topic_country_year'])} topic-country-year rows")
+          f"{len(snap['topic_country_year'])} topic-country-year rows in the snapshot ({len(full_rows)} in the table)")
 
 
 if __name__ == "__main__":

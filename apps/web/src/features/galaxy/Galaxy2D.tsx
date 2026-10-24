@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { TopicLink } from "@/lib/graph";
 import { gap as gapColor, ink } from "@/lib/theme";
-import { createHoverLock, HOVER_DWELL_MS, pickClosestPaper, reduceHover } from "./hoverLock";
+import { cardBoxBeside, createHoverLock, pickClosestPaperAt, reduceHover, type CardBox } from "./hoverLock";
 import { breathAmount, heroNetwork, neighborIds, networkLinks, ORBIT_SPEED, plexusCore, plexusDrift, plexusTint, REST_SHIFT, ROCK_X_HZ, ROCK_Z_HZ, WIDE_CANVAS, zoomScale, type PlexusPose, type Star } from "./stars";
 
 type Frame = {
@@ -58,8 +58,6 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
   const tipRef = useRef<HTMLDivElement>(null);
   const lockRef = useRef(createHoverLock());
   const overCardRef = useRef(false);
-  const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPtr = useRef({ x: 0, y: 0 });
   const frozenRef = useRef<{ id: string; left: number; top: number } | null>(null);
   const drawnRef = useRef(false);
   const pinCardRef = useRef<() => void>(() => {});
@@ -180,22 +178,25 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
     };
   }, [net, showGaps]);
 
-  const cardAnchor = (id: string) => {
+  const cardBoxAt = (x: number, y: number): CardBox | null => {
     const canvas = canvasRef.current;
-    const node = net.nodes.find((n) => n.paper && n.id === id);
-    if (!canvas || !node) return null;
-    const [x, y] = projectNode(node.pos, node.phase, frameRef.current);
-    const w = canvas.clientWidth || canvas.width || 1;
-    const h = canvas.clientHeight || canvas.height || 1;
+    if (!canvas) return null;
     const cardW = tipRef.current?.offsetWidth || CARD_W;
     const cardH = tipRef.current?.offsetHeight || CARD_H;
-    let left = x + 14;
-    let top = y - cardH * 0.35;
-    if (left + cardW > w - 8) left = x - cardW - 14;
-    if (left < 8) left = 8;
-    if (top < 8) top = 8;
-    if (top + cardH > h - 8) top = Math.max(8, h - cardH - 8);
-    return { left: Math.round(left), top: Math.round(top) };
+    return cardBoxBeside(
+      { x, y },
+      { width: canvas.clientWidth || canvas.width || 1, height: canvas.clientHeight || canvas.height || 1 },
+      cardW,
+      cardH,
+    );
+  };
+
+  const cardAnchor = (id: string) => {
+    const node = net.nodes.find((n) => n.paper && n.id === id);
+    if (!node) return null;
+    const [x, y] = projectNode(node.pos, node.phase, frameRef.current);
+    const box = cardBoxAt(x, y);
+    return box ? { left: box.left, top: box.top } : null;
   };
 
   const applyFrozen = () => {
@@ -223,18 +224,22 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
     pinCardRef.current();
   }, [hover, focus, keepFocusCard]);
 
-  const pickPaper = (ev: { clientX: number; clientY: number }) => {
+  const pointerLocal = (ev: { clientX: number; clientY: number }) => {
+    const canvas = canvasRef.current;
+    const rect = canvas?.getBoundingClientRect();
+    return { x: ev.clientX - (rect?.left ?? 0), y: ev.clientY - (rect?.top ?? 0) };
+  };
+
+  const pickPaperAt = (ev: { clientX: number; clientY: number }) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const px = ev.clientX - rect.left;
-    const py = ev.clientY - rect.top;
+    const { x: px, y: py } = pointerLocal(ev);
     const frame = frameRef.current;
     const points = net.nodes.map((node) => {
       const [x, y] = projectNode(node.pos, node.phase, frame);
       return { id: node.id, paper: node.paper, x, y };
     });
-    return pickClosestPaper(points, px, py, HIT_PX);
+    return pickClosestPaperAt(points, px, py, HIT_PX);
   };
 
   const publish = (id: string | null) => {
@@ -251,52 +256,41 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
     setHover(id);
   };
 
-  const armDwell = () => {
-    if (dwellRef.current) clearTimeout(dwellRef.current);
-    dwellRef.current = setTimeout(() => {
-      const next = reduceHover(lockRef.current, {
-        now: performance.now(),
-        moving: false,
-        hitId: pickPaper({ clientX: lastPtr.current.x, clientY: lastPtr.current.y }),
-        overCard: overCardRef.current,
-      });
-      lockRef.current = next;
-      publish(next.id);
-    }, HOVER_DWELL_MS);
-  };
-
-  useEffect(() => () => {
-    if (dwellRef.current) clearTimeout(dwellRef.current);
-  }, []);
-
-  // Travel keeps the open paper. A zero-movement pointermove is the pointer
-  // sitting still while nodes drift, so it must not retarget. A different
-  // paper is taken only after the pointer rests on it.
+  // A zero-movement pointermove is the pointer sitting still while nodes drift.
+  // Touching a different paper replaces the card immediately, except along the
+  // short lane from the open paper into its card.
   const onPointerMove = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
     if (ev.pointerType === "touch") return;
-    lastPtr.current = { x: ev.clientX, y: ev.clientY };
     if (ev.movementX === 0 && ev.movementY === 0) return;
     if (!keepFocusRef.current) {
       keepFocusRef.current = true;
       setKeepFocusCard(true);
     }
+    const hit = pickPaperAt(ev);
     const next = reduceHover(lockRef.current, {
-      now: performance.now(),
       moving: true,
-      hitId: pickPaper(ev),
+      hitId: hit?.id ?? null,
+      hitAt: hit ? { x: hit.x, y: hit.y } : null,
+      pointer: pointerLocal(ev),
+      movement: { x: ev.movementX, y: ev.movementY },
       overCard: overCardRef.current,
+      nextCard: hit ? cardBoxAt(hit.x, hit.y) : null,
     });
     lockRef.current = next;
     publish(next.id);
-    armDwell();
   };
 
   const onPointerUp = (ev: ReactPointerEvent<HTMLCanvasElement>) => {
     if (ev.pointerType !== "touch") return;
-    const id = pickPaper(ev);
+    const hit = pickPaperAt(ev);
+    const id = hit?.id ?? null;
     keepFocusRef.current = id != null;
     setKeepFocusCard(id != null);
-    lockRef.current = { id, lastMoveAt: performance.now(), pendingId: null };
+    lockRef.current = {
+      id,
+      anchor: hit ? { x: hit.x, y: hit.y } : null,
+      card: hit ? cardBoxAt(hit.x, hit.y) : null,
+    };
     publish(id);
   };
 
@@ -307,7 +301,6 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
       overCardRef.current = true;
       return;
     }
-    if (dwellRef.current) clearTimeout(dwellRef.current);
     overCardRef.current = false;
     lockRef.current = createHoverLock();
     publish(null);
@@ -324,7 +317,7 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerLeave}
         onClick={(ev) => {
-          const id = pickPaper(ev);
+          const id = pickPaperAt(ev)?.id ?? null;
           const node = net.nodes.find((n) => n.id === id);
           if (!node?.paper) return;
           onFocus?.(node.id);
@@ -352,7 +345,6 @@ export function Galaxy2D({ nodes, links, showGaps, focus, highlight, pose = null
             overCardRef.current = false;
             const next = ev.relatedTarget;
             if (next instanceof Node && canvasRef.current?.contains(next)) return;
-            if (dwellRef.current) clearTimeout(dwellRef.current);
             lockRef.current = createHoverLock();
             publish(null);
           }}

@@ -29,6 +29,6 @@ test("growth is hidden by default with a note", async () => {
   expect(SHOW_GROWTH).toBe(false);
   const { GrowthHiddenNote } = await import("@/features/countries/CountriesPage");
   render(<GrowthHiddenNote />);
-  expect(screen.getByTestId("growth-hidden")).toHaveTextContent("Growth trends are hidden while we rebalance the paper sample; see About the data.");
+  expect(screen.getByTestId("growth-hidden")).toHaveTextContent("Growth trends are hidden because recent papers have fewer author countries recorded yet; see About the data.");
   expect(screen.getByRole("link", { name: "About the data" })).toHaveAttribute("href", "/about");
 });

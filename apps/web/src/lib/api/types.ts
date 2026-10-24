@@ -33,7 +33,8 @@ export interface SearchResponse {
   offset?: number;
 }
 export interface CorpusStats { papers: number }
-export interface AskRequest { question: string }
+export interface AskTurn { role: "user" | "assistant"; content: string }
+export interface AskRequest { question: string; history?: AskTurn[] }
 export interface AskResponse { answer: string; sources: string[] }
 export interface Pattern {
   items: string[];

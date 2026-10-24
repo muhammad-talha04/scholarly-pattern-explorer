@@ -112,7 +112,7 @@ function CountryTable({ list, sel, onSelect, fmt }: { list: CountryStats[]; sel:
 }
 
 export function GrowthHiddenNote() {
-  return <p data-testid="growth-hidden" className="px-2 pt-2 text-xs text-slate-400">Growth trends are hidden while we rebalance the paper sample; see <Link href="/about" className="text-accent hover:underline">About the data</Link>.</p>;
+  return <p data-testid="growth-hidden" className="px-2 pt-2 text-xs text-slate-400">Growth trends are hidden because recent papers have fewer author countries recorded yet; see <Link href="/about" className="text-accent hover:underline">About the data</Link>.</p>;
 }
 
 function RegionTag() {

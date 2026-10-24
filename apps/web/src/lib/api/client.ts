@@ -1,5 +1,5 @@
 import type {
-  AskResponse, ChartScale, Collaboration, CorpusStats, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
+  AskResponse, AskTurn, ChartScale, Collaboration, CorpusStats, Counting, CountryStats, GalaxyGraph, PaperDetail, PaperSummary,
   Pattern, Run, SearchParams, SearchResponse, TimeGrain, TopicCountryYear, TopicYearQuery,
 } from "./types";
 import { COUNTRY_AGGREGATE_PATH, COUNTRY_CHART_TOP_N, PUBLICATION_AGGREGATE_PATH, TOPIC_AGGREGATE_PATH, countryChartFromStats, parseCountryChart, parsePublication, parseTopicAggregate } from "@/lib/charts/aggregate";
@@ -208,8 +208,8 @@ export const api = {
   /** Indexed paper count. Fixtures report the sample size, not a live corpus. */
   stats: () => request<CorpusStats>("/stats", () => ({ papers: mock.FIXTURE_COUNT })),
   paper: (id: string) => request<PaperDetail>(`/papers/${encodeURIComponent(id)}`, () => mock.paper(id)),
-  ask: (id: string, question: string) =>
-    request<AskResponse>(`/papers/${encodeURIComponent(id)}/ask`, () => mock.ask(id, question), { method: "POST", body: JSON.stringify({ question }) }),
+  ask: (id: string, question: string, history: AskTurn[] = []) =>
+    request<AskResponse>(`/papers/${encodeURIComponent(id)}/ask`, () => mock.ask(id, question), { method: "POST", body: JSON.stringify({ question, history }) }),
   related: (id: string, limit = 6) => request<PaperSummary[]>(`/papers/${encodeURIComponent(id)}/related${qs({ limit })}`, () => mock.related(id, limit)),
   patterns: (opts: { window?: number; trend?: "gap" | "emerging" } = {}) =>
     request<Pattern[]>(`/patterns${qs(opts)}`, () => (opts.trend === "gap" ? mock.gaps() : opts.trend === "emerging" ? mock.emerging() : mock.patterns(opts.window))),

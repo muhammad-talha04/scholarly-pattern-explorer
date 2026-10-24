@@ -164,7 +164,8 @@ class FastEmbedder:
     def _load(self):
         if self._model is None:
             from fastembed import TextEmbedding  # heavy import
-            self._model = TextEmbedding(self.model_name, cache_dir=self.cache_dir)
+            self._model = TextEmbedding(self.model_name, cache_dir=self.cache_dir,
+                                        threads=int(os.getenv("ML_EMBED_THREADS", os.cpu_count() or 1)))
         return self._model
 
     def encode(self, texts: list[str], mode: str = "document") -> np.ndarray:
