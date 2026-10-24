@@ -409,3 +409,9 @@ Not fixed here, on purpose: the emerging window, the hash production embedder, r
 - [ ] Deploy the API from `render.yaml` (free tier) and set Vercel `NEXT_PUBLIC_API_URL` to that origin. The web app is already on Vercel and, with the URL unset, serves the 66-paper sample. Env vars are listed under Deploy above. Do not commit secret values.
 - [ ] Council C5, specialization (luni, 2026-10-16): `pipeline/country_stats.py` now emits `specialized_topics` per country, which ranks topics by location quotient (the country's topic share divided by the corpus topic share) and needs at least 10 country papers per topic. `top_topics` (raw counts) is unchanged and becomes the secondary view. The API schema exposes the field; the web Countries page still has to switch to it. The country snapshot has to be regenerated after the 55k re-sample before the field holds data.
 - [ ] Council C4, gap definition (luni, 2026-10-16): `ml/gaps.py` has a published `GAP_DEFINITION` (gaps are relative to this AI-subfield corpus from Oct 2024 onward). Growth gaps carry `low_coverage` and `thin_years` (a window year whose corpus total is under half the busiest window year, or under 50 topic papers), and `/api/v1/patterns?trend=gap` returns `low_coverage`. On today's snapshot all 20 growth gaps are low coverage, because the 2022–2025 window includes 2022–2024, which the corpus barely or only partly covers. The web Patterns page still has to show the flag and the definition.
+
+## 2026-10-24 (batch 2)
+- Galaxy card now sits just right of the pointer (28px right, 24px up) so neighbours stay visible.
+- Merged galaxy-related PRs #20, #19, #49, #21 together. #52 and #16 held back (see PR notes).
+- Growth gaps filtered to CS topics; gap list cached per window (endpoint no longer recomputes examples on each request).
+- Ingest, mining and fetch workflows now run monthly (1st of the month).

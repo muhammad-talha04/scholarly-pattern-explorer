@@ -32,6 +32,8 @@ V2 = [
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    from app.routers import core
+    core._gap_patterns.cache_clear()
     svc = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
                     cache=SummaryCache(tmp_path / "s.sqlite"))
     svc.index_papers([Paper.from_record(r) for r in V2])
