@@ -61,7 +61,7 @@ def test_refresh_saves_scores_keyed_by_color(tmp_path, monkeypatch):
         "clusters": [], "links": [],
     })
     refresh_discoveries("2026-10-15", store=store, db_path=db,
-                        snapshot_path=tmp_path / "no.json", works_path=tmp_path / "no.jsonl")
+                        snapshot_path=tmp_path / "no.json", works_path=tmp_path / "no.jsonl", cs_only=False)
     saved = json.loads((tmp_path / "ml" / "snapshots" / "discoveries-2026-10-15.json").read_text())
     assert saved["emerging_scores"]["5"] == 1.0
     assert saved["emerging_scores"]["8"] == 0.0
