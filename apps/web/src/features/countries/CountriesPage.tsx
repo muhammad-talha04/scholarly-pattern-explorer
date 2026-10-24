@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api/client";
 import type { ChartScale, Counting, CountryStats, GrowthReason } from "@/lib/api/types";
@@ -23,6 +23,24 @@ export function CountriesPage({ scale = "sample", initialCountries }: { scale?: 
   const [counting, setCounting] = useState<Counting>("fractional");
   const [sel, setSel] = useState<string | null>(null);
   const [year, setYear] = useState<number | "all">("all");
+  // Shareable link: /countries?country=CN&counting=full. Read after mount (not useSearchParams) so the server-rendered rows stay in the HTML.
+  const [urlRead, setUrlRead] = useState(false);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const c = q.get("counting");
+    if (c === "fractional" || c === "full" || c === "per_country") setCounting(c as Counting);
+    const code = q.get("country");
+    if (code) setSel(code.toUpperCase());
+    setUrlRead(true);
+  }, []);
+  useEffect(() => {
+    if (!urlRead) return;
+    const q = new URLSearchParams(window.location.search);
+    if (sel) q.set("country", sel); else q.delete("country");
+    if (counting !== "fractional") q.set("counting", counting); else q.delete("counting");
+    const next = `${window.location.pathname}${q.toString() ? `?${q}` : ""}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(null, "", next);
+  }, [sel, counting, urlRead]);
   const cs = useApi(() => api.countries(counting, scale), [counting, scale], counting === "fractional" ? initialCountries : undefined);
   const col = useApi(() => api.collaborations(counting), [counting]);
   const chartYear = year === "all" ? null : year;

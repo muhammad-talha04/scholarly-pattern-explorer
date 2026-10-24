@@ -98,6 +98,9 @@ Last updated: 2026-10-24 ~12:30 PKT by the ML Cowork crew: the CS load is finish
 
 ## 2026-10-16 (evan): server-rendered first rows (council issue 6)
 - `/countries` and `/patterns` now prefetch on the server (`apps/web/src/lib/api/server.ts`, ISR `revalidate = 3600`, 4 s timeout). The first HTML has all 135 country rows (fractional counting) and the latest pattern window, so crawlers and slow connections no longer see an empty shell. If the API is unset, mocked, cold or failing, the pages fall back to client fetching as before. `useApi` takes an optional `initial` value that stays on screen while the client refetches. `/search` has nothing to prerender without a query.
+## 2026-10-16 (evan): share card and country permalinks (council step 10, issue 6)
+- `app/opengraph-image.tsx` renders one 1200×630 share card. `pageMeta` lists it in `openGraph.images` and `twitter.images` on every route, because a page's own `openGraph` replaces the inherited one.
+- `/countries` keeps the selection in the URL: `?country=CN&counting=full` (fractional is the default and isn't written). The URL is read after mount with `window.location` rather than `useSearchParams`, so the server-rendered rows from the SSR PR stay in the HTML.
 
 ## What we are building
 Scholarly Pattern Explorer v2: a free web app to search research papers by
