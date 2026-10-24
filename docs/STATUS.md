@@ -189,6 +189,7 @@ Set these in the Render dashboard. `render.yaml` lists them as `sync: false`.
 | `SEARCH_MIN_SCORE` | No | Second in precedence after `ML_MIN_SCORE`. Overrides the per-model "no close matches" cosine floor (hash off, MiniLM 0.38, bge 0.65). `0` turns it off. |
 | `ML_MIN_SCORE` | No | Same floor override, read on every search (default bge 0.65, pending chris's benchmark). Highest precedence: beats `SEARCH_MIN_SCORE` and `ML_SEARCH_MIN_SCORE`. Must be in [0, 1]; invalid values (text, nan, inf, out of range) log a warning and the per-model default is used. `0` turns it off. |
 | `ML_EMBED_MODEL_REVISION` | No | Overrides the version part of `paper_embeddings.model` (default `main`, or `fastembed-<version>` for fastembed). |
+| `ML_EMBED_THREADS` | No | ONNX threads for fastembed. Default: all CPU cores (it used 1 before; 2 cores embed ~50% faster). |
 | `ML_EMBED_BATCH_SIZE` / `FASTEMBED_CACHE_PATH` | No | fastembed batch (default 32) and model cache (default `<repo>/.cache/fastembed`, filled by `python -m ml.prefetch_model` at build). |
 | `ML_EMBED_MODEL` | No | Sentence-transformer id. Default `sentence-transformers/all-MiniLM-L6-v2`. |
 | `ML_DATA_DIR` | No | File-backend directory. Default `data/ml`. |
