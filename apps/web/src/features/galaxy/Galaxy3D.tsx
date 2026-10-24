@@ -336,7 +336,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       }
       if (ev.movementX === 0 && ev.movementY === 0) return;
       const { rect, hit } = hitPaper(ev.clientX, ev.clientY);
-      const nextCard = hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H, true) : null;
+      const nextCard = hit ? cardBoxBeside({ x: ev.clientX - rect.left, y: ev.clientY - rect.top }, { width: rect.width, height: rect.height }, CARD_W, CARD_H, true) : null;
       const next = reduceHover(lockRef.current, {
         moving: true,
         hitId: hit?.id ?? null,
