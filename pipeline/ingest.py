@@ -127,11 +127,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="data/works_v2.jsonl")
     ap.add_argument("--state", default="data/ingest_state.json")
-    ap.add_argument("--filter", action="append", default=["primary_topic.subfield.id:subfields/1702"])
+    ap.add_argument("--filter", action="append", help="repeatable; default: all of computer science (OpenAlex field 17)")
     ap.add_argument("--first-lookback-days", type=int, default=365)
     ap.add_argument("--overlap-days", type=int, default=7, help="re-check recent days; duplicates are skipped")
     ap.add_argument("--max-records", type=int, default=50000)
     a = ap.parse_args(argv)
+    a.filter = a.filter or ["primary_topic.field.id:fields/17"]
     out, state = Path(a.out), Path(a.state)
     out.parent.mkdir(parents=True, exist_ok=True)
     last = json.loads(state.read_text())["last_run"] if state.exists() else None
