@@ -38,6 +38,19 @@ COLOR_MATCH_MIN_SIM = 0.5
 # Nearest-neighbour edges for the front end. Kept small on purpose.
 LINK_NEIGHBOURS = 2
 LINK_CAP = 200
+# Generic words that win c-TF-IDF on broad clusters. Kept out of text.STOP so
+# summaries and grounded answers still see them.
+LABEL_STOP = frozenset("""
+ai artificial intelligence learn learning learned machine
+model models modeling modelling
+data dataset datasets
+study studies multi multiple
+based approach approaches method methods
+result results analysis research paper papers
+system systems network networks
+deep neural algorithm algorithms
+proposed novel new towards large small
+""".split())
 
 def _optional_available() -> bool:
     return (importlib.util.find_spec("umap") is not None
@@ -141,17 +154,26 @@ def topic_labels(labels, metas: list[dict], n_terms: int = 2) -> dict[int, str]:
 
 
 def ctfidf_labels(labels, texts: list[str], n_terms: int = 3) -> dict[int, str]:
-    """c-TF-IDF keywords per cluster (BERTopic-style class-based TF-IDF)."""
+    """c-TF-IDF keywords per cluster (BERTopic-style class-based TF-IDF).
+
+    Generic boilerplate (``ai``, ``learning``, ``model``, ``data``, and the
+    rest of ``LABEL_STOP``) is dropped. A cluster whose every term is generic
+    keeps the unfiltered keywords so the label is not empty.
+    """
     groups: dict[int, list[str]] = {}
     for lab, text in zip(labels, texts):
         lab = int(lab)
         if lab < 0:
             continue
         groups.setdefault(lab, []).append(text or "")
-    counts = {c: Counter(tokens(" ".join(parts))) for c, parts in groups.items()}
-    counts = {c: ct for c, ct in counts.items() if ct}
-    if not counts:
+    raw = {c: Counter(tokens(" ".join(parts))) for c, parts in groups.items()}
+    raw = {c: ct for c, ct in raw.items() if ct}
+    if not raw:
         return {}
+    counts = {}
+    for c, ct in raw.items():
+        kept = Counter({term: freq for term, freq in ct.items() if term not in LABEL_STOP})
+        counts[c] = kept or ct
     tf_all: Counter = Counter()
     lengths = {}
     for c, ct in counts.items():
@@ -488,16 +510,18 @@ def _slug(value: str) -> str:
     return text or "topic"
 
 
-def _unique_names(points: list[dict], metas: list[dict]) -> list[str]:
-    """Front-end links join on topic_name, so each node needs its own."""
-    seen: dict[str, int] = {}
-    names = []
-    for point, meta in zip(points, metas):
-        title = (meta.get("title") or "").strip() or point["id"]
-        n = seen.get(title, 0)
-        seen[title] = n + 1
-        names.append(title if n == 0 else f"{title} ({point['id']})")
-    return names
+def _paper_title(meta: dict, point_id: str) -> str:
+    title = str(meta.get("title") or "").strip()
+    return title or str(point_id)
+
+
+def _openalex_topic(meta: dict) -> str:
+    """OpenAlex display name stored on the embedding meta as ``topics[0]``."""
+    for topic in meta.get("topics") or []:
+        text = str(topic).strip()
+        if text:
+            return text
+    return ""
 
 
 def knn_links(names: list[str], vectors: np.ndarray, neighbours: int = LINK_NEIGHBOURS,
@@ -535,26 +559,32 @@ def knn_links(names: list[str], vectors: np.ndarray, neighbours: int = LINK_NEIG
 
 def graph_from_layout(points: list[dict], vectors: np.ndarray, metas: list[dict],
                       neighbours: int = LINK_NEIGHBOURS, max_edges: int = LINK_CAP) -> dict:
-    """GalaxyGraph: front-end fields plus the per-paper id, label and year."""
+    """GalaxyGraph: one node per paper, links keyed on the work id.
+
+    ``title`` is the paper title. ``topic_name`` is the OpenAlex display name
+    (``meta.topics[0]``), or the title when the paper has no topic.
+    """
     if not points:
         return empty_graph()
     metas = list(metas)
-    names = _unique_names(points, metas)
     cited = [int(meta.get("cited_by") or 0) for meta in metas]
     peak = max(cited) or 1
     nodes = []
-    for point, meta, name, cites in zip(points, metas, names, cited):
-        topics = [t for t in (meta.get("topics") or []) if t]
-        topic_src = topics[0] if topics else point["id"]
+    ids = []
+    for point, meta, cites in zip(points, metas, cited):
+        title = _paper_title(meta, point["id"])
+        topic = _openalex_topic(meta) or title
         cid = str(point["cluster_id"])
         if point.get("color_index") is None:
             color = -1 if cid == "-1" else int(cid)
         else:
             color = int(point["color_index"])
+        ids.append(point["id"])
         nodes.append({
             "id": point["id"],
-            "topic_id": _slug(str(topic_src)),
-            "topic_name": name,
+            "title": title,
+            "topic_id": _slug(topic),
+            "topic_name": topic,
             "x": point["x"], "y": point["y"], "z": point["z"],
             "cluster_id": cid,
             "cluster_label": point.get("cluster_label") or "",
@@ -581,7 +611,7 @@ def graph_from_layout(points: list[dict], vectors: np.ndarray, metas: list[dict]
             "color_index": int(members[0]["color_index"]),
         })
     return {"nodes": nodes, "clusters": clusters,
-            "links": knn_links(names, vectors, neighbours, max_edges)}
+            "links": knn_links(ids, vectors, neighbours, max_edges)}
 
 
 def _fallback_color(cluster_id) -> int:

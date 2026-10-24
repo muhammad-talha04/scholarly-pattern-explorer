@@ -305,17 +305,17 @@ without `umap-learn` and `hdbscan` installed, clustering is k-means.
 
 The API returns a graph, not a bare list. Each node carries the paper id, year,
 cluster label, and the fields the web client reads (`topic_id`, `topic_name`,
-`cluster_id`, `support`). `topic_name` is the paper title, with the work id
-appended when two titles match, because the client draws links between those
-names. `support` is the paper's citation count divided by the highest count in
+`title`, `cluster_id`, `support`). `title` is the paper title. `topic_name` is
+the OpenAlex display name (`meta.topics[0]`), or the title when the paper has
+no topic. `support` is the paper's citation count divided by the highest count in
 the index (at least 1). Clusters have `id`, `name`, `label`, a 3D `centroid`,
 `size`, and `color_index`. `color_index` is matched to the previous centroid
 (Hungarian assignment on cosine distance) when a rebuild recomputes clusters,
 so a palette slot stays with the same region. A new cluster below the match
 threshold gets a fresh index. The mapping is stored in the `galaxy_state`
 document. Links are undirected nearest-neighbour edges (2 neighbours, at most
-200 edges) with `source`, `target`, and `weight`. `index` and `update` store
-the graph. `GET /api/v1/galaxy` only reads that stored document, and an empty
+200 edges) keyed on the work id, with `source`, `target`, and `weight`. `index --galaxy` and `update` store
+the graph; `index --reembed` and `update --refit` refit the layout. `GET /api/v1/galaxy` only reads that stored document, and an empty
 store returns `{nodes: [], clusters: [], links: []}`.
 
 **Local LLM, optional.** Summaries and chat work with no model at all

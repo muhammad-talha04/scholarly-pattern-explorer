@@ -113,7 +113,12 @@ class LocalStore:
         return len(self.ids)
 
     def rows(self):
-        return list(self.ids), self.vecs, [self.meta.get(i, {}) for i in self.ids]
+        order = sorted(range(len(self.ids)), key=lambda i: self.ids[i])
+        ids = [self.ids[i] for i in order]
+        if not order:
+            return [], self.vecs, []
+        vecs = self.vecs[np.asarray(order, dtype=int)]
+        return ids, vecs, [self.meta.get(i, {}) for i in ids]
 
     def stored_dim(self) -> int | None:
         """Dimension of the stored vectors, or None when nothing is stored."""
@@ -604,7 +609,8 @@ GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
 
     def rows(self):
         def q(cur):
-            cur.execute("SELECT work_id, embedding::vector::text, meta FROM paper_embeddings")
+            cur.execute(
+                "SELECT work_id, embedding::vector::text, meta FROM paper_embeddings ORDER BY work_id")
             return cur.fetchall()
         fetched = self._run(q)
         if not fetched:

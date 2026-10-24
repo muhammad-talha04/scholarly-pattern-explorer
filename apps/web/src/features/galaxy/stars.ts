@@ -4,6 +4,10 @@ import { accent, clusterColors, galaxyColor, plexusCopper, plexusGold } from "@/
 /** One paper placed in the galaxy, with the cluster fields the shaders read. */
 export interface Star {
   id: string;
+  /** Paper title. The topics list and the 3D tooltip show this above the topic. */
+  title?: string;
+  /** OpenAlex display name, when it is distinct from the title. */
+  topic?: string;
   support: number;
   gap: boolean;
   gapScore?: number;
@@ -64,6 +68,8 @@ export function nodeAmber(colorIndex: number | null | undefined, clusterId: stri
 type Vec = [number, number, number];
 type Placed = {
   id: string;
+  title?: string;
+  topic?: string;
   support: number;
   clusterId?: string;
   cluster?: string;
@@ -139,6 +145,8 @@ export interface PlexusNode {
   colorIndex?: number;
   emerging: number;
   fresh?: boolean;
+  title?: string;
+  topic?: string;
   pos: Vec;
   center: Vec;
   role: NetRole;
@@ -332,6 +340,8 @@ function bindPapers<T extends Placed>(dots: Dot[], papers: T[]): PlexusNode[] {
     return {
       ...base,
       id: paper.id,
+      title: paper.title,
+      topic: paper.topic,
       support: paper.support,
       gap: !!paper.gap,
       gapScore: undefined,

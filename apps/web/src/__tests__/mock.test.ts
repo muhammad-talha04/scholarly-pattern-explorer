@@ -26,7 +26,9 @@ it("galaxy fixtures are papers in topic clusters", () => {
   const byCluster = new Map<string, number>();
   for (const n of g.nodes) byCluster.set(n.cluster_id, (byCluster.get(n.cluster_id) ?? 0) + 1);
   expect(Math.min(...byCluster.values())).toBeGreaterThanOrEqual(8);
-  expect(g.nodes.every((n) => n.topic_name.includes("meets"))).toBe(true);
+  expect(g.nodes.every((n) => n.title?.includes("meets"))).toBe(true);
+  expect(g.nodes.every((n) => n.topic_name.length > 0 && !n.topic_name.includes("meets"))).toBe(true);
+  expect(g.links.every((e) => g.nodes.some((n) => n.id === e.source) && g.nodes.some((n) => n.id === e.target))).toBe(true);
   expect(g.nodes.every((n) => g.clusters.some((c) => c.id === n.cluster_id))).toBe(true);
 });
 it("search filters by country and year", () => {

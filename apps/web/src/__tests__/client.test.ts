@@ -85,6 +85,37 @@ describe("normalizeGalaxy", () => {
     expect(graph.clusters[0]).toEqual({ id: "methods", name: "Methods", color_index: 2, emerging_score: 1 });
   });
 
+  it("keeps the paper title, the OpenAlex topic, and work-id links", () => {
+    const raw = {
+      nodes: [{
+        id: "W1",
+        title: "Transformers for protein structure",
+        topic_id: "protein-folding",
+        topic_name: "Protein folding",
+        x: 1, y: 2, z: 3, cluster_id: "0", support: 1,
+      }],
+      clusters: [{ id: "0", name: "protein, folding" }],
+      links: [{ source: "W1", target: "W2", weight: 0.5 }],
+    };
+    expect(normalizeGalaxy(raw)).toEqual(raw);
+  });
+
+  it("treats a blank title as the older title-keyed payload", () => {
+    const graph = normalizeGalaxy({
+      nodes: [{
+        id: "W1", title: "  ", topic_id: "proteins",
+        topic_name: "Transformers for protein structure prediction",
+        x: 0, y: 0, z: 0, cluster_id: "0", support: 1,
+      }],
+      clusters: [],
+      links: [{ source: "Transformers for protein structure prediction", target: "Other", weight: 1 }],
+    });
+    expect(graph.nodes[0].title).toBeUndefined();
+    expect(graph.nodes[0].id).toBe("W1");
+    expect(graph.nodes[0].topic_name).toBe("Transformers for protein structure prediction");
+    expect(graph.links[0].source).toBe("Transformers for protein structure prediction");
+  });
+
   it("returns an empty graph for an unexpected body and does not throw", () => {
     for (const raw of [null, undefined, "nope", 3, {}, { nodes: "nope" }, { points: FLAT }]) {
       expect(normalizeGalaxy(raw)).toEqual({ nodes: [], clusters: [], links: [] });

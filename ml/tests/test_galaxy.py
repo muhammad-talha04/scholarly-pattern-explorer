@@ -18,6 +18,29 @@ def test_ctfidf_labels_use_distinctive_words():
     assert "quantum" in names[1] or "qubits" in names[1]
 
 
+def test_ctfidf_labels_drop_generic_words():
+    labels = [0, 0, 1, 1, 2, 2, 2]
+    texts = [
+        "ai learning study of multi model data",
+        "ai learning study of multi model data systems",
+        "quantum model learning qubits data",
+        "quantum learning model qubits study",
+        "large language models for translation",
+        "large language models answer questions",
+        "language models at large scale",
+    ]
+    names = ctfidf_labels(labels, texts, n_terms=3)
+    assert names[1] == "quantum, qubits"
+    for word in ("ai", "learning", "model", "data", "study", "multi"):
+        assert word not in names[1].split(", ")
+    assert names[2].split(", ")[0] == "language"
+    for word in ("large", "models", "model"):
+        assert word not in names[2].split(", ")
+    # Every term was generic, so the label falls back instead of going empty.
+    assert names[0]
+    assert "cluster" not in names[0]
+
+
 def test_method_falls_back_without_umap(monkeypatch):
     monkeypatch.setattr("ml.galaxy._optional_available", lambda: False)
     assert resolve_method("auto", 100) == "kmeans"
@@ -119,6 +142,34 @@ def test_cli_index_writes_a_galaxy(tmp_path, monkeypatch, capsys):
     assert stored["nodes"] and stored["nodes"][0]["id"] == "W1"
 
 
+def test_reembed_refits_and_update_honors_refit(tmp_path, monkeypatch):
+    monkeypatch.setenv("ML_EMBEDDER", "hash")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "local")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("ML_DATA_DIR", str(tmp_path / "ml"))
+    papers = tmp_path / "works.jsonl"
+    papers.write_text(
+        '{"id": "W1", "title": "Protein folding", "abstract": "transformers predict structure", "year": 2020}\n',
+        encoding="utf-8")
+    calls = []
+
+    def fake_rebuild(self, refit=False):
+        calls.append(bool(refit))
+        return {"nodes": [{"id": "W1"}], "clusters": [], "links": []}
+
+    monkeypatch.setattr("ml.service.MLService.rebuild_galaxy", fake_rebuild)
+    from ml.cli import main
+    main(["index", "--jsonl", str(papers)])
+    assert calls == []
+    main(["index", "--jsonl", str(papers), "--galaxy"])
+    main(["index", "--jsonl", str(papers), "--reembed", "--galaxy"])
+    main(["galaxy"])
+    main(["galaxy", "--refit"])
+    main(["update", "--jsonl", str(papers)])
+    main(["update", "--jsonl", str(papers), "--refit"])
+    assert calls == [False, True, False, True, False, True]
+
+
 def test_service_galaxy_round_trip(tmp_path):
     papers = [
         Paper("W1", "Transformers for protein structure", "Attention predicts protein folding contacts.", 2021,
@@ -146,7 +197,9 @@ def test_service_galaxy_round_trip(tmp_path):
     by_id = {n["id"]: n for n in graph["nodes"]}
     assert by_id["W1"]["year"] == 2021 and by_id["W2"]["year"] == 2020
     assert by_id["W1"]["topic_id"] == "protein-folding"
-    assert by_id["W1"]["topic_name"] == "Transformers for protein structure"
+    assert by_id["W1"]["title"] == "Transformers for protein structure"
+    assert by_id["W1"]["topic_name"] == "Protein folding"
+    assert by_id["W2"]["topic_name"] == "Quantum codes"
     assert by_id["W1"]["support"] == 1.0
     assert isinstance(by_id["W1"]["cluster_id"], str)
     assert {c["id"] for c in graph["clusters"]} >= {n["cluster_id"] for n in graph["nodes"]}
@@ -155,9 +208,9 @@ def test_service_galaxy_round_trip(tmp_path):
         assert isinstance(cluster["color_index"], int)
         assert cluster["name"] == cluster["label"]
         assert set(cluster["centroid"]) == {"x", "y", "z"}
-    names = {n["topic_name"] for n in graph["nodes"]}
+    ids = {n["id"] for n in graph["nodes"]}
     for link in graph["links"]:
-        assert link["source"] in names and link["target"] in names
+        assert link["source"] in ids and link["target"] in ids
     assert svc.read_galaxy() == graph
     assert calls["rows"] == 1
     again = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
@@ -180,8 +233,13 @@ def test_graph_links_are_capped_nearest_neighbours():
     graph = graph_from_layout(points, np.stack(vectors), metas, neighbours=2, max_edges=3)
     assert len(graph["links"]) == 3
     assert graph["links"] == sorted(graph["links"], key=lambda link: -link["weight"])
-    names = {n["topic_name"] for n in graph["nodes"]}
-    assert names == {"Same title"} | {f"Same title (W{i})" for i in range(1, 6)}
+    assert {n["topic_name"] for n in graph["nodes"]} == {"Shared topic"}
+    assert {n["title"] for n in graph["nodes"]} == {"Same title"}
+    ids = {n["id"] for n in graph["nodes"]}
+    assert ids == {f"W{i}" for i in range(6)}
+    for link in graph["links"]:
+        assert link["source"] in ids and link["target"] in ids
+        assert link["source"] != link["target"]
     assert graph["clusters"][0]["size"] == 6
     assert graph["clusters"][0]["id"] == "0"
     assert graph["clusters"][0]["color_index"] == 0
