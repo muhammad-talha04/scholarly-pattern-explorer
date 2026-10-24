@@ -175,6 +175,41 @@ def test_refresh_snapshot_uses_table_without_rebuilding_vectors(tmp_path, monkey
     assert saved["emerging"][0]["topic_name"] == "Growing Lasers"
 
 
+def test_default_loader_reads_postgres_when_selected(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.invalid/db")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "pgvector")
+    row = {"topic_id": "T1", "topic_name": "From Postgres", "country_code": "PK",
+           "year": 2024, "paper_count": 4, "fractional_count": 4.0}
+    monkeypatch.setattr("pipeline.aggregate_store.read_topic_country_year", lambda conn=None: [row])
+    rows, src = load_topic_rows()
+    assert src == "table" and rows[0]["topic_name"] == "From Postgres"
+
+
+def test_explicit_sqlite_path_skips_postgres(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.invalid/db")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "pgvector")
+
+    def boom(conn=None):
+        raise AssertionError("postgres")
+
+    monkeypatch.setattr("pipeline.aggregate_store.read_topic_country_year", boom)
+    rows, src = load_topic_rows(tmp_path / "no.json", tmp_path / "missing.sqlite", tmp_path / "no.jsonl")
+    assert src == "none" and rows == []
+
+
+def test_empty_postgres_falls_through_to_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.invalid/db")
+    monkeypatch.setenv("ML_VECTOR_BACKEND", "pgvector")
+    monkeypatch.setenv("TOPIC_COUNTRY_YEAR_DB", str(tmp_path / "missing.sqlite"))
+    monkeypatch.setenv("COUNTRY_SNAPSHOT", str(tmp_path / "snap.json"))
+    monkeypatch.setenv("ML_WORKS_PATH", str(tmp_path / "no.jsonl"))
+    snap = tmp_path / "snap.json"
+    snap.write_text(json.dumps({"topic_country_year": _series("S1", "From Snapshot", "CA", [5, 5, 5, 5])}))
+    monkeypatch.setattr("pipeline.aggregate_store.read_topic_country_year", lambda conn=None: [])
+    rows, src = load_topic_rows()
+    assert src == "snapshot" and rows[0]["topic_name"] == "From Snapshot"
+
+
 def test_string_years_from_snapshot_json(tmp_path):
     snap = tmp_path / "snap.json"
     payload = [_row("grow", "Growing Lasers", "PK", y, n) for y, n in
