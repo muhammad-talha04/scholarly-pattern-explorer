@@ -39,7 +39,7 @@ export default function AboutPage() {
       </section>
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">Growth figures</h2>
-        <p>Growth compares two periods of equal length. When either period has fewer than 30 papers, it will show &ldquo;Not enough data&rdquo; instead of a percentage, because small counts swing wildly. The sample is spread evenly across months from 2015, so a rise or fall reflects the field and not how many papers we collected.</p>
+        <p>Growth trends are hidden for now: only about 72% of 2026 papers have author countries recorded, against 97% of 2025 papers, so a year-to-date comparison would show false declines. When they return, growth compares two periods of equal length. When either period has fewer than 30 papers, it will show &ldquo;Not enough data&rdquo; instead of a percentage, because small counts swing wildly.</p>
       </section>
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">How search works today</h2>
