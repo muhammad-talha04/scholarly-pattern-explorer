@@ -10,6 +10,12 @@ from pipeline.country_stats import combine, snapshot, tally
 SNAP = Path(__file__).resolve().parents[2] / "deploy" / "data" / "country_snapshot.json"
 
 
+@pytest.fixture(autouse=True)
+def _partial_2024(monkeypatch):
+    """The tests below exercise the partial-year rule; production corpus now starts in 2015."""
+    monkeypatch.setattr("pipeline.country_stats.PARTIAL_YEARS", {2024})
+
+
 def _works(code, n, date, other=None):
     return [{"id": f"{code}{date}{i}", "year": int(date[:4]), "date": date,
              "countries": [code] + ([other] if other else []), "topics": ["AI"]} for i in range(n)]

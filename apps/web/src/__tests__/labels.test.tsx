@@ -24,9 +24,9 @@ test("growth uses reason, counts and window when present", () => {
   expect(screen.getByText("50 vs 40")).toBeInTheDocument();
 });
 
-test("growth is hidden by default with a note", async () => {
+test("growth is shown by default and the hidden note still renders", async () => {
   const { SHOW_GROWTH } = await import("@/lib/flags");
-  expect(SHOW_GROWTH).toBe(false);
+  expect(SHOW_GROWTH).toBe(true);
   const { GrowthHiddenNote } = await import("@/features/countries/CountriesPage");
   render(<GrowthHiddenNote />);
   expect(screen.getByTestId("growth-hidden")).toHaveTextContent("Growth trends are hidden while we rebalance the paper sample; see About the data.");

@@ -1,0 +1,64 @@
+{
+ "date": "2026-10-24",
+ "total_papers": 80191,
+ "n_windows": 14,
+ "n_patterns": 96,
+ "top_pairs_by_window": {
+  "2013": [
+   {
+    "itemset": "Quantum Information and Cryptography | Quantum Mechanics and Applications",
+    "support": 0.05894
+   },
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.0507
+   }
+  ],
+  "2014": [
+   {
+    "itemset": "Quantum Information and Cryptography | Quantum Mechanics and Applications",
+    "support": 0.06139
+   },
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05196
+   }
+  ],
+  "2015": [
+   {
+    "itemset": "Quantum Information and Cryptography | Quantum Mechanics and Applications",
+    "support": 0.06152
+   },
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05249
+   }
+  ],
+  "2016": [
+   {
+    "itemset": "Quantum Information and Cryptography | Quantum Mechanics and Applications",
+    "support": 0.05915
+   },
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05223
+   }
+  ],
+  "2017": [
+   {
+    "itemset": "Quantum Information and Cryptography | Quantum Mechanics and Applications",
+    "support": 0.05503
+   }
+  ],
+  "2018": [
+   {
+    "itemset": "Quantum Information and Cryptography | Quantum Mechanics and Applications",
+    "support": 0.05191
+   },
+   {
+    "itemset": "Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography",
+    "support": 0.05086
+   }
+  ]
+ }
+}

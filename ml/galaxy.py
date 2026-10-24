@@ -110,6 +110,33 @@ def cluster_ids(vectors: np.ndarray, method: str = "auto", k: int | None = None)
     return _kmeans(X, kk), "kmeans"
 
 
+def topic_labels(labels, metas: list[dict], n_terms: int = 2) -> dict[int, str]:
+    """Label each cluster with its most distinctive OpenAlex topic names (class-based TF-IDF over topics).
+
+    Word-level labels pick up stopwords from non-English abstracts ("de, dan, yang"); topic names are
+    clean English. Falls back to word labels for clusters whose papers carry no topics.
+    """
+    groups: dict[int, Counter] = {}
+    for lab, m in zip(labels, metas):
+        lab = int(lab)
+        if lab >= 0:
+            groups.setdefault(lab, Counter()).update(t for t in (m.get("topics") or []) if t)
+    groups = {c: ct for c, ct in groups.items() if ct}
+    words = ctfidf_labels(labels, [_text(m) for m in metas])
+    if not groups:
+        return words
+    total: Counter = Counter()
+    for ct in groups.values():
+        total.update(ct)
+    size = {c: sum(ct.values()) for c, ct in groups.items()}
+    avg = sum(size.values()) / len(size)
+    out = dict(words)
+    for c, ct in groups.items():
+        ranked = sorted(ct, key=lambda t: (-(ct[t] / size[c]) * math.log(1 + avg / total[t]), t))
+        out[c] = " · ".join(ranked[:n_terms])
+    return out
+
+
 def ctfidf_labels(labels, texts: list[str], n_terms: int = 3) -> dict[int, str]:
     """c-TF-IDF keywords per cluster (BERTopic-style class-based TF-IDF)."""
     groups: dict[int, list[str]] = {}
@@ -241,8 +268,7 @@ class GalaxyMap:
         labels, used = cluster_ids(vectors, method=method)
         basis = fit_basis(vectors)
         coords = project(vectors, basis)
-        texts = [_text(m) for m in metas]
-        names = ctfidf_labels(labels, texts)
+        names = topic_labels(labels, metas)
         centroids = {}
         for cid in sorted({int(c) for c in labels if int(c) >= 0}):
             block = vectors[np.asarray(labels) == cid]
@@ -289,7 +315,7 @@ class GalaxyMap:
     def _relabel(self, ids, metas) -> None:
         papers = self.state["papers"]
         labels = [papers[wid]["cluster_id"] for wid in ids]
-        names = ctfidf_labels(labels, [_text(m) for m in metas])
+        names = topic_labels(labels, metas)
         self.state["label_names"] = {str(k): v for k, v in names.items()}
 
     @staticmethod
@@ -337,7 +363,7 @@ def knn_links(names: list[str], vectors: np.ndarray, neighbours: int = LINK_NEIG
               max_edges: int = LINK_CAP) -> list[dict]:
     """Undirected k-nearest-neighbour edges, capped at ``max_edges`` strongest."""
     names = list(names)
-    X = np.asarray(vectors, dtype=np.float64)
+    X = np.asarray(vectors, dtype=np.float32)
     n = len(names)
     if n < 2 or neighbours < 1 or max_edges < 1 or X.ndim != 2 or len(X) != n:
         return []
@@ -346,18 +372,22 @@ def knn_links(names: list[str], vectors: np.ndarray, neighbours: int = LINK_NEIG
     X = X / norms
     kk = min(int(neighbours), n - 1)
     edges: dict[tuple[str, str], float] = {}
-    for i in range(n):
-        sims = X @ X[i]
-        sims[i] = -1.0
-        chosen = np.argpartition(-sims, kk - 1)[:kk]
-        for j in chosen:
-            j = int(j)
-            weight = float(sims[j])
-            if j == i or weight <= 0 or names[i] == names[j]:
-                continue
-            key = tuple(sorted((names[i], names[j])))
-            if key not in edges or weight > edges[key]:
-                edges[key] = weight
+    step = 512   # blocked matmul: one BLAS call per 512 rows instead of one matvec per row
+    for lo in range(0, n, step):
+        block = X[lo:lo + step] @ X.T
+        for r in range(block.shape[0]):
+            i = lo + r
+            sims = block[r]
+            sims[i] = -1.0
+            chosen = np.argpartition(-sims, kk - 1)[:kk]
+            for j in chosen:
+                j = int(j)
+                weight = float(sims[j])
+                if j == i or weight <= 0 or names[i] == names[j]:
+                    continue
+                key = tuple(sorted((names[i], names[j])))
+                if key not in edges or weight > edges[key]:
+                    edges[key] = weight
     ranked = sorted(edges.items(), key=lambda item: (-item[1], item[0]))[:max_edges]
     return [{"source": a, "target": b, "weight": round(weight, 4)} for (a, b), weight in ranked]
 
