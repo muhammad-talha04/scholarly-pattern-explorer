@@ -85,13 +85,14 @@ function inCorridor(anchor: Vec, target: Vec, point: Vec) {
 }
 
 /** Card rectangle beside a paper, flipped to stay on the canvas. Same box the views draw. */
-export function cardBoxBeside(node: Vec, canvas: { width: number; height: number }, cardW: number, cardH: number): CardBox {
-  let left = node.x + 14;
-  let top = node.y - cardH * 0.35;
-  if (left + cardW > canvas.width - 8) left = node.x - cardW - 14;
+export function cardBoxBeside(node: Vec, canvas: { width: number; height: number }, cardW: number, cardH: number, below = false): CardBox {
+  const gap = below ? 22 : 14;
+  let left = node.x + gap;
+  let top = below ? node.y + 20 : node.y - cardH * 0.35;
+  if (left + cardW > canvas.width - 8) left = node.x - cardW - gap;
   if (left < 8) left = 8;
   if (top < 8) top = 8;
-  if (top + cardH > canvas.height - 8) top = Math.max(8, canvas.height - cardH - 8);
+  if (top + cardH > canvas.height - 8) top = below ? Math.max(8, node.y - cardH - 20) : Math.max(8, canvas.height - cardH - 8);
   return { left: Math.round(left), top: Math.round(top), width: cardW, height: cardH };
 }
 

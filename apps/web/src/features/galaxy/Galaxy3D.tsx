@@ -23,8 +23,8 @@ const FOG_NEAR = 8;
 const FOG_FAR = 24;
 /** Screen radius for a paper hit. Non-paper dots are not targets. */
 const HIT_PX = 15;
-const CARD_W = 192;
-const CARD_H = 96;
+const CARD_W = 176;
+const CARD_H = 112;
 
 const DRIFT = `
 vec3 bandDrift(float phase) {
@@ -318,7 +318,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       if (shownIdRef.current === id) return;
       shownIdRef.current = id;
       if (at && rect) {
-        const box = lockRef.current.card ?? cardBoxBeside(at, { width: rect.width, height: rect.height }, CARD_W, CARD_H);
+        const box = lockRef.current.card ?? cardBoxBeside(at, { width: rect.width, height: rect.height }, CARD_W, CARD_H, true);
         // drei's Html overwrites the wrapper transform with the node's screen point, so the
         // card's top-left is that point plus this translate. It matches cardBoxBeside.
         setCardShift({ x: box.left - at.x, y: box.top - at.y });
@@ -336,7 +336,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       }
       if (ev.movementX === 0 && ev.movementY === 0) return;
       const { rect, hit } = hitPaper(ev.clientX, ev.clientY);
-      const nextCard = hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H) : null;
+      const nextCard = hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H, true) : null;
       const next = reduceHover(lockRef.current, {
         moving: true,
         hitId: hit?.id ?? null,
@@ -358,7 +358,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
       lockRef.current = {
         id,
         anchor: hit ? { x: hit.x, y: hit.y } : null,
-        card: hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H) : null,
+        card: hit ? cardBoxBeside(hit, { width: rect.width, height: rect.height }, CARD_W, CARD_H, true) : null,
       };
       publish(id, hit, rect);
     };
@@ -480,7 +480,7 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
         {tip && (
           <Html position={tip.pos} center zIndexRange={[12, 0]} style={{ pointerEvents: "none" }}>
             <div
-              className="glass pointer-events-auto w-48 p-2.5 text-left text-xs"
+              className="glass pointer-events-auto w-44 p-2 text-left text-[11px] leading-snug"
               style={{ transform: `translate(${cardShift.x}px, ${cardShift.y}px)` }}
               data-testid="galaxy-paper-card"
               data-galaxy-card=""
@@ -501,10 +501,10 @@ function Field({ nodes: catalogue, showGaps, focus, highlight, reduce, pose, onF
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <div className="font-medium text-white">{tip.id}</div>
-              <p className="mt-0.5 text-mist">Paper{tip.cluster ? ` · topic cluster ${tip.cluster}` : ""}</p>
+              <div className="line-clamp-2 font-medium text-white">{tip.id}</div>
+              <p className="mt-0.5 truncate text-mist">{tip.cluster ?? "Paper"}</p>
               {showGaps && tip.gap && <p className="text-gap">Research gap</p>}
-              <button className="btn mt-2 w-full py-1" onClick={() => onPick?.(tip.id)}>Search this paper</button>
+              <button className="btn mt-1.5 w-full py-0.5" onClick={() => onPick?.(tip.id)}>Search this paper</button>
             </div>
           </Html>
         )}
