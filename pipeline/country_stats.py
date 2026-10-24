@@ -258,6 +258,7 @@ def share_for(dates: dict | None, totals: dict | None, win: dict | None) -> dict
 
 
 MIN_SPEC_PAPERS = 10       # a country needs this many papers on a topic before it can rank as a specialty
+SNAPSHOT_MIN_SPEC = 100   # published snapshot: at 100k papers a lower floor ranks off-topic outliers first
 
 
 def specialized_topics(t: dict, code: str, top_n: int = 5, min_papers: int = MIN_SPEC_PAPERS) -> list[dict]:
@@ -294,7 +295,7 @@ def to_stats(t: dict, top_n: int = 5, counting: str = "fractional") -> list[dict
                      **growth_for(dsrc.get(code), win),
                      **share_for(dsrc.get(code), totals, win),
                      "top_topics": [n for n, _ in t["topics"][code].most_common(top_n)],
-                     "specialized_topics": specialized_topics(t, code, top_n),
+                     "specialized_topics": specialized_topics(t, code, top_n, SNAPSHOT_MIN_SPEC),
                      "counting": counting})
     return sorted(rows, key=lambda r: -r["papers"])
 
