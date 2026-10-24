@@ -83,6 +83,9 @@ class Pattern(BaseModel):
     top_countries: list[str] | None = None
     explanation: str | None = None
     example_papers: list[ExamplePaper] | None = None
+    # Growth gaps only (council C4): True when the gap rests on few papers or thinly
+    # sampled years, so it may be a sampling hole rather than a real research gap.
+    low_coverage: bool | None = None
 
 
 class CountryYearCount(BaseModel):
