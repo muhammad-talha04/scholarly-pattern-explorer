@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api/client";
@@ -8,20 +8,21 @@ import { useApi } from "@/lib/useApi";
 import { ErrorNote, PageHeader, Spinner } from "@/components/ui";
 import { chartColor } from "@/lib/theme";
 import { deriveRules } from "./rules";
+import type { Pattern } from "@/lib/api/types";
 
 type Tab = "itemsets" | "rules" | "lifecycles" | "gaps";
-export function PatternsPage() {
-  const all = useApi(() => api.patterns(), []);
-  const gaps = useApi(() => api.patterns({ trend: "gap" }), []);
-  const emerging = useApi(() => api.patterns({ trend: "emerging" }), []);
+export function PatternsPage({ initial = {} }: { initial?: { all?: Pattern[]; gaps?: Pattern[]; emerging?: Pattern[] } } = {}) {
+  const all = useApi(() => api.patterns(), [], initial.all);
+  const gaps = useApi(() => api.patterns({ trend: "gap" }), [], initial.gaps);
+  const emerging = useApi(() => api.patterns({ trend: "emerging" }), [], initial.emerging);
   const windows = useMemo(() => [...new Set((all.data ?? []).map((p) => p.window_start))].sort(), [all.data]);
-  const [win, setWin] = useState<number | null>(null);
+  const [pickedWin, setWin] = useState<number | null>(null);
+  const win = pickedWin ?? (windows.length ? windows[windows.length - 1] : null);
   const [tab, setTab] = useState<Tab>("itemsets");
-  useEffect(() => { if (win === null && windows.length) setWin(windows[windows.length - 1]); }, [windows, win]);
   const inWin = useMemo(() => (all.data ?? []).filter((p) => p.window_start === win), [all.data, win]);
   const rules = useMemo(() => deriveRules(inWin), [inWin]);
   const life = useMemo(() => lifecycles(all.data ?? []), [all.data]);
-  if (all.loading) return <Spinner />;
+  if (all.loading && !all.data) return <Spinner />;
   if (all.error) return <ErrorNote msg={all.error} />;
   return (
     <div>
@@ -48,7 +49,7 @@ export function PatternsPage() {
               {r.supports.map((s, i) => <td key={i} className="p-1"><div title={s?.toFixed(3) ?? "absent"} className="mx-auto h-5 w-10 rounded" style={{ background: s == null ? "rgba(255,255,255,.04)" : chartColor(4), opacity: s == null ? 1 : 0.35 + Math.min(0.65, s * 2) }} /></td>)}
               <td className="p-2 text-up">{r.born}</td><td className="p-2 text-down">{r.died ?? "alive"}</td></tr>)}</tbody></table>
         )}
-        {tab === "gaps" && (gaps.loading ? <Spinner /> :
+        {tab === "gaps" && (gaps.loading && !gaps.data ? <Spinner /> :
           <div className="space-y-6">
             <div className="grid gap-3 md:grid-cols-2">{(gaps.data ?? []).map((g) => (
               <div key={g.items[0]} className="rounded-xl border border-gap/30 bg-gap/10 p-4">
@@ -58,7 +59,7 @@ export function PatternsPage() {
               </div>))}</div>
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist">Emerging topics</h3>
-              {emerging.loading ? <Spinner /> : (
+              {emerging.loading && !emerging.data ? <Spinner /> : (
                 <ul className="grid gap-2 md:grid-cols-2">
                   {(emerging.data ?? []).map((g) => (
                     <li key={g.items[0]}><Link href={`/?cluster=${encodeURIComponent(g.items[0])}`} className="glass block px-3 py-2 text-sm text-accent hover:underline">{g.items[0]}</Link></li>

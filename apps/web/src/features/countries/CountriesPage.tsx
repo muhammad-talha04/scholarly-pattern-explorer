@@ -18,12 +18,12 @@ import { CountryChart } from "./CountryChart";
 
 const Globe3D = dynamic(() => import("./Globe3D"), { ssr: false, loading: () => <LoadingBlock label="Raising the globe" /> });
 
-export function CountriesPage({ scale = "sample" }: { scale?: ChartScale }) {
+export function CountriesPage({ scale = "sample", initialCountries }: { scale?: ChartScale; initialCountries?: CountryStats[] }) {
   const { lowPower } = useMotionPrefs();
   const [counting, setCounting] = useState<Counting>("fractional");
   const [sel, setSel] = useState<string | null>(null);
   const [year, setYear] = useState<number | "all">("all");
-  const cs = useApi(() => api.countries(counting, scale), [counting, scale]);
+  const cs = useApi(() => api.countries(counting, scale), [counting, scale], counting === "fractional" ? initialCountries : undefined);
   const col = useApi(() => api.collaborations(counting), [counting]);
   const chartYear = year === "all" ? null : year;
   const chart = useApi(() => api.countryChart({ counting, top: COUNTRY_CHART_TOP_N, year: chartYear, scale }), [counting, chartYear, scale]);
