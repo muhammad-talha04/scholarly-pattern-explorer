@@ -24,11 +24,11 @@ test("growth uses reason, counts and window when present", () => {
   expect(screen.getByText("50 vs 40")).toBeInTheDocument();
 });
 
-test("growth is shown by default and the hidden note still renders", async () => {
+test("growth is hidden by default with a note", async () => {
   const { SHOW_GROWTH } = await import("@/lib/flags");
-  expect(SHOW_GROWTH).toBe(true);
+  expect(SHOW_GROWTH).toBe(false);
   const { GrowthHiddenNote } = await import("@/features/countries/CountriesPage");
   render(<GrowthHiddenNote />);
-  expect(screen.getByTestId("growth-hidden")).toHaveTextContent("Growth trends are hidden while we rebalance the paper sample; see About the data.");
+  expect(screen.getByTestId("growth-hidden")).toHaveTextContent("Growth trends are hidden because recent papers have fewer author countries recorded yet; see About the data.");
   expect(screen.getByRole("link", { name: "About the data" })).toHaveAttribute("href", "/about");
 });
