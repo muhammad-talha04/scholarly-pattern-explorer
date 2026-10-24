@@ -17,6 +17,8 @@ from collections import defaultdict
 
 import numpy as np
 
+from .cs_topics import is_cs
+
 
 def _as_vec(v) -> np.ndarray:
     return np.asarray(v, dtype=np.float32).ravel()
@@ -146,7 +148,7 @@ def _pick_examples(groups: list[list[dict]], n: int = 3) -> list[dict]:
 def find_semantic_gaps(papers: list[dict], vectors: np.ndarray, *,
                        min_sim: float = 0.45, min_each: int = 60, max_co_rate: float = 0.2,
                        neighbor_k: int = 3, min_neighbor: float = 300, max_density_ratio: float = 0.5,
-                       limit: int = 10) -> list[dict]:
+                       limit: int = 10, cs_only: bool = False) -> list[dict]:
     """Rank co-occurrence gaps and low-density neighbourhoods.
 
     ``papers[i]`` aligns with ``vectors[i]``. Each paper needs ``topics`` and an id.
@@ -190,7 +192,7 @@ def find_semantic_gaps(papers: list[dict], vectors: np.ndarray, *,
         c = _norm(total)
         if c is not None:
             centroids[t] = c
-    names = sorted(centroids)
+    names = sorted(t for t in centroids if not cs_only or is_cs(t))
     if len(names) < 2:
         return []
 

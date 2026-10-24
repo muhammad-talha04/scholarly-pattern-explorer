@@ -119,7 +119,7 @@ def main(argv=None):
         return
     from .incremental import IncrementalMiner, papers_since_from_db
     miner = IncrementalMiner(ml_data_dir() / "patterns",
-                             window=a.window, min_support=a.min_support)
+                             window=a.window, min_support=a.min_support, cs_only=True, min_year=2015, complete_only=True)
     if a.db:
         from dbconn import DB
         papers = papers_since_from_db(DB(a.db))
