@@ -74,7 +74,8 @@ def get_semantic_gaps(limit: int = 10) -> list[dict]:
     """
     cached = _snapshot_semantic_gaps()
     if cached is not None:
-        return cached[:limit]
+        keep = [g for g in cached if all(is_cs(str(t)) for t in (g.get("items") or []))]
+        return keep[:limit]
     try:
         store = get_service().store
     except Exception:
