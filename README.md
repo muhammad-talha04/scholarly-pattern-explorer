@@ -12,6 +12,12 @@ Each dot is a paper. Papers that share ideas sit close together, and colours mar
 topic clusters. Hover a dot to read the paper; search by meaning ("protein folding")
 rather than exact words.
 
+**About the data:** the database holds a stratified sample, not every paper. It is
+100,061 computer-science papers (about 678 per month, 2015 to Oct 2026), roughly 4-6%
+of OpenAlex's output for the field. The Progress page shows the sample next to
+OpenAlex's own monthly totals. Supports and counts are shares within the sample.
+The free database tier (500 MB) is the reason for the cap.
+
 ## What you can do
 
 | Page | What it shows |

@@ -415,3 +415,10 @@ Not fixed here, on purpose: the emerging window, the hash production embedder, r
 - Merged galaxy-related PRs #20, #19, #49, #21 together. #52 and #16 held back (see PR notes).
 - Growth gaps filtered to CS topics; gap list cached per window (endpoint no longer recomputes examples on each request).
 - Ingest, mining and fetch workflows now run monthly (1st of the month).
+
+## 2026-10-25
+- Monthly ingest verified end to end (PRs #76-#83): fetch capped at 600 papers, indexes only that month's new papers, bge-small, size cap 490 MB, stored galaxy capped at 3,000 nodes (the 100k-node version returned 502). A run on 2026-10-24 wrongly embedded 15,000 old papers; they were deleted and the database is back to 100,061 papers (file stays ~472 MB; do not VACUUM FULL).
+- Render and the GitHub secret both need the Supabase session-pooler `DATABASE_URL` (user `postgres.<ref>`, port 5432); the direct host is IPv6-only.
+- `sampling_rates` filled for 2024-11/12 and 2025-02..05 from OpenAlex. Still missing: 2025-01 and 2025-11 (retry scheduled; 2025 shows "unknown" until then).
+- Gaps exclude a hand-picked `NOT_CS` list of topics OpenAlex files under Computer Science (ml/cs_topics.py).
+- Held: #52 (removes 2D fallback), #16 (breaks live gaps with Postgres snapshots); mobile 3D view and 390px home page skipped by choice.
