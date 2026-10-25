@@ -222,8 +222,11 @@ class MLService:
         points = layout.sync(ids, vecs, metas, refit=refit)
         graph = graph_from_layout(points, vecs, metas) if points else empty_graph()
         self.store.put_document("galaxy_state", layout.state)
-        self.store.put_document("galaxy", graph)
         from .galaxy import HERO_SAMPLE_SIZE, sample_graph
+        # The 512 MB API cannot load a 100k-node document (41 MB: the route returned 502).
+        # Store a stratified sample; the layout state keeps every point.
+        store_cap = int(os.getenv("GALAXY_STORE_LIMIT", "3000"))
+        self.store.put_document("galaxy", sample_graph(graph, store_cap) if store_cap else graph)
         self.store.put_document("galaxy_sample", sample_graph(graph, HERO_SAMPLE_SIZE))
         self._doc_cache.clear()
         self._sample_cache.clear()
