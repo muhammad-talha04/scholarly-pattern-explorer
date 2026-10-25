@@ -34,8 +34,14 @@ export function VolumeChart({ data, onDrill }: { data: PublicationAggregate; onD
   const ticks = [0, max / 2, max];
   const tip = (label: string, estimated: number | null, sampled: number) =>
     `${label}: Estimated OpenAlex output ${estimated == null ? "unknown" : fmt(estimated)}. Sampled ${fmt(sampled)}.`;
+  const totalKnown = known.reduce((a, b) => a + b, 0);
+  const missing = buckets.filter((b) => b.estimated_total == null && b.sampled > 0).length;
+  const sampledTotal = buckets.reduce((a, b) => a + b.sampled, 0);
   return (
     <div data-testid="publication-chart">
+      <p className="mb-2 text-sm text-ink" data-testid="cs-total">
+        {`Computer science papers in OpenAlex: ${fmt(totalKnown)}${missing ? ` (${missing} ${grain === "month" ? "month" : "year"}${missing > 1 ? "s" : ""} with no estimate not counted)` : ""} · in this sample: ${fmt(sampledTotal)}`}
+      </p>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-64 w-full" role="img" aria-label={grain === "month" ? `Estimated OpenAlex output by month in ${data.year}` : "Estimated OpenAlex output by year"}>
         <text transform={`rotate(-90 16 ${H / 2})`} x={16} y={H / 2} textAnchor="middle" fill={mist} fontSize={11}>Estimated OpenAlex output</text>
         {ticks.map((t) => (
