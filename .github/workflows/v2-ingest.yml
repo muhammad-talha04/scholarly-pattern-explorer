@@ -35,7 +35,7 @@ jobs:
           OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
         run: |
           wc -l < data/works_v2.jsonl > before.txt 2>/dev/null || echo 0 > before.txt
-          set +e; python -m pipeline.ingest; code=$?; set -e
+          set +e; python -m pipeline.ingest --max-records 600; code=$?; set -e
           [ "$code" -eq 1 ] && exit 1
           tail -n +$(( $(cat before.txt) + 1 )) data/works_v2.jsonl > data/new.jsonl
       - name: Update country analytics with the new works only
@@ -72,7 +72,7 @@ jobs:
           ML_EMBED_MODEL: BAAI/bge-small-en-v1.5   # must match the stored vectors
         run: |
           pip install -r ml/requirements.txt
-          python -m ml.cli index --max-db-mb 470   # free tier is 500 MB; stops before it
+          python -m ml.cli index --jsonl data/new.jsonl --max-db-mb 470   # free tier is 500 MB; stops before it
           python -m ml.cli update || echo "pattern update failed"
       - name: Save the galaxy payload
         env: {GH_TOKEN: "${{ github.token }}"}
