@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from analytics import split_change
 from dbconn import DB
 from fpgrowth import association_rules, frequent_itemsets
 
@@ -102,10 +103,11 @@ def emerging_report(db, top=8):
     if df.empty:
         print("no multi-item patterns found - lower --min-support and try again")
         return
+    up, down = split_change(df, top)
     print("\nEMERGING patterns (support grew the most):")
-    print(df.head(top).to_string(index=False))
+    print(up.to_string(index=False) if not up.empty else "none")
     print("\nDECLINING patterns (support fell the most):")
-    print(df.tail(top).iloc[::-1].to_string(index=False))
+    print(down.to_string(index=False) if not down.empty else "none")
 
 
 def main():

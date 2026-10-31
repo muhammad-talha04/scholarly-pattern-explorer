@@ -225,9 +225,17 @@ def emerging_declining(db, top=10, country=None):
           ON l.itemset = f.itemset AND f.rn_first = 1 AND l.rn_last = 1
         ORDER BY change DESC
     """, params)
+    return split_change(df, top)
+
+
+def split_change(df: pd.DataFrame, top: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Growing patterns (change > 0, biggest first) and fading ones (change < 0,
+    biggest drop first). A pattern never lands in both lists."""
     if df.empty:
         return df, df
-    return df.head(top).reset_index(drop=True), df.tail(top).iloc[::-1].reset_index(drop=True)
+    up = df[df.change > 0].sort_values("change", ascending=False).head(top)
+    down = df[df.change < 0].sort_values("change").head(top)
+    return up.reset_index(drop=True), down.reset_index(drop=True)
 
 
 def short_label(itemset: str, per_item: int = 20) -> str:

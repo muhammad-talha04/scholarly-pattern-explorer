@@ -8,22 +8,20 @@ _Generated 2026-10-18 08:49. Corpus: 3,745 papers, 18,576 authors,
 ## Emerging topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0204 | 2024 | 0.0223 | 0.0019 |
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0396 | 2024 | 0.0364 | -0.0032 |
+| Anomaly Detection Techniques and Applications \| Network Security and Intrusion Detection | 2023 | 0.0204 | 2024 | 0.0223 | 0.0019 |
 
 ![lifecycles](charts/pattern_lifecycles.png)
 
 ## Declining topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2023 | 0.0396 | 2024 | 0.0364 | -0.0032 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2023 | 0.0204 | 2024 | 0.0223 | 0.0019 |
+| Quantum Computing Algorithms and Architecture \| Quantum Information and Cryptography | 2023 | 0.0396 | 2024 | 0.0364 | -0.0032 |
 
 ## Strongest patterns in 2024-2026
 | itemset | k | support_count | n_tx | support |
 |---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture | Quantum Information and Cryptography | 2 | 108 | 2966 | 0.03641267700606878 |
-| Anomaly Detection Techniques and Applications | Network Security and Intrusion Detection | 2 | 66 | 2966 | 0.022252191503708697 |
+| Quantum Computing Algorithms and Architecture \| Quantum Information and Cryptography | 2 | 108 | 2966 | 0.03641267700606878 |
+| Anomaly Detection Techniques and Applications \| Network Security and Intrusion Detection | 2 | 66 | 2966 | 0.022252191503708697 |
 
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |

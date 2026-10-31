@@ -66,9 +66,7 @@ def emerging_declining(db: DB, top: int) -> tuple[pd.DataFrame, pd.DataFrame]:
           ON l.itemset = f.itemset AND f.rn_first = 1 AND l.rn_last = 1
         ORDER BY change DESC
     """)
-    if df.empty:
-        return df, df
-    return df.head(top).reset_index(drop=True), df.tail(top).iloc[::-1].reset_index(drop=True)
+    return A.split_change(df, top)
 
 
 def top_collaborators(edges: pd.DataFrame, top: int) -> pd.DataFrame:
@@ -139,7 +137,7 @@ def chart_link_metrics(metrics: pd.DataFrame, path: Path) -> None:
 def md_table(df: pd.DataFrame, n: int = 10) -> str:
     if df.empty:
         return "_no rows_"
-    d = df.head(n).astype(str)
+    d = df.head(n).astype(str).apply(lambda c: c.str.replace("|", "\\|"))  # itemsets contain " | "
     lines = ["| " + " | ".join(d.columns) + " |", "|" + "---|" * len(d.columns)]
     lines += ["| " + " | ".join(r) + " |" for r in d.itertuples(index=False, name=None)]
     return "\n".join(lines)
