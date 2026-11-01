@@ -1,41 +1,39 @@
 # Weekly snapshot
 
-_Generated 2026-10-18 08:49. Corpus: 3,745 papers, 18,576 authors,
-1,102 topics, publication years 2023-2026._
+_Generated 2026-11-01 11:07. Corpus: 3,822 papers, 18,831 authors,
+1,112 topics, publication years 2023-2026._
 
 ![papers per year](charts/papers_per_year.png)
 
 ## Emerging topic pairs
-| itemset | first_window | first_support | last_window | last_support | change |
-|---|---|---|---|---|---|
-| Anomaly Detection Techniques and Applications \| Network Security and Intrusion Detection | 2023 | 0.0204 | 2024 | 0.0223 | 0.0019 |
+_no rows_
 
 ![lifecycles](charts/pattern_lifecycles.png)
 
 ## Declining topic pairs
 | itemset | first_window | first_support | last_window | last_support | change |
 |---|---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture \| Quantum Information and Cryptography | 2023 | 0.0396 | 2024 | 0.0364 | -0.0032 |
+| Quantum Computing Algorithms and Architecture \| Quantum Information and Cryptography | 2023 | 0.0388 | 2024 | 0.0355 | -0.0033 |
 
 ## Strongest patterns in 2024-2026
 | itemset | k | support_count | n_tx | support |
 |---|---|---|---|---|
-| Quantum Computing Algorithms and Architecture \| Quantum Information and Cryptography | 2 | 108 | 2966 | 0.03641267700606878 |
-| Anomaly Detection Techniques and Applications \| Network Security and Intrusion Detection | 2 | 66 | 2966 | 0.022252191503708697 |
+| Quantum Computing Algorithms and Architecture \| Quantum Information and Cryptography | 2 | 108 | 3042 | 0.03550295857988166 |
+| Anomaly Detection Techniques and Applications \| Network Security and Intrusion Detection | 2 | 66 | 3042 | 0.021696252465483234 |
 
 ## Collaboration network, 2024-2026
 | author | collaborators | joint_papers |
 |---|---|---|
-| Xuemin Shen | 30 | 196 |
-| Dusit Tao Niyato | 22 | 160 |
-| Habib Hamam | 19 | 126 |
+| Xuemin Shen | 31 | 199 |
+| Dusit Tao Niyato | 19 | 151 |
+| Habib Hamam | 18 | 123 |
 | Jiawen Kang | 16 | 111 |
-| Witold Pedrycz | 15 | 58 |
-| Fei Richard Yu | 12 | 48 |
-| Tehseen Mazhar | 11 | 87 |
-| Hongyang Du | 10 | 90 |
-| Zehui Xiong | 10 | 81 |
-| Roberto Morandotti | 10 | 36 |
+| Witold Pedrycz | 14 | 55 |
+| Hongyang Du | 11 | 93 |
+| Fei Richard Yu | 11 | 45 |
+| Tehseen Mazhar | 10 | 84 |
+| Zehui Xiong | 9 | 78 |
+| Trung Q. Duong | 9 | 45 |
 
 ![network](charts/coauthor_network.png)
 
