@@ -45,6 +45,24 @@ def text_prefixes(model_name: str) -> dict[str, str]:
     return {"query": "", "passage": ""}
 
 
+
+def default_threads() -> int:
+    """ONNX threads = the CPUs this container may actually use, not the host's core count.
+
+    On Render's free tier the host reports many cores but the cgroup allows 0.1 CPU;
+    one thread per host core made each query embedding take ~130 s instead of ~1 s.
+    """
+    n = os.cpu_count() or 1
+    for files in (("/sys/fs/cgroup/cpu.max",),                                    # cgroup v2
+                  ("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us")):  # v1
+        try:
+            vals = " ".join(open(f).read() for f in files).split()[:2]
+            if vals[0] not in ("max", "-1"):
+                return max(1, min(n, int(int(vals[0]) / int(vals[1]))))
+        except (OSError, ValueError, IndexError):
+            continue
+    return max(1, n)
+
 class Embedder:
     def __init__(self, model_name: str | None = None):
         self.model_name = model_name or os.getenv("ML_EMBED_MODEL", DEFAULT_MODEL)
@@ -165,7 +183,7 @@ class FastEmbedder:
         if self._model is None:
             from fastembed import TextEmbedding  # heavy import
             self._model = TextEmbedding(self.model_name, cache_dir=self.cache_dir,
-                                        threads=int(os.getenv("ML_EMBED_THREADS", os.cpu_count() or 1)))
+                                        threads=int(os.getenv("ML_EMBED_THREADS") or default_threads()))
         return self._model
 
     def encode(self, texts: list[str], mode: str = "document") -> np.ndarray:

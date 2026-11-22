@@ -14,5 +14,8 @@ export function deriveRules(patterns: Pattern[], minConf = 0): Rule[] {
       if (confidence >= minConf) out.push({ antecedent: ante, consequent: [c], support: p.support, confidence, lift: sc ? confidence / sc : null });
     }
   }
-  return out.sort((a, b) => b.confidence - a.confidence);
+  // Lift > 1: the topics appear together more often than chance. Confidence alone
+  // favours rules whose consequent is simply a very common topic.
+  return out.filter((r) => r.lift == null || r.lift > 1)
+    .sort((a, b) => (b.lift ?? 0) - (a.lift ?? 0) || b.confidence - a.confidence);
 }

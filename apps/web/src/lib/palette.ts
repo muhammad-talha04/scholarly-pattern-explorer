@@ -51,13 +51,14 @@ function clusterIndexFromId(id: string) {
 }
 
 /**
- * Galaxy swatch. `color_index` from /galaxy wins. Otherwise the cluster id
- * picks one of the five amber tones. An index outside 0–4 is the other grey.
+ * Galaxy swatch. `color_index` from /galaxy wins, cycling through the five amber
+ * tones (the API hands out indexes 0, 1, 2, ... one per cluster, and a refit keeps
+ * counting up). Otherwise the cluster id picks a tone. A negative index is the other grey.
  */
 export function galaxyColor(colorIndex: number | null | undefined, clusterId: string) {
   const idx = colorIndex != null && Number.isFinite(colorIndex) ? Math.trunc(colorIndex) : clusterIndexFromId(clusterId);
-  if (idx < 0 || idx >= clusterColors.length) return otherColor;
-  return clusterColors[idx];
+  if (idx < 0) return otherColor;
+  return clusterColors[idx % clusterColors.length];
 }
 
 /** sRGB scale. 1 is the hex itself; NODE_BRIGHTNESS is the resting node. */

@@ -32,6 +32,8 @@ services:
         value: fastembed          # matches paper_embeddings.model (bge-small, fastembed 0.9.0)
       - key: ML_EMBED_MODEL
         value: BAAI/bge-small-en-v1.5
+      - key: ML_EMBED_THREADS   # free tier = 0.1 CPU; more threads made each query take ~130 s
+        value: "1"
       - key: ML_EMBED_MODEL_REVISION
         sync: false
       - key: SEARCH_MIN_SCORE

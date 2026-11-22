@@ -19,6 +19,8 @@ export function PatternsPage({ initial = {} }: { initial?: { all?: Pattern[]; ga
   const [pickedWin, setWin] = useState<number | null>(null);
   const win = pickedWin ?? (windows.length ? windows[windows.length - 1] : null);
   const [tab, setTab] = useState<Tab>("itemsets");
+  // Single topics are just topic frequencies (2/3 of all itemsets); co-occurring topics are the pattern.
+  const [showSingles, setShowSingles] = useState(false);
   const inWin = useMemo(() => (all.data ?? []).filter((p) => p.window_start === win), [all.data, win]);
   const rules = useMemo(() => deriveRules(inWin), [inWin]);
   const life = useMemo(() => lifecycles(all.data ?? []), [all.data]);
@@ -27,6 +29,7 @@ export function PatternsPage({ initial = {} }: { initial?: { all?: Pattern[]; ga
   return (
     <div>
       <PageHeader title="Patterns" subtitle="Frequent topic itemsets, derived rules, lifecycles and research gaps.">
+        {tab === "itemsets" && <label className="mr-3 inline-flex items-center gap-2 text-sm text-mist"><input type="checkbox" checked={showSingles} onChange={(e) => setShowSingles(e.target.checked)} />Include single topics</label>}
         {tab !== "gaps" && <select aria-label="Window" value={win ?? ""} onChange={(e) => setWin(Number(e.target.value))} className="input">{windows.map((w) => <option key={w} value={w}>{w}–{w + 2}</option>)}</select>}
       </PageHeader>
       <div className="mb-4 flex gap-1 overflow-x-auto">{(["itemsets", "rules", "lifecycles", "gaps"] as Tab[]).map((t) => (
@@ -36,10 +39,11 @@ export function PatternsPage({ initial = {} }: { initial?: { all?: Pattern[]; ga
       <motion.div key={tab + win} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass overflow-x-auto p-4">
         {tab === "itemsets" && (
           <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-400"><tr><th className="p-2">Itemset</th><th className="p-2">Size</th><th className="p-2 w-1/3">Support</th></tr></thead>
-            <tbody>{[...inWin].sort((a, b) => b.support - a.support).map((p) => (
+            <tbody>{inWin.filter((p) => showSingles || p.items.length > 1).sort((a, b) => b.items.length - a.items.length || b.support - a.support).map((p) => (
               <tr key={p.items.join()} className="border-t border-white/5"><td className="p-2">{p.items.map((i) => <span key={i} className="chip mr-1">{i}</span>)}</td><td className="p-2">{p.items.length}</td>
                 <td className="p-2"><div className="flex items-center gap-2"><div className="h-1.5 flex-1 rounded bg-white/10"><div className="h-full rounded bg-accent" style={{ width: `${Math.min(100, p.support * 250)}%` }} /></div><span className="tabular-nums text-xs">{p.support.toFixed(3)}</span></div></td></tr>))}</tbody></table>
         )}
+        {tab === "itemsets" && !showSingles && !inWin.some((p) => p.items.length > 1) && <p className="p-2 text-slate-400">No topic pair is frequent enough in this window. Tick “Include single topics” to see topic frequencies.</p>}
         {tab === "rules" && (rules.length === 0 ? <p className="text-slate-400">No topic pair is frequent enough in {win}–{win != null ? win + 2 : ""} to form a rule. Try another window.</p> :
           <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-400"><tr><th className="p-2">Rule</th><th className="p-2">Support</th><th className="p-2">Confidence</th><th className="p-2">Lift</th></tr></thead>
             <tbody>{rules.map((r, i) => <tr key={i} className="border-t border-white/5"><td className="p-2">{r.antecedent.join(" + ")} <span className="text-accent">→</span> {r.consequent.join(", ")}</td><td className="p-2">{r.support.toFixed(3)}</td><td className="p-2">{(r.confidence * 100).toFixed(0)}%</td><td className="p-2">{r.lift?.toFixed(2) ?? "–"}</td></tr>)}</tbody></table>)}

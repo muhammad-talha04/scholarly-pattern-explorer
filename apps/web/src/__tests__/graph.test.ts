@@ -13,6 +13,13 @@ it("derives rules with confidence and lift", () => {
   const ab = r.find((x) => x.antecedent[0] === "A")!;
   expect(ab.confidence).toBeCloseTo(0.25); expect(ab.lift).toBeCloseTo(1.25);
 });
+it("drops rules with lift <= 1 and ranks by lift", () => {
+  // A,B together less than chance (lift 0.5); C,D strongly linked (lift 5)
+  const r = deriveRules([P(["A"], 0.5), P(["B"], 0.4), P(["A", "B"], 0.1), P(["C"], 0.1), P(["D"], 0.1), P(["C", "D"], 0.05)]);
+  expect(r.every((x) => (x.lift ?? 2) > 1)).toBe(true);
+  expect(r[0].antecedent.concat(r[0].consequent).sort()).toEqual(["C", "D"]);
+  expect(r.some((x) => x.antecedent.includes("A"))).toBe(false);
+});
 it("computes lifecycles born/died", () => {
   const l = lifecycles([P(["A"], 0.1, 2019), P(["A"], 0.1, 2021), P(["B"], 0.1, 2021), P(["B"], 0.1, 2023), P(["C"], 0.1, 2023)]);
   const by = Object.fromEntries(l.rows.map((r) => [r.key, r]));
