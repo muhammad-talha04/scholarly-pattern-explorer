@@ -49,6 +49,8 @@ def main(argv=None):
                     help="stop before a batch once pg_database_size reaches this (0 = off)")
     ap.add_argument("--galaxy", action="store_true", help="index: rebuild the galaxy afterwards")
     ap.add_argument("--target", type=int, default=70000, help="bulk: papers to fetch")
+    ap.add_argument("--per-month", type=int, default=None,
+                    help="bulk: fill every month to this many in-sample papers (sets --target)")
     ap.add_argument("--start", default="2015-01", help="bulk: first month YYYY-MM")
     ap.add_argument("--end", default=None, help="bulk: last month YYYY-MM (default now)")
     ap.add_argument("--out", default="data/bulk_works.jsonl", help="bulk: JSONL checkpoint")
@@ -81,8 +83,17 @@ def main(argv=None):
                 check_models(store, model_label(embedder))
             except ModelMismatch as exc:
                 raise SystemExit(str(exc))
-        r = fetch(a.target, a.out, start=a.start, end=a.end, exclude_ids=store.existing_ids(),
-                  existing_by_month=store.month_counts(), min_abstract_chars=a.min_abstract_chars,
+        from .bulk import months
+        from .sample import out_of_sample_ids
+        # Quotas count only papers in the random sample; out-of-sample papers
+        # (e.g. the first AI-only load) must not fill a month's quota.
+        existing = store.month_counts(exclude=out_of_sample_ids())
+        target = a.target
+        if a.per_month is not None:
+            target = sum(max(0, a.per_month - existing.get(m, 0)) for m in months(a.start, a.end))
+            print(f"--per-month {a.per_month}: {target} papers needed")
+        r = fetch(target, a.out, start=a.start, end=a.end, exclude_ids=store.existing_ids(),
+                  existing_by_month=existing, min_abstract_chars=a.min_abstract_chars,
                   rates_sink=store.put_sampling_rate)
         print(f"fetched {r.fetched} new papers in {r.requests} requests; short months: {len(r.short_months)}")
         if a.index:

@@ -233,7 +233,8 @@ class AggregatePeriod(BaseModel):
 
 class TopicPoint(BaseModel):
     key: str
-    value: float                          # fractional papers (1 / topics on the paper)
+    value: float                          # design-weighted fractional papers (est. OpenAlex papers)
+    share: float | None = None            # percent of the period's estimated papers (weighted)
 
 
 class TopicSeries(BaseModel):
