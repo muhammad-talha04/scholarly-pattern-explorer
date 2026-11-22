@@ -144,18 +144,20 @@ class LocalStore:
     def database_size(self) -> int | None:
         return None
 
-    def month_counts(self) -> dict[str, int]:
-        """Stored papers per month: meta.publication_date, else meta.created."""
+    def month_counts(self, exclude=frozenset()) -> dict[str, int]:
+        """Stored papers per month: meta.publication_date, else meta.created. Skips ``exclude`` ids."""
         out: dict[str, int] = {}
         for wid in self.ids:
+            if wid in exclude:
+                continue
             m = _month_of(self.meta.get(wid))
             if m:
                 out[m] = out.get(m, 0) + 1
         return out
 
-    def aggregate_counts(self) -> dict:
+    def aggregate_counts(self, exclude=frozenset()) -> dict:
         """Papers per (year, month) and fractional topic counts per (year, month, topic)."""
-        return aggregate_meta(self.meta.get(i) for i in self.ids)
+        return aggregate_meta(self.meta.get(i) for i in self.ids if i not in exclude)
 
     def ids_missing_publication_date(self) -> list[str]:
         """work_ids whose meta has no ``publication_date`` key (null = looked up, unknown)."""
@@ -338,6 +340,19 @@ def aggregate_meta(metas) -> dict:
     return {"papers": papers, "topics": topics}
 
 
+_WORK_ID = re.compile(r"^W[0-9]+$")
+
+
+def _ids_literal(ids) -> str:
+    """A constant text[] literal of OpenAlex work ids. Inlined (not a bind parameter) so
+    Postgres hashes it for `<> ALL(...)`; a parameter in a generic plan is scanned once per
+    row (100k rows x 14k ids). Ids are validated, so nothing else can reach the SQL."""
+    bad = [i for i in ids if not _WORK_ID.match(str(i))]
+    if bad:
+        raise ValueError(f"not an OpenAlex work id: {bad[:3]}")
+    return "'{" + ",".join(sorted(ids)) + "}'::text[]"
+
+
 def _vec_literal(v) -> str:
     return "[" + ",".join(f"{x:.6f}" for x in np.asarray(v).ravel()) + "]"
 
@@ -507,12 +522,12 @@ class PgVectorStore:
             return int(row[0]) if row and row[0] is not None else None
         return self._run(q)
 
-    def month_counts(self) -> dict[str, int]:
-        """Stored papers per month: meta.publication_date, else meta.created."""
+    def month_counts(self, exclude=frozenset()) -> dict[str, int]:
+        """Stored papers per month: meta.publication_date, else meta.created. Skips ``exclude`` ids."""
         def q(cur):
             cur.execute("SELECT substr(d, 1, 7) m, count(*) FROM (SELECT coalesce(meta->>'publication_date', "
-                        "meta->>'created') d FROM paper_embeddings) t "
-                        "WHERE d ~ '^[0-9]{4}-[0-9]{2}' GROUP BY 1")
+                        "meta->>'created') d FROM paper_embeddings WHERE work_id <> ALL("
+                        + _ids_literal(exclude) + ")) t WHERE d ~ '^[0-9]{4}-[0-9]{2}' GROUP BY 1")
             return {m: int(n) for m, n in cur.fetchall()}
         return self._run(q)
 
@@ -523,7 +538,8 @@ class PgVectorStore:
 WITH r AS MATERIALIZED (   -- one detoast of meta per row (jsonb_to_record), not one per field
   SELECT r.publication_date AS pd, r.pub_year AS py, r.created AS cr,
          CASE WHEN jsonb_typeof(r.topics) = 'array' THEN r.topics ELSE '[]'::jsonb END AS ts
-  FROM paper_embeddings, jsonb_to_record(meta) AS r(publication_date text, pub_year text, created text, topics jsonb)),
+  FROM paper_embeddings, jsonb_to_record(meta) AS r(publication_date text, pub_year text, created text, topics jsonb)
+  WHERE work_id <> ALL(__EXCLUDE__)),   -- papers outside the random sample (ml.sample)
 p AS (
   SELECT CASE WHEN pd ~ '^[0-9]{4}-[0-9]{2}' THEN substr(pd, 1, 4)
               WHEN py ~ '^[0-9]{4}$' THEN py
@@ -540,10 +556,10 @@ FROM p LEFT JOIN LATERAL jsonb_array_elements_text(ts) WITH ORDINALITY AS e(t, o
 WHERE y IS NOT NULL
 GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
 
-    def aggregate_counts(self) -> dict:
+    def aggregate_counts(self, exclude=frozenset()) -> dict:
         """Papers per (year, month) and fractional topic counts per (year, month, topic)."""
         def q(cur):
-            cur.execute(self._AGG_SQL)
+            cur.execute(self._AGG_SQL.replace("__EXCLUDE__", _ids_literal(exclude)))
             return cur.fetchall()
         papers, topics = {}, {}
         for y, m, t, g, n, frac in self._run(q):

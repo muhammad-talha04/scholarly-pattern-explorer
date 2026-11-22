@@ -175,3 +175,16 @@ def test_backfill_batches_of_50_with_http_backoff(tmp_path):
     r = bulk.backfill_dates(s, client=c, batch=500)   # clamped to 50
     assert r.updated == 120 and r.not_found == 0 and r.requests == 4
     assert all(p["filter"].count("|") <= 49 and p["api_key"] == "k" for p in sess.params)
+
+
+def test_full_month_still_records_its_openalex_total(tmp_path):
+    """A month already at quota fetches nothing but must still get a sampling_rates row,
+    or it has no design weight and its year no estimate (Jan and Nov 2025 had none)."""
+    counter = iter(range(1, 10_000))
+    c = FakeClient(lambda p: [_work(next(counter)) for _ in range(5)])
+    rates = {}
+    r = bulk.fetch(3, tmp_path / "w.jsonl", start="2020-01", end="2020-02", client=c,
+                   existing_by_month={"2020-01": 50},
+                   rates_sink=lambda mo, total, sampled, flt: rates.__setitem__(mo, (total, sampled)))
+    assert r.fetched == 3
+    assert rates == {"2020-01": (1000, 50), "2020-02": (1000, 3)}

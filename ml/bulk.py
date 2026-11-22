@@ -185,14 +185,19 @@ def fetch(target: int, out: str | Path, state: str | Path | None = None, start: 
     with open(out, "a", encoding="utf-8") as fh:
         for mo, want in st["quota"].items():
             ms = st["months"].setdefault(mo, {"fetched": 0, "quota": want, "attempts": 0})
-            if ms["fetched"] >= want:
-                res.months_done += 1
-                continue
             lo, hi = month_bounds(mo)
             flt = FILTER.format(lo=lo, hi=hi)
             if ms.get("openalex_total") is None:
                 meta = client.get({"filter": flt, "per-page": 1, "select": "id"}).get("meta") or {}
                 ms["openalex_total"] = int(meta.get("count") or 0)
+            if ms["fetched"] >= want:
+                # Record the month's OpenAlex total even when nothing is fetched: without it
+                # the month has no design weight and its year has no estimate.
+                if rates_sink is not None:
+                    rates_sink(mo, ms["openalex_total"], existing_by_month.get(mo, 0) + ms["fetched"],
+                               flt + f",min_abstract_chars:{min_abstract_chars}")
+                res.months_done += 1
+                continue
             need = want - ms["fetched"]
             got, page = 0, 1
             sample = min(MAX_SAMPLE, max(need, int(need * oversample) + len(exclude) // len(st["quota"]) + 1))

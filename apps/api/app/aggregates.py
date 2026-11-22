@@ -11,7 +11,12 @@ The scan reads every row's meta once (~3.5 s at 26.5k rows on Supabase free tier
 estimated_total for a month is ``sampling_rates.openalex_total`` as stored: that
 column already is the OpenAlex population for the month (``meta.count`` of the
 filtered query), so no scaling is applied. A year's estimate is the sum of its
-months, and null unless every month of that year that has papers has a row.
+months, and null unless every month of that year (up to the newest sampled month)
+has a row.
+
+Sampling (ml.sample): papers outside the random sample are not counted at all, and
+topic values are design-weighted (OpenAlex total / sampled papers, per month), so a
+topic's share of a year estimates its share of all OpenAlex CS that year.
 """
 from __future__ import annotations
 
@@ -42,8 +47,9 @@ def clear_cache() -> None:
 
 
 def _load() -> dict:
+    from ml.sample import out_of_sample_ids
     store = ml.get_service().store
-    counts = store.aggregate_counts()
+    counts = store.aggregate_counts(exclude=out_of_sample_ids())
     rates = {}
     for month, r in (store.sampling_rates() or {}).items():
         try:
@@ -120,10 +126,11 @@ def periods(d: dict, grain: str, year: int | None) -> list[dict]:
         if grain == "month":
             est = rates.get(k)
         else:
-            months = [f"{k}-{i:02d}" for i in range(1, 13)]
-            held = {m for (y, m) in d["papers"] if str(y) == k and m}
-            known = [rates[m] for m in months if m in rates]
-            est = sum(known) if known and all(m in rates for m in held) else None
+            # every month of the year up to the newest sampled month, so a year with
+            # an unsampled month (no OpenAlex total) shows no estimate instead of a low one
+            newest = max((m for (_y, m) in d["papers"] if m), default="")
+            months = [m for m in (f"{k}-{i:02d}" for i in range(1, 13)) if m <= newest]
+            est = sum(rates[m] for m in months) if months and all(m in rates for m in months) else None
         out.append({"key": k, "sampled": sampled[k], "estimated_total": est})
     return out
 
@@ -135,23 +142,46 @@ def publications(grain: str, year: int | None) -> dict:
             "total": sum(b["paper_count"] for b in buckets), "buckets": buckets}
 
 
+def _weights(d: dict) -> dict[str, float]:
+    """Design weight per month (ml.sample.month_weights); papers with a year but no
+    month use their year's median weight under the key 'YYYY'."""
+    from statistics import median
+    from ml.sample import month_weights
+    sampled = {m: n for (_y, m), n in d["papers"].items() if m}
+    w = month_weights(sampled, d["rates"])
+    for (y, m) in d["papers"]:
+        if not m:
+            ys = [v for k, v in w.items() if k.startswith(f"{y}-")]
+            w[str(y)] = median(ys) if ys else 1.0
+    return w
+
+
 def topics(grain: str, year: int | None, top: int) -> dict:
     d = data()
     keys = _keys(d, grain, year)
     idx = set(keys)
     per: dict[str, dict[str, float]] = {}
+    w = _weights(d)
     for (y, m, t), v in d["topics"].items():
         k = _bucket_of(y, m, grain, year)
         if k in idx:
             row = per.setdefault(t, {})
-            row[k] = row.get(k, 0.0) + v
+            row[k] = row.get(k, 0.0) + v * w.get(m or str(y), 1.0)
+    # Denominator: estimated papers in the period = sum of design weight x sampled papers,
+    # so a topic's share estimates its share of all OpenAlex CS papers in that period.
+    denom = dict.fromkeys(keys, 0.0)
+    for (y, m), n in d["papers"].items():
+        k = _bucket_of(y, m, grain, year)
+        if k in denom:
+            denom[k] += n * w.get(m or str(y), 1.0)
+
+    def pt(k, v):
+        return {"key": k, "value": round(v, 6), "share": round(100 * v / denom[k], 4) if denom[k] else 0.0}
     ranked = sorted(per, key=lambda t: (-sum(per[t].values()), t))
     head, tail = ranked[:top], ranked[top:]
-    series = [{"name": t, "points": [{"key": k, "value": round(per[t].get(k, 0.0), 6)} for k in keys]}
-              for t in head]
+    series = [{"name": t, "points": [pt(k, per[t].get(k, 0.0)) for k in keys]} for t in head]
     if tail:
-        series.append({"name": OTHER, "points": [
-            {"key": k, "value": round(sum(per[t].get(k, 0.0) for t in tail), 6)} for k in keys]})
+        series.append({"name": OTHER, "points": [pt(k, sum(per[t].get(k, 0.0) for t in tail)) for k in keys]})
     return {"grain": grain, "year": year if grain == "month" else None, "top": top,
             "series": series, "period": periods(d, grain, year)}
 

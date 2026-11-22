@@ -2,7 +2,12 @@ name: v2 ingest (monthly)
 on:
   schedule:
     - cron: "0 3 1 * *"   # 03:00 UTC on the 1st of each month
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: "Rebuild countries, patterns and discoveries from scratch (in-sample papers only)"
+        type: boolean
+        default: false
   push:
     paths: ["pipeline/**"]
 permissions:
@@ -23,46 +28,25 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - run: pip install requests
-      - name: Restore previous data
-        env: {GH_TOKEN: "${{ github.token }}"}
-        run: |
-          mkdir -p data
-          gh release download data-store -p works_v2.jsonl -p ingest_state.json -p country_snapshot.json -D data --clobber || echo "first run"
-      - name: Fetch only new works
-        env:
-          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
-          OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
-        run: |
-          wc -l < data/works_v2.jsonl > before.txt 2>/dev/null || echo 0 > before.txt
-          set +e; python -m pipeline.ingest --max-records 600 --sample-seed "$(date -u +%Y%m)"; code=$?; set -e
-          [ "$code" -eq 1 ] && exit 1
-          tail -n +$(( $(cat before.txt) + 1 )) data/works_v2.jsonl > data/new.jsonl
-      - name: Save back
-        env: {GH_TOKEN: "${{ github.token }}"}
-        run: gh release upload data-store data/works_v2.jsonl data/ingest_state.json --clobber
-      - name: Check database connection
+      - name: Fill every month to 678 random papers (stratified sample, ml/sample.py)
+        # Up to two months back: OpenAlex keeps indexing a month's papers for weeks, so a
+        # month sampled right after it ends would have an incomplete population. Every month
+        # since 2015 is checked, so a missed run or a short month is topped up, and every
+        # month's OpenAlex total is re-read (the design weights stay current).
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+          OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
+          ML_EMBEDDER: fastembed
+          ML_EMBED_MODEL: BAAI/bge-small-en-v1.5
         run: |
-          pip install "psycopg[binary]>=3.1"
-          python - <<'PY'
-          import os, sys
-          from urllib.parse import urlsplit
-          u = os.environ.get("DATABASE_URL", "")
-          if not u:
-              sys.exit("DATABASE_URL secret is empty or missing")
-          p = urlsplit(u)
-          print("scheme", p.scheme, "| user", p.username, "| host", p.hostname, "| port", p.port, "| db", p.path)
-          import psycopg
-          try:
-              with psycopg.connect(u, connect_timeout=15) as c:
-                  print("connected:", c.execute("select 1").fetchone())
-          except Exception as e:
-              print("CONNECT FAILED:", type(e).__name__, str(e).replace(p.password or "\0", "***")[:300])
-              sys.exit(1)
-          PY
-      - name: Embeddings, patterns, discoveries, galaxy and country analytics
+          pip install -r ml/requirements.txt
+          M=$(date -u -d "$(date -u +%Y-%m-01) -2 month" +%Y-%m)
+          mkdir -p data
+          python -m ml.cli bulk --start 2015-01 --end "$M" --per-month 678 --index \
+                 --out data/new.jsonl --max-db-mb 475   # free tier is 500 MB; HNSW + dead rows need headroom
+          touch data/new.jsonl
+      - name: Patterns, discoveries, galaxy and country analytics for the new month
         # The API serves patterns, gaps, emerging, runs and countries from deploy/data.
         # These steps update those files in place and the next step commits them, so
         # the site refreshes every month (before, they stayed frozen at 2026-10-24).
@@ -73,8 +57,27 @@ jobs:
           ML_EMBEDDER: fastembed   # never fall back to the hash embedder on real data
           ML_EMBED_MODEL: BAAI/bge-small-en-v1.5   # must match the stored vectors
         run: |
-          pip install -r ml/requirements.txt
-          python -m ml.cli index --jsonl data/new.jsonl --max-db-mb 490   # free tier is 500 MB; deleted rows keep the file at ~472 MB until reused
+          if [ "${{ inputs.rebuild }}" = "true" ]; then
+            # Full rebuild on the random sample only: export the live corpus, drop papers
+            # outside the sample, and recompute every derived file from scratch.
+            python -m ml.export_corpus --out data/all.jsonl
+            python - <<'PY'
+          import json
+          from ml.sample import in_sample
+          with open("data/all.jsonl") as src, open("data/new.jsonl", "w") as out:
+              for line in src:
+                  r = json.loads(line)
+                  if in_sample(r["id"]):
+                      r["date"] = r.get("publication_date") or r.get("date")   # export's date is meta.created
+                      out.write(json.dumps(r) + "\n")
+          PY
+            wc -l data/all.jsonl data/new.jsonl
+            rm -f deploy/data/country_snapshot.json
+            rm -rf deploy/data/ml/patterns deploy/data/ml/snapshots deploy/data/ml/discoveries.json
+            python -m pipeline.country_stats --new data/new.jsonl --out deploy/data/country_snapshot.json
+            python -m ml.cli update --jsonl data/new.jsonl
+            exit 0
+          fi
           # Country analytics first: it also fills the topic_country_year table that
           # emerging topics read. The snapshot's tally holds every counter, so only new works are read.
           python -m pipeline.country_stats --new data/new.jsonl --prev deploy/data/country_snapshot.json \
