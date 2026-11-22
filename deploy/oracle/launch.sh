@@ -7,7 +7,7 @@ BRANCH=${BRANCH:-claude/fixes-and-oracle}
 C=${OCI_TENANCY:?not in Cloud Shell?}
 q() { "$@" --raw-output 2>/dev/null || true; }
 
-[ -f ~/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/id_ed25519
+[ -f ~/.ssh/id_rsa ] || ssh-keygen -q -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa   # Cloud Shell is FIPS: no ed25519
 
 VCN=$(q oci network vcn list -c "$C" --display-name spe-vcn --query 'data[0].id')
 if [ -z "$VCN" ]; then
@@ -42,7 +42,7 @@ if [ -z "$ID" ]; then
       ID=$(oci compute instance launch -c "$C" --availability-domain "$AD" --shape VM.Standard.A1.Flex \
            --shape-config '{"ocpus":4,"memoryInGBs":24}' --image-id "$IMG" --subnet-id "$SUB" \
            --assign-public-ip true --display-name spe-server --boot-volume-size-in-gbs 150 \
-           --ssh-authorized-keys-file ~/.ssh/id_ed25519.pub --user-data-file /tmp/spe-init.sh \
+           --ssh-authorized-keys-file ~/.ssh/id_rsa.pub --user-data-file /tmp/spe-init.sh \
            --wait-for-state RUNNING --query data.id --raw-output 2>/tmp/spe-err.txt) && break 2
       grep -o '"message": "[^"]*"' /tmp/spe-err.txt | head -1; ID=""; sleep 30
     done
