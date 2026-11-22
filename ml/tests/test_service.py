@@ -355,3 +355,19 @@ def test_pgvector_rows_parse_embeddings():
         def cursor(self): return Cur()
     ids, vecs, metas = PgVectorStore(conn=Conn()).rows()
     assert ids == ["W1"] and vecs.shape == (1, 2) and metas[0]["pub_year"] == 2020
+
+
+def test_search_cache_is_cleared_by_new_papers(tmp_path):
+    from ml.embeddings import HashEmbedder
+    from ml.papers import Paper
+    from ml.service import MLService, SummaryCache
+    from ml.store import LocalStore
+    svc = MLService(embedder=HashEmbedder(), store=LocalStore(tmp_path / "v"),
+                    cache=SummaryCache(":memory:"), galaxy_dir=tmp_path / "g")
+    svc.index_papers([Paper(work_id="W1", title="graph neural networks", abstract="graphs")])
+    first = svc.search("graph neural networks", 5)
+    assert [h["work_id"] for h in first] == ["W1"]
+    first[0]["title"] = "mutated by caller"
+    assert svc.search("graph neural networks", 5)[0]["title"] == "graph neural networks"
+    svc.index_papers([Paper(work_id="W2", title="graph neural networks", abstract="graphs too")])
+    assert {h["work_id"] for h in svc.search("graph neural networks", 5)} == {"W1", "W2"}
