@@ -1,0 +1,25 @@
+name: galaxy refit (manual)
+# Re-clusters the whole index and redraws the galaxy (k-means k from ml.galaxy.k_for,
+# capped by GALAXY_MAX_K). The monthly job only places new papers into existing
+# clusters, so run this after changing the clustering. Writes to Postgres only.
+on:
+  workflow_dispatch:
+    inputs:
+      max_k:
+        description: "Maximum number of clusters"
+        default: "20"
+jobs:
+  refit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r ml/requirements.txt
+      - env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ML_DATA_DIR: deploy/data/ml
+          ML_EMBEDDER: fastembed
+          ML_EMBED_MODEL: BAAI/bge-small-en-v1.5
+          GALAXY_MAX_K: ${{ inputs.max_k }}
+        run: python -m ml.cli galaxy --refit

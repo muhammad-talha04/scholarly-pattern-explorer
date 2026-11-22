@@ -1,10 +1,11 @@
 import { accent, clusterColors, galaxyColor, ink, NODE_BRIGHTNESS, okabeIto, otherColor, scaleHex } from "@/lib/palette";
 import { freshPaperIds } from "@/features/galaxy/stars";
 
-it("maps galaxy clusters by color_index, then id, and greys the rest", () => {
+it("maps galaxy clusters by color_index (cycling), then id, and greys negatives", () => {
   expect(galaxyColor(0, "ignored")).toBe(clusterColors[0]);
   expect(galaxyColor(4, "ignored")).toBe(clusterColors[4]);
-  expect(galaxyColor(5, "extra")).toBe(otherColor);
+  expect(galaxyColor(5, "extra")).toBe(clusterColors[0]);
+  expect(galaxyColor(13, "extra")).toBe(clusterColors[3]);
   expect(galaxyColor(-1, "extra")).toBe(otherColor);
   const a = galaxyColor(undefined, "methods");
   const b = galaxyColor(null, "methods");

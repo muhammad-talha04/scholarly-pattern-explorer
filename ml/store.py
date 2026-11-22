@@ -600,7 +600,8 @@ GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
     def search(self, query, k=10, country=None, year_from=None):
         """Nearest papers. Filters run inside the index scan (pgvector >= 0.8 iterative
         scan), so a country or year filter still returns k rows when k rows match.
-        The abstract is left out of ``meta``: result lists never show it."""
+        Only the first 1200 characters of the abstract come back (``abstract_head``),
+        enough for the one-line summary on result cards."""
         lit = _vec_literal(query)
         ef = hnsw_ef_search()
         where, args = [], []
@@ -621,7 +622,8 @@ GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
                 if where:
                     cur.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
                 cur.execute(
-                    "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, meta - 'abstract' "
+                    "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, "
+                    "(meta - 'abstract') || jsonb_build_object('abstract_head', left(meta->>'abstract', 1200)) "
                     f"FROM paper_embeddings {clause}ORDER BY embedding <=> %s::halfvec LIMIT %s",
                     (lit, *args, lit, k))
                 rows = cur.fetchall()

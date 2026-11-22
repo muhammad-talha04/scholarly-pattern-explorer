@@ -22,6 +22,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 import re
 from collections import Counter
 from pathlib import Path
@@ -68,9 +69,12 @@ def resolve_method(method: str, n: int) -> str:
 
 
 def k_for(n: int) -> int:
+    """k-means cluster count: sqrt(n/2), capped by GALAXY_MAX_K (default 20).
+    The old cap of 8 lumped 100k CS papers into mixed clusters (metaheuristics with solar radiation)."""
     if n < 2:
         return 1
-    return int(max(2, min(8, round(math.sqrt(n / 2)))))
+    cap = int(os.getenv("GALAXY_MAX_K", "20"))
+    return int(max(2, min(cap, round(math.sqrt(n / 2)))))
 
 
 def _kmeans(X: np.ndarray, k: int, seed: int = 0, n_iter: int = 25) -> np.ndarray:

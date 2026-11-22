@@ -83,10 +83,14 @@ def _link(meta: dict) -> dict:
 
 
 def _hit(wid: str, score: float, meta: dict) -> dict:
+    abstract = meta.get("abstract") or meta.get("abstract_head") or ""
     return {"work_id": wid, "title": meta.get("title"), "pub_year": meta.get("pub_year"),
             "score": round(score, 4), "topics": meta.get("topics", []),
             "authors": meta.get("authors", []), "countries": meta.get("countries", []),
-            "cited_by": meta.get("cited_by") or 0, **_link(meta)}
+            "cited_by": meta.get("cited_by") or 0,
+            # best sentence of the abstract, so every result card has a one-line summary
+            "snippet": extractive_summary(meta.get("title") or "", abstract, n=1) or None,
+            **_link(meta)}
 
 
 def _keep(meta: dict, country: str | None, year_from: int | None) -> bool:

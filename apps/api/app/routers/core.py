@@ -23,7 +23,8 @@ def _summary_model(hit: dict) -> PaperSummary:
     return PaperSummary(id=hit["work_id"], title=hit.get("title") or "",
                         authors=hit.get("authors") or [], year=hit.get("pub_year"),
                         cited_by=hit.get("cited_by") or 0, score=hit.get("score"),
-                        one_line_summary=ml.one_line(ml.get_service().cached_summary(hit["work_id"])))
+                        one_line_summary=ml.one_line(ml.get_service().cached_summary(hit["work_id"])
+                                                     or hit.get("snippet")))
 
 
 def _url(u):
