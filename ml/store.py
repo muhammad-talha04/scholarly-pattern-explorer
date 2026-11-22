@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import time
 import logging
 import os
 import re
@@ -78,7 +79,8 @@ def migration_sql() -> list[str]:
 
 class VectorStore(Protocol):
     def upsert(self, ids: list[str], vectors: np.ndarray, meta: list[dict], model: str | None = None) -> None: ...
-    def search(self, query: np.ndarray, k: int = 10) -> list[tuple[str, float, dict]]: ...
+    def search(self, query: np.ndarray, k: int = 10, country: str | None = None,
+               year_from: int | None = None) -> list[tuple[str, float, dict]]: ...
     def get(self, work_id: str) -> dict | None: ...
     def vector(self, work_id: str): ...
     def rows(self): ...
@@ -223,9 +225,12 @@ class LocalStore:
                                                          "models": self.models}),
                                              encoding="utf-8")
 
-    def search(self, query, k=10):
+    def search(self, query, k=10, country=None, year_from=None):
         if not self.ids:
             return []
+        if country or year_from is not None:   # small local index: rank all, then filter
+            hits = self.search(query, len(self.ids))
+            return [h for h in hits if meta_matches(h[2], country, year_from)][:k]
         q = np.asarray(query, dtype=np.float32).reshape(1, -1)
         k = min(k, len(self.ids))
         try:
@@ -280,6 +285,18 @@ def hnsw_ef_search() -> int:
     except ValueError:
         ef = 100
     return max(1, min(ef, 1000))
+
+
+def meta_matches(meta: dict, country: str | None, year_from: int | None) -> bool:
+    """Same rule as the SQL filter in PgVectorStore.search."""
+    if country and country.upper() not in [str(c).upper() for c in meta.get("countries") or []]:
+        return False
+    if year_from is not None and (meta.get("pub_year") or 0) < year_from:
+        return False
+    return True
+
+
+COUNT_TTL_SECONDS = 300
 
 
 def _month_of(meta: dict) -> str | None:
@@ -439,10 +456,18 @@ class PgVectorStore:
             self._pool.close()
 
     def __len__(self):
+        # Every search checks for an empty index; a full count(*) each time cost ~0.3 s.
+        cached = getattr(self, "_count_cache", None)
+        now = time.monotonic()
+        if cached and now - cached[0] < COUNT_TTL_SECONDS:
+            return cached[1]
+
         def q(cur):
             cur.execute("SELECT count(*) FROM paper_embeddings")
             return cur.fetchone()[0]
-        return self._run(q)
+        n = self._run(q)
+        self._count_cache = (now, n)
+        return n
 
     # ---- writes ----
     _UPSERT = ("INSERT INTO paper_embeddings (work_id, embedding, meta, model) "
@@ -572,10 +597,20 @@ GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
         return self._run(q)
 
     # ---- reads ----
-    def search(self, query, k=10):
+    def search(self, query, k=10, country=None, year_from=None):
+        """Nearest papers. Filters run inside the index scan (pgvector >= 0.8 iterative
+        scan), so a country or year filter still returns k rows when k rows match.
+        The abstract is left out of ``meta``: result lists never show it."""
         lit = _vec_literal(query)
-
         ef = hnsw_ef_search()
+        where, args = [], []
+        if country:
+            where.append("meta->'countries' @> %s::jsonb")
+            args.append(json.dumps([country.upper()]))
+        if year_from is not None:
+            where.append("(meta->>'pub_year')::int >= %s")
+            args.append(int(year_from))
+        clause = ("WHERE " + " AND ".join(where) + " ") if where else ""
 
         def q(cur):
             conn = getattr(cur, "connection", None)
@@ -583,11 +618,15 @@ GROUP BY GROUPING SETS ((y, m), (y, m, t))"""
                 else contextlib.nullcontext()
             with tx:   # SET LOCAL only lasts inside a transaction
                 cur.execute(f"SET LOCAL hnsw.ef_search = {ef}")
+                if where:
+                    cur.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
                 cur.execute(
-                    "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, meta "
-                    "FROM paper_embeddings ORDER BY embedding <=> %s::halfvec LIMIT %s",
-                    (lit, lit, k))
-                return cur.fetchall()
+                    "SELECT work_id, 1 - (embedding <=> %s::halfvec) AS score, meta - 'abstract' "
+                    f"FROM paper_embeddings {clause}ORDER BY embedding <=> %s::halfvec LIMIT %s",
+                    (lit, *args, lit, k))
+                rows = cur.fetchall()
+            # relaxed_order may return rows slightly out of order
+            return sorted(rows, key=lambda r: -float(r[1])) if where else rows
         rows = self._run(q)
         return [(w, float(s), m if isinstance(m, dict) else json.loads(m)) for w, s, m in rows]
 

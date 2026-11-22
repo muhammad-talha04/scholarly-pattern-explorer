@@ -89,17 +89,26 @@ def merge(out: Path, new: list[dict]) -> int:
     return added
 
 
-def fetch(since: str, filters: list[str], max_records: int, session=requests):
+def fetch(since: str, filters: list[str], max_records: int, session=requests, seed: int | None = None):
+    """Yield up to max_records works. With ``seed``, OpenAlex returns a seeded random
+    sample (same method as ml/bulk.py) instead of the first works in index order,
+    so monthly top-ups are not biased against the bulk load."""
     cursor, got = "*", 0
     params = {"filter": ",".join([f"from_publication_date:{since}", "type:article", *filters]),
               "per-page": "200", "select": SELECT}
+    page = None
+    if seed is not None:
+        params.update({"sample": str(min(max_records, 10000)), "seed": str(seed)})
+        params["filter"] += ",has_abstract:true"
+        cursor, page = None, 1   # OpenAlex pages a sample with page=, not cursor
     if os.environ.get("OPENALEX_MAILTO"):
         params["mailto"] = os.environ["OPENALEX_MAILTO"]
     if os.environ.get("OPENALEX_API_KEY"):
         params["api_key"] = os.environ["OPENALEX_API_KEY"]
-    while cursor and got < max_records:
+    while (cursor or page) and got < max_records:
         for attempt in range(6):
-            r = session.get(API, params={**params, "cursor": cursor, "per-page": str(min(200, max_records - got))}, timeout=60)
+            paging = {"page": str(page)} if page else {"cursor": cursor}
+            r = session.get(API, params={**params, **paging, "per-page": str(min(200, max_records - got))}, timeout=60)
             if r.status_code == 200:
                 break
             if r.status_code in (401, 403):
@@ -116,6 +125,12 @@ def fetch(since: str, filters: list[str], max_records: int, session=requests):
                 break
             got += 1
             yield normalize(w)
+        if page:
+            if got >= max_records or len(results) < 200:
+                break
+            page += 1
+            time.sleep(0.15)
+            continue
         next_cursor = (data.get("meta") or {}).get("next_cursor")
         if got >= max_records or not next_cursor or next_cursor == cursor:
             break
@@ -131,6 +146,7 @@ def main(argv=None):
     ap.add_argument("--first-lookback-days", type=int, default=365)
     ap.add_argument("--overlap-days", type=int, default=7, help="re-check recent days; duplicates are skipped")
     ap.add_argument("--max-records", type=int, default=50000)
+    ap.add_argument("--sample-seed", type=int, help="random sample of --max-records works (e.g. YYYYMM)")
     a = ap.parse_args(argv)
     a.filter = a.filter or ["primary_topic.field.id:fields/17"]
     out, state = Path(a.out), Path(a.state)
@@ -140,7 +156,7 @@ def main(argv=None):
         else date.today() - timedelta(days=a.first_lookback_days)
     added, batch, failed = 0, [], None
     try:
-        for r in fetch(since.isoformat(), a.filter, a.max_records):
+        for r in fetch(since.isoformat(), a.filter, a.max_records, seed=a.sample_seed):
             batch.append(r)
             if len(batch) >= 200:  # save each page as it arrives
                 added += merge(out, batch); batch = []

@@ -25,7 +25,7 @@ The free database tier (500 MB) is the reason for the cap.
 | Galaxy | 2D and 3D map of the papers, semantic search, highlighted research gaps |
 | Countries | Who publishes what: shared, split and full credit counting, a globe with collaboration arcs, per-country specialised topics |
 | Patterns | Frequent topic itemsets, association rules, pattern lifecycles, research gaps |
-| Progress | What each data load added |
+| Progress (`/timeline`) | What each data load added, and the sample next to OpenAlex totals |
 | Saved | Papers you keep |
 
 | | |

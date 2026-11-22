@@ -157,6 +157,10 @@ def refresh_discoveries(run_date: str | None = None, *,
                "n_emerging": len(emerging), "n_semantic_gaps": len(gaps),
                "emerging": emerging, "semantic_gaps": gaps,
                "emerging_scores": scores}
+    if not emerging and not gaps:
+        # No topic data reached this run (e.g. a missing table): keep the last snapshot
+        # instead of publishing an empty one over it.
+        return {"date": run_date, "topic_source": source, "skipped": "no emerging topics or gaps"}
     body = json.dumps(payload)
     out = ml_data_dir() / "snapshots" / f"discoveries-{run_date}.json"
     out.parent.mkdir(parents=True, exist_ok=True)

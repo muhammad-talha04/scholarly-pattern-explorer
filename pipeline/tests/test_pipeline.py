@@ -378,3 +378,24 @@ def test_raw_openalex_year_is_counted_in_the_aggregate():
     snap = snapshot(tally([undated]))
     assert snap["topic_country_year"] == []
     assert "None" not in snap["tally"]["by_year"].get("PK", {})
+
+
+def test_fetch_with_seed_requests_a_random_sample():
+    from pipeline import ingest as ing
+    calls = []
+
+    class R:
+        status_code = 200
+        def __init__(self, n): self.n = n
+        def json(self): return {"results": [{"id": f"https://openalex.org/W{len(calls)}{i}"} for i in range(self.n)], "meta": {}}
+
+    class S:
+        def get(self, url, params, timeout):
+            calls.append(params)
+            return R(200 if len(calls) == 1 else 50)
+
+    got = list(ing.fetch("2026-10-01", [], 600, session=S(), seed=202611))
+    assert len(got) == 250 and len(calls) == 2
+    assert calls[0]["sample"] == "600" and calls[0]["seed"] == "202611"
+    assert [c["page"] for c in calls] == ["1", "2"] and "cursor" not in calls[0]
+    assert "has_abstract:true" in calls[0]["filter"]

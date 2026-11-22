@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 import os
 import sqlite3
 import threading
@@ -140,6 +141,8 @@ class MLService:
         self.store = store if store is not None else get_store()
         data_dir = ml_data_dir()
         self.cache = cache or SummaryCache(data_dir / "summaries.sqlite")
+        self._search_cache: OrderedDict = OrderedDict()
+        self._search_lock = threading.Lock()
         self.galaxy_dir = Path(galaxy_dir) if galaxy_dir is not None else data_dir / "galaxy"
         self._doc_cache: dict[str, tuple[float, dict | None]] = {}
         self._sample_cache: dict[int, dict] = {}
@@ -153,6 +156,8 @@ class MLService:
             vecs = encode_docs([p.text for p in chunk])
             self.store.upsert([p.work_id for p in chunk], vecs, [p.to_dict() for p in chunk],
                               model=model_label(self.embedder))
+        with self._search_lock:
+            self._search_cache.clear()
         return len(papers)
 
     def _cached_doc(self, kind: str):
@@ -230,6 +235,8 @@ class MLService:
         self.store.put_document("galaxy_sample", sample_graph(graph, HERO_SAMPLE_SIZE))
         self._doc_cache.clear()
         self._sample_cache.clear()
+        with self._search_lock:
+            self._search_cache.clear()
         return graph
 
     @staticmethod
@@ -242,15 +249,32 @@ class MLService:
     # ---- 2. semantic search ----
     def search(self, query: str, k: int = 10, country: str | None = None,
                year_from: int | None = None) -> list[dict]:
+        """Cached: the index changes once a month, and paging re-asks the same query.
+        ponytail: per-process LRU, never invalidated until restart (deploys restart it)."""
+        key = (query.strip().lower(), k, (country or "").upper() or None, year_from)
+        with self._search_lock:
+            hit = self._search_cache.get(key)
+            if hit is not None:
+                self._search_cache.move_to_end(key)
+                return [dict(h) for h in hit]
+        res = self._search(query, k, country, year_from)
+        if res:
+            with self._search_lock:
+                self._search_cache[key] = res
+                if len(self._search_cache) > 512:
+                    self._search_cache.popitem(last=False)
+        return [dict(h) for h in res]
+
+    def _search(self, query, k, country, year_from) -> list[dict]:
         if len(self.store) == 0:          # nothing indexed: don't load the model
             return []
         encode_q = getattr(self.embedder, "encode_queries", None) or self.embedder.encode
         with stage("embed"):
             q = encode_q([query])[0]
-        filtered = bool(country or year_from)
+        filters = {k_: v for k_, v in (("country", country), ("year_from", year_from)) if v}
         # meta comes back with the vector query, so "vector" covers the meta fetch too
         with stage("vector"):
-            hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
+            hits = self.store.search(q, k, **filters)   # the store applies the filters
         floor = min_search_score(self.embedder)
         return [_hit(w, s, m) for w, s, m in hits
                 if s >= floor and _keep(m, country, year_from)][:k]

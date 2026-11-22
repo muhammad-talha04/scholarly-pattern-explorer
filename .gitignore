@@ -60,3 +60,4 @@ eval/report.json
 
 # fastembed ONNX model cache (filled by `python -m ml.prefetch_model`)
 .cache/
+deploy/data/ml/summaries.sqlite
