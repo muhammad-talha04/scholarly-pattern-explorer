@@ -36,16 +36,25 @@ if [ -z "$ID" ]; then
   IMG=$(oci compute image list -c "$C" --operating-system "Canonical Ubuntu" --operating-system-version "24.04" \
         --shape VM.Standard.A1.Flex --sort-by TIMECREATED --query 'data[0].id' --raw-output)
   curl -fsSL "https://raw.githubusercontent.com/muhammad-talha04/scholarly-pattern-explorer/$BRANCH/deploy/oracle/cloud-init.sh" > /tmp/spe-init.sh
-  for AD in $(oci iam availability-domain list -c "$C" --query 'data[].name' --raw-output | tr -d '[]",'); do
-    for try in 1 2 3; do
-      echo "launching in $AD (try $try)"
-      ID=$(oci compute instance launch -c "$C" --availability-domain "$AD" --shape VM.Standard.A1.Flex \
-           --shape-config '{"ocpus":4,"memoryInGBs":24}' --image-id "$IMG" --subnet-id "$SUB" \
-           --assign-public-ip true --display-name spe-server --boot-volume-size-in-gbs 150 \
-           --ssh-authorized-keys-file ~/.ssh/id_rsa.pub --user-data-file /tmp/spe-init.sh \
-           --wait-for-state RUNNING --query data.id --raw-output 2>/tmp/spe-err.txt) && break 2
-      grep -o '"message": "[^"]*"' /tmp/spe-err.txt | head -1; ID=""; sleep 30
+  ADS=$(oci iam availability-domain list -c "$C" --query 'data[].name' --raw-output | tr -d '[]",')
+  # Free A1 capacity comes and goes. Keep asking for MINUTES (default 40), largest size first;
+  # a smaller VM can be resized to 4 OCPU / 24 GB later from the console.
+  end=$(( $(date +%s) + ${MINUTES:-40} * 60 )); try=0
+  while [ -z "$ID" ] && [ "$(date +%s)" -lt "$end" ]; do
+    try=$((try + 1))
+    for AD in $ADS; do
+      for size in "4 24" "2 12" "1 6"; do
+        set -- $size
+        ID=$(oci compute instance launch -c "$C" --availability-domain "$AD" --shape VM.Standard.A1.Flex \
+             --shape-config "{\"ocpus\":$1,\"memoryInGBs\":$2}" --image-id "$IMG" --subnet-id "$SUB" \
+             --assign-public-ip true --display-name spe-server --boot-volume-size-in-gbs 150 \
+             --ssh-authorized-keys-file ~/.ssh/id_rsa.pub --user-data-file /tmp/spe-init.sh \
+             --wait-for-state RUNNING --query data.id --raw-output 2>/tmp/spe-err.txt) && { echo "got $1 OCPU / $2 GB"; break 3; }
+        ID=""
+      done
     done
+    echo "$(date +%H:%M) try $try: $(grep -o '"message": "[^"]*"' /tmp/spe-err.txt | head -1)  - retrying in 60s"
+    sleep 60
   done
 fi
 [ -n "$ID" ] || { echo "RESULT: FAILED (see /tmp/spe-err.txt)"; exit 1; }
