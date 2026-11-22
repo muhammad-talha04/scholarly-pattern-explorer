@@ -29,9 +29,9 @@ services:
       #   (optional) ML_MIN_SCORE=0.65   # bge default already (pending chris's benchmark); 0 = off;
       #     beats SEARCH_MIN_SCORE; must be in [0,1], invalid values warn and use the default
       - key: ML_EMBEDDER
-        value: hash
+        value: fastembed          # matches paper_embeddings.model (bge-small, fastembed 0.9.0)
       - key: ML_EMBED_MODEL
-        sync: false
+        value: BAAI/bge-small-en-v1.5
       - key: ML_EMBED_MODEL_REVISION
         sync: false
       - key: SEARCH_MIN_SCORE

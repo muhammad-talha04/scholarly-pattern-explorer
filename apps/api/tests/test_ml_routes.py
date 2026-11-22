@@ -300,7 +300,7 @@ def test_patterns_emerging_country_filter(client, tmp_path, monkeypatch):
                 "year, paper_count, fractional_count FROM topic_country_year")
     rows = []
     for year, n in ((2022, 10), (2023, 20), (2024, 40), (2025, 80)):
-        rows.append(("grow", "Growing Lasers", "PK", year, n, float(n)))
+        rows.append(("grow", "Topic Modeling", "PK", year, n, float(n)))
     for year in (2022, 2023, 2024, 2025):
         rows.append(("flat", "Flat Graphs", "US", year, 40, 40.0))
     con.executemany("INSERT INTO topic_country_year VALUES (?, ?, ?, ?, ?, ?)", rows)
@@ -311,7 +311,7 @@ def test_patterns_emerging_country_filter(client, tmp_path, monkeypatch):
     pk = client.get("/api/v1/patterns", params={"trend": "emerging", "country": "pk"})
     assert pk.status_code == 200
     body = pk.json()
-    assert [p["items"] for p in body] == [["Growing Lasers"]]
+    assert [p["items"] for p in body] == [["Topic Modeling"]]
     assert body[0]["growth_rate"] > 0.5 and body[0]["support"] == body[0]["growth_rate"]
     assert body[0]["paper_count"] == 150
     assert "in PK" in body[0]["explanation"]

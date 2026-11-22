@@ -1,9 +1,15 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import core
 
 app = FastAPI(title="Scholarly Pattern Explorer API", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# ALLOWED_ORIGINS: comma-separated list of site origins; unset or "*" allows any origin.
+_origins = [o.strip() for o in (os.getenv("ALLOWED_ORIGINS") or "*").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_methods=["GET", "POST", "OPTIONS"],
+                   allow_headers=["*"], allow_origin_regex=r"https://scholarly-pattern-explorer-[a-z0-9-]+\.vercel\.app"
+                   if _origins != ["*"] else None)
 app.include_router(core.router, prefix="/api/v1")
 
 

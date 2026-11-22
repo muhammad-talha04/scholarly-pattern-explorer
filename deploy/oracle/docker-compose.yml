@@ -1,0 +1,54 @@
+# Oracle Always Free Ampere A1 (arm64): Postgres + pgvector, the API, and Caddy for HTTPS.
+# Everything persistent lives under /data on the VM. Secrets come from deploy/oracle/.env
+# (written by setup.sh, never committed).
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: spe_api          # same role name the migrations expect (007)
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: spe
+    command: >
+      postgres -c shared_buffers=2GB -c effective_cache_size=8GB
+               -c maintenance_work_mem=1GB -c work_mem=32MB -c max_connections=50
+    volumes:
+      - /data/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spe_api -d spe"]
+      interval: 5s
+      retries: 20
+    # no ports: only the api container can reach it
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/oracle/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://spe_api:${PG_PASSWORD}@db:5432/spe
+      ML_EMBEDDER: fastembed
+      ML_EMBED_MODEL: BAAI/bge-small-en-v1.5
+      ML_DATA_DIR: /data/ml
+      COUNTRY_SNAPSHOT: /data/country_snapshot.json
+      ML_WORKS_PATH: /data/works_live.jsonl
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      OPENALEX_MAILTO: ${OPENALEX_MAILTO:-}
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
+      API_WORKERS: ${API_WORKERS:-3}
+    volumes:
+      - /data/app:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ["80:80", "443:443"]
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /data/caddy:/data

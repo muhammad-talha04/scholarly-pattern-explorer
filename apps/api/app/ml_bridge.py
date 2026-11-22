@@ -86,7 +86,7 @@ def get_semantic_gaps(limit: int = 10) -> list[dict]:
 def get_emerging(country: str | None = None, limit: int = 20) -> list[dict]:
     """Topics ranked by smoothed year-over-year growth. Optional ISO country code."""
     rows, _src = load_topic_rows()
-    return rank_emerging(rows, country=country, limit=limit)
+    return rank_emerging(rows, country=country, limit=limit, cs_only=True)
 
 
 def gap_examples(topics: list[str], n: int = 3) -> list[dict]:

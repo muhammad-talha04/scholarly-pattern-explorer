@@ -1,0 +1,10 @@
+.git
+data/
+**/node_modules
+apps/web/.next
+docs/
+screenshots/
+eval/embedder-*
+.cache/
+**/__pycache__
+.env

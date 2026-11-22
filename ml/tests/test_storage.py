@@ -162,3 +162,20 @@ def test_pg_rows_still_parse_meta():
     assert "ORDER BY work_id" in cur.sql
     assert ids == ["W1"] and vecs.shape == (1, 2) and metas[0]["title"] == "t"
     assert not np.isnan(vecs).any()
+
+
+def test_filtered_search_returns_k_matches(tmp_path):
+    """A filter must not shrink results to the few matches among the top-k unfiltered hits."""
+    import numpy as np
+    from ml.store import LocalStore
+    st = LocalStore(tmp_path)
+    rng = np.random.default_rng(0)
+    v = rng.normal(size=(60, 384)).astype("float32")
+    v /= np.linalg.norm(v, axis=1, keepdims=True)
+    meta = [{"title": f"p{i}", "pub_year": 2025 if i >= 50 else 2018,
+             "countries": ["PK"] if i % 20 == 0 else ["US"]} for i in range(60)]
+    st.upsert([f"W{i}" for i in range(60)], v, meta)
+    q = v[1]
+    assert len(st.search(q, 5, year_from=2025)) == 5
+    assert all(m["pub_year"] >= 2025 for _, _, m in st.search(q, 5, year_from=2025))
+    assert {w for w, _, _ in st.search(q, 10, country="pk")} == {"W0", "W20", "W40"}

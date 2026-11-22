@@ -247,10 +247,10 @@ class MLService:
         encode_q = getattr(self.embedder, "encode_queries", None) or self.embedder.encode
         with stage("embed"):
             q = encode_q([query])[0]
-        filtered = bool(country or year_from)
+        filters = {k_: v for k_, v in (("country", country), ("year_from", year_from)) if v}
         # meta comes back with the vector query, so "vector" covers the meta fetch too
         with stage("vector"):
-            hits = self.store.search(q, k * 5 if filtered else k)   # over-fetch, then filter
+            hits = self.store.search(q, k, **filters)   # the store applies the filters
         floor = min_search_score(self.embedder)
         return [_hit(w, s, m) for w, s, m in hits
                 if s >= floor and _keep(m, country, year_from)][:k]

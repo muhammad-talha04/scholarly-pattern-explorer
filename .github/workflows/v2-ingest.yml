@@ -35,7 +35,7 @@ jobs:
           OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
         run: |
           wc -l < data/works_v2.jsonl > before.txt 2>/dev/null || echo 0 > before.txt
-          set +e; python -m pipeline.ingest --max-records 600; code=$?; set -e
+          set +e; python -m pipeline.ingest --max-records 600 --sample-seed "$(date -u +%Y%m)"; code=$?; set -e
           [ "$code" -eq 1 ] && exit 1
           tail -n +$(( $(cat before.txt) + 1 )) data/works_v2.jsonl > data/new.jsonl
       - name: Update country analytics with the new works only
