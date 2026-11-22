@@ -19,7 +19,7 @@ systemctl enable --now docker cron fail2ban
 
 echo "== firewall: Oracle's Ubuntu image rejects everything but SSH in iptables"
 for p in 80 443; do
-  iptables -C INPUT -p tcp --dport $p -j ACCEPT 2>/dev/null || iptables -I INPUT 5 -p tcp --dport $p -j ACCEPT
+  iptables -C INPUT -p tcp --dport $p -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport $p -j ACCEPT
 done
 netfilter-persistent save
 
